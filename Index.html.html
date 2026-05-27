@@ -1,0 +1,3141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>NW MCA · Demand Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f0efe9;--surface:#fff;--s2:#f5f4ef;--s3:#eceae2;
+  --border:#e2dfd6;--border2:#ccc9be;
+  --text:#17160f;--t1:#17160f;--t2:#5c5a52;--t3:#9c9a90;
+  --blue:#1a4b8c;--blue-bg:#e8eef8;--blue-lt:#f0f4fc;
+  --green:#1a6640;--green-bg:#e6f4ec;
+  --red:#8c1f1f;--red-bg:#faeaea;
+  --amber:#7a4a00;--amber-bg:#fef3e2;
+  --purple:#4a2d8c;--purple-bg:#eeebf8;
+  --teal:#0d5c52;--teal-bg:#e6f4f2;
+  --orange:#8c3a00;--orange-bg:#fdeede;
+  --r:7px;--rl:12px;--rxl:16px;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 4px 16px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04);
+  --sb-w:230px;
+  --topbar-h:56px;
+  --mobile-nav-h:60px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* ══════════════════════════════════════
+   LOADER
+══════════════════════════════════════ */
+.loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.loader.hidden{display:none}
+.loader-logo{font-size:13px;font-weight:700;letter-spacing:.14em;color:var(--blue);text-transform:uppercase;margin-bottom:4px}
+.loader-name{font-size:22px;font-weight:600;color:var(--text)}
+.spin{width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin-top:8px}
+.loader-msg{font-size:13px;color:var(--t3)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══════════════════════════════════════
+   APP SHELL
+══════════════════════════════════════ */
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ══════════════════════════════════════
+   SIDEBAR — Desktop
+══════════════════════════════════════ */
+.sb{width:var(--sb-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:transform .25s ease,width .25s ease}
+.sb-top{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
+.sb-brand .tag{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--t3);text-transform:uppercase;margin-bottom:3px}
+.sb-brand .name{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
+.sb-live{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10px;color:var(--green);font-weight:600}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.sb-nav{flex:1;padding:8px;overflow-y:auto;overflow-x:hidden}
+.sb-nav::-webkit-scrollbar{width:3px}
+.sb-nav::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.nsect{font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--t3);text-transform:uppercase;padding:12px 8px 4px}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--t2);margin-bottom:1px;user-select:none;transition:all .12s;white-space:nowrap;overflow:hidden}
+.ni:hover{background:var(--s2);color:var(--text)}
+.ni.on{background:var(--blue-bg);color:var(--blue);font-weight:600}
+.ni-ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.ni-lbl{flex:1;overflow:hidden;text-overflow:ellipsis}
+.ni-badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;flex-shrink:0}
+.ni-badge.blue{background:var(--blue-bg);color:var(--blue)}
+.ni-badge.red{background:var(--red-bg);color:var(--red)}
+.ni-badge.green{background:var(--green-bg);color:var(--green)}
+.sb-foot{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--t3);flex-shrink:0}
+.sb-user{font-size:12px;font-weight:600;color:var(--t2);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-date{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3)}
+.sb-version{font-size:10px;color:var(--t3);margin-top:2px}
+
+/* ══════════════════════════════════════
+   MOBILE TOP NAV BAR
+══════════════════════════════════════ */
+.mob-topbar{display:none;position:fixed;top:0;left:0;right:0;height:var(--topbar-h);background:var(--surface);border-bottom:1px solid var(--border);z-index:300;align-items:center;padding:0 16px;gap:10px}
+.mob-menu-btn{width:36px;height:36px;border-radius:var(--r);border:1px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.mob-brand{flex:1}
+.mob-brand .name{font-size:14px;font-weight:700;color:var(--text)}
+.mob-brand .sub{font-size:10px;color:var(--t3)}
+.mob-actions{display:flex;gap:6px}
+.mob-action-btn{width:32px;height:32px;border-radius:var(--r);border:1px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
+
+/* Mobile drawer overlay */
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:399}
+.mob-overlay.on{display:block}
+
+/* Mobile sidebar drawer */
+.sb.mob-open{transform:translateX(0)!important}
+
+/* ══════════════════════════════════════
+   MOBILE BOTTOM NAV
+══════════════════════════════════════ */
+.mob-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--mobile-nav-h);background:var(--surface);border-top:1px solid var(--border);z-index:300;flex-direction:row;align-items:stretch}
+.mob-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;font-size:10px;font-weight:500;color:var(--t3);transition:color .12s;border:none;background:transparent;padding:6px 4px}
+.mob-nav-item.on{color:var(--blue)}
+.mob-nav-item .mn-ic{font-size:18px;line-height:1}
+.mob-nav-item .mn-badge{position:absolute;top:6px;right:calc(50% - 16px);font-size:9px;font-weight:700;background:var(--red);color:#fff;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.mob-nav-item-wrap{position:relative;flex:1;display:flex}
+
+/* ══════════════════════════════════════
+   MAIN CONTENT AREA
+══════════════════════════════════════ */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;min-width:0;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
+.topbar-left h1{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.topbar-left p{font-size:11px;color:var(--t3);margin-top:1px}
+.topbar-right{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.legend{display:flex;gap:10px;align-items:center}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t3)}
+.leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sync-pill{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;display:flex;align-items:center;gap:4px}
+.sync-pill.ok{background:var(--green-bg);color:var(--green)}
+.sync-pill.saving{background:var(--amber-bg);color:var(--amber)}
+.sync-pill.err{background:var(--red-bg);color:var(--red)}
+
+/* ══════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════ */
+.btn{padding:7px 14px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface);font-size:12px;font-family:inherit;cursor:pointer;color:var(--text);font-weight:500;transition:all .12s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;line-height:1}
+.btn:hover{background:var(--s2)}.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.primary:hover{background:#153d74}
+.btn.danger{background:var(--red);border-color:var(--red);color:#fff}.btn.danger:hover{background:#6e1818}
+.btn.success{background:var(--green);border-color:var(--green);color:#fff}.btn.success:hover{background:#124d30}
+.btn.ghost{border-color:transparent;background:transparent}.btn.ghost:hover{background:var(--s2);border-color:var(--border)}
+.btn.sm{padding:4px 9px;font-size:11px}
+.btn.icon-btn{width:32px;height:32px;padding:0;justify-content:center;font-size:15px}
+
+/* ══════════════════════════════════════
+   PAGES
+══════════════════════════════════════ */
+.page{display:none;flex:1;flex-direction:column;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.page.on{display:flex;flex:1;flex-direction:column;overflow-y:auto;min-height:0}
+
+/* ══════════════════════════════════════
+   TRACKER PAGE
+══════════════════════════════════════ */
+
+/* Summary strip */
+.summary-strip{padding:14px 24px 0;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;flex-shrink:0}
+.mc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:13px 15px;box-shadow:var(--sh);transition:box-shadow .15s;cursor:default;position:relative;overflow:hidden}
+.mc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--rl) var(--rl) 0 0}
+.mc.blue::before{background:var(--blue)}.mc.red::before{background:var(--red)}.mc.amber::before{background:var(--amber)}.mc.green::before{background:var(--green)}.mc.teal::before{background:var(--teal)}
+.mc:hover{box-shadow:var(--sh-md)}
+.mc .ml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px}
+.mc .mv{font-size:26px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1;letter-spacing:-.02em}
+.mc.blue .mv{color:var(--blue)}.mc.red .mv{color:var(--red)}.mc.amber .mv{color:var(--amber)}.mc.green .mv{color:var(--green)}.mc.teal .mv{color:var(--teal)}
+.mc .ms{font-size:11px;color:var(--t3);margin-top:5px}
+.mc .mc-trend{position:absolute;bottom:10px;right:12px;font-size:18px;opacity:.15}
+
+/* Quick filter bar */
+.qf-bar{padding:10px 24px 0;display:flex;gap:7px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.srch{position:relative;flex:1;min-width:160px;max-width:260px}
+.srch input{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);transition:all .15s}
+.srch input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,75,140,.1)}
+.srch-ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px;pointer-events:none}
+.sel-wrap{position:relative}
+select{padding:7px 26px 7px 9px;border:1px solid var(--border2);border-radius:var(--r);font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%239c9a90' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;transition:border-color .15s}
+select:focus{outline:none;border-color:var(--blue)}
+.qf-divider{width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 2px}
+.rcount-pill{font-size:11px;color:var(--t3);background:var(--s2);padding:4px 10px;border-radius:20px;white-space:nowrap;font-weight:500}
+
+/* Ageing tabs */
+.age-tabs{padding:8px 24px 0;display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.atab{padding:4px 12px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--t2);font-weight:500;transition:all .12s;white-space:nowrap}
+.atab:hover{border-color:var(--border2);background:var(--s2)}
+.atab.on{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 2px 6px rgba(26,75,140,.25)}
+.atab.red.on{background:var(--red);border-color:var(--red);box-shadow:0 2px 6px rgba(140,31,31,.25)}
+.atab.amb.on{background:#b86e00;border-color:#b86e00}
+.atab.grn.on{background:var(--green);border-color:var(--green)}
+
+/* Table */
+.tbl-outer{margin:10px 24px 24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:auto;flex:1;min-height:0;box-shadow:var(--sh)}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead{background:var(--s2);position:sticky;top:0;z-index:2}
+th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .12s}
+th:hover{color:var(--t2);background:var(--s3)}
+th .si{margin-left:3px;opacity:.25;font-style:normal;transition:opacity .12s}
+th.srt .si{opacity:1;color:var(--blue)}
+td{padding:9px 10px;font-size:12px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover{background:var(--blue-lt)}
+tbody tr.ov td:first-child{border-left:3px solid var(--red)}
+tbody tr.wa td:first-child{border-left:3px solid #d4860a}
+tbody tr.so td:first-child{border-left:3px solid #c9a800}
+tbody tr.ok td:first-child{border-left:3px solid var(--green)}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;letter-spacing:.02em}
+.b-open{background:var(--blue-bg);color:var(--blue)}.b-closed{background:var(--green-bg);color:var(--green)}.b-cancel{background:var(--red-bg);color:var(--red)}.b-hold{background:var(--s3);color:var(--t2)}.b-new{background:var(--purple-bg);color:var(--purple)}.b-backfill{background:var(--amber-bg);color:var(--amber)}.b-sellbill{background:var(--teal-bg);color:var(--teal)}.b-offshore{background:#e8f4f8;color:#1a5c7a}.b-onsite{background:#f4e8f8;color:#5c1a7a}.b-canada{background:#f8ece8;color:#7a2e1a}.b-mexico{background:#f8f4e8;color:#6b5a1a}.b-na{background:var(--s3);color:var(--t2)}
+.age-badge{display:inline-flex;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;letter-spacing:.02em}
+.ac{background:var(--red-bg);color:var(--red)}.ah{background:#fdf0e0;color:#8c4a00}.am{background:var(--amber-bg);color:var(--amber)}.al{background:#f8f9e8;color:#5a6600}.ao{background:var(--green-bg);color:var(--green)}
+
+.row-acts{display:flex;gap:3px;justify-content:flex-end;align-items:center}
+.empty-state{text-align:center;padding:48px 20px;color:var(--t3)}
+.empty-state .ei{font-size:32px;margin-bottom:10px;opacity:.5}
+.empty-state p{font-size:14px}
+
+/* ══════════════════════════════════════
+   MOBILE CARD VIEW (replaces table on mobile)
+══════════════════════════════════════ */
+.card-list{display:none;flex-direction:column;gap:10px;padding:10px 16px 24px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.demand-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:14px;box-shadow:var(--sh);cursor:pointer;transition:box-shadow .15s,transform .12s;position:relative;overflow:hidden}
+.demand-card:hover{box-shadow:var(--sh-md);transform:translateY(-1px)}
+.demand-card:active{transform:scale(.98)}
+.demand-card .dc-stripe{position:absolute;top:0;left:0;bottom:0;width:4px}
+.dc-stripe.ov{background:var(--red)}.dc-stripe.wa{background:#d4860a}.dc-stripe.so{background:#c9a800}.dc-stripe.ok{background:var(--green)}
+.demand-card .dc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;padding-left:10px}
+.dc-id{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:500}
+.dc-badges{display:flex;gap:4px;flex-wrap:wrap}
+.dc-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;padding-left:10px;line-height:1.4}
+.dc-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding-left:10px;margin-bottom:8px}
+.dc-meta-item{font-size:11px;color:var(--t2)}
+.dc-meta-label{color:var(--t3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.dc-footer{display:flex;align-items:center;justify-content:space-between;padding-left:10px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px}
+.dc-profile{font-size:11px;color:var(--t2)}
+.dc-actions{display:flex;gap:5px}
+
+/* ══════════════════════════════════════
+   DASHBOARD PAGE
+══════════════════════════════════════ */
+.dash-inner{padding:16px 24px 80px}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--sh);transition:box-shadow .15s}
+.kpi-card:hover{box-shadow:var(--sh-md)}
+.kpi-ic{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.kpi-ic.blue{background:var(--blue-bg)}.kpi-ic.red{background:var(--red-bg)}.kpi-ic.green{background:var(--green-bg)}.kpi-ic.amber{background:var(--amber-bg)}.kpi-ic.purple{background:var(--purple-bg)}.kpi-ic.teal{background:var(--teal-bg)}
+.kpi-v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1;letter-spacing:-.02em}
+.kpi-l{font-size:10px;color:var(--t3);margin-top:3px;font-weight:500}
+
+/* Chart grid */
+.cg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px;box-shadow:var(--sh)}
+.cc.w2{grid-column:span 2}.cc.w3{grid-column:span 3}
+.cc-hd{margin-bottom:12px}
+.cc-title{font-size:13px;font-weight:600;color:var(--text)}
+.cc-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.ch-wrap{position:relative}
+.ch-wrap.h180{height:180px}.ch-wrap.h200{height:200px}.ch-wrap.h220{height:220px}.ch-wrap.h160{height:160px}
+.leg{display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:10px}
+.leg-i{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.ovd-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.ovd-tbl th{text-align:left;padding:5px 8px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);border-bottom:1px solid var(--border)}
+.ovd-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ovd-tbl tr:last-child td{border-bottom:none}
+.t1-list{display:flex;flex-direction:column;gap:6px}
+.t1-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--s2);border-radius:var(--r);border:1px solid var(--border)}
+.t1-name{font-size:12px;font-weight:500}.t1-cnt{font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--blue)}
+.summ-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.summ-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.summ-tbl tr:last-child td{border-bottom:none}
+.summ-tbl td:first-child{color:var(--t2)}.summ-tbl td:nth-child(2){font-family:'IBM Plex Mono',monospace;font-weight:700;width:70px}.summ-tbl td:nth-child(3){font-size:11px;color:var(--t3)}
+
+/* BSA bar */
+.bsa-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+.bsa-name{width:110px;flex-shrink:0;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bsa-bar-bg{flex:1;height:6px;border-radius:3px;background:var(--s3)}
+.bsa-bar-fill{height:6px;border-radius:3px;background:var(--blue);transition:width .5s}
+.bsa-num{width:24px;text-align:right;color:var(--blue);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:11px}
+
+/* ══════════════════════════════════════
+   NOTIFICATIONS PAGE
+══════════════════════════════════════ */
+.notif-layout{padding:16px 24px 80px;display:grid;grid-template-columns:300px 1fr;gap:16px}
+.np{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px;box-shadow:var(--sh)}
+.np h3{font-size:13px;font-weight:600;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.ff{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.ff label{font-size:11px;font-weight:600;color:var(--t2)}
+.ff input,.ff select,.ff textarea{padding:7px 10px;font-size:12px;border:1px solid var(--border2);border-radius:var(--r);font-family:inherit;color:var(--text);background:var(--surface);transition:border-color .15s}
+.ff input:focus,.ff select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,75,140,.1)}
+.tag-box{display:flex;flex-wrap:wrap;gap:4px;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--r);min-height:36px;cursor:text;background:var(--surface);align-items:center;transition:border-color .15s}
+.tag-box:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,75,140,.1)}
+.rtag{background:var(--blue-bg);color:var(--blue);font-size:11px;padding:2px 7px;border-radius:20px;display:flex;align-items:center;gap:4px;font-weight:500}
+.rtag .rx{cursor:pointer;opacity:.5;line-height:1;font-size:13px}.rtag .rx:hover{opacity:1}
+.rtag-inp{border:none;outline:none;font-size:12px;font-family:inherit;background:transparent;color:var(--text);min-width:100px;flex:1}
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.tog-row:last-child{border-bottom:none}
+.tog-info .tt{font-size:12px;font-weight:500}.tog-info .ts{font-size:11px;color:var(--t3);margin-top:1px}
+.tog{position:relative;width:38px;height:22px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0;position:absolute}
+.tog-sl{position:absolute;inset:0;background:var(--border2);border-radius:11px;cursor:pointer;transition:.2s}
+.tog-sl:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tog input:checked+.tog-sl{background:var(--blue)}
+.tog input:checked+.tog-sl:before{transform:translateX(16px)}
+.notif-log{display:flex;flex-direction:column;max-height:300px;overflow-y:auto}
+.nl-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.nl-item:last-child{border-bottom:none}
+.nl-ic{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:1px}
+.nl-ic.add{background:var(--green-bg);color:var(--green)}.nl-ic.cancel{background:var(--red-bg);color:var(--red)}.nl-ic.close{background:var(--teal-bg);color:var(--teal)}.nl-ic.update{background:var(--amber-bg);color:var(--amber)}
+.nl-text{flex:1;font-size:12px}.nl-text .nm{font-weight:500;color:var(--text)}.nl-text .ns{color:var(--t3);font-size:11px;margin-top:1px}
+.nl-meta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.nl-sent{font-size:10px;font-weight:600;color:var(--green)}.nl-time{font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace}
+
+/* Email preview */
+.ep-wrap{background:#f0f0f0;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);box-shadow:var(--sh)}
+.ep-bar{background:var(--s2);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px}
+.ep-dots{display:flex;gap:4px}
+.ep-dot{width:10px;height:10px;border-radius:50%}
+.ep-bar select{font-size:11px;padding:3px 20px 3px 7px;margin-left:auto;border-radius:var(--r)}
+.ep-body{padding:14px;overflow-y:auto;max-height:400px}
+.em{background:#fff;border-radius:8px;overflow:hidden;max-width:560px;margin:0 auto;border:1px solid #e0e0e0;font-size:13px}
+.em-hd{padding:18px 22px;color:#fff}
+.em-hd .eh-tag{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:3px}
+.em-hd h2{font-size:18px;font-weight:700}.em-hd .eh-sub{font-size:11px;opacity:.75;margin-top:2px}
+.em-bd{padding:18px 22px}
+.em-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.em-kpi{background:#f8f9fc;border-radius:6px;padding:10px;text-align:center}
+.em-kpi .ev{font-size:20px;font-weight:700;color:var(--blue);font-family:'IBM Plex Mono',monospace}.em-kpi .el{font-size:11px;color:#666;margin-top:2px}
+.em-st{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#888;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #f0f0f0}
+.em-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f5f5;font-size:12px}.em-row:last-child{border-bottom:none}
+.em-ev{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f5f5f5;font-size:12px}.em-ev:last-child{border-bottom:none}
+.em-ev-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.em-ft{background:#f8f8f8;padding:12px 22px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee}
+
+/* ══════════════════════════════════════
+   DETAIL PANEL
+══════════════════════════════════════ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:400;backdrop-filter:blur(2px)}
+.overlay.on{display:block}
+.panel{position:fixed;right:0;top:0;bottom:0;width:480px;max-width:100vw;background:var(--surface);border-left:1px solid var(--border);z-index:410;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);box-shadow:var(--sh-md)}
+.panel.on{transform:translateX(0)}
+.ph{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;flex-shrink:0}
+.ph-info{flex:1}.ph-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:2px}
+.ph-title{font-size:15px;font-weight:700;color:var(--text)}
+.pb{flex:1;overflow-y:auto;padding:16px 18px;-webkit-overflow-scrolling:touch}
+.ps{margin-bottom:20px}
+.ps-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+.di .dl{font-size:10px;color:var(--t3);margin-bottom:2px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.di .dv{font-size:12px;font-weight:500;color:var(--text)}.di.full{grid-column:1/-1}
+.upd-box{background:var(--s2);border-radius:var(--r);padding:12px;font-size:11px;color:var(--t2);line-height:1.7;white-space:pre-wrap;max-height:180px;overflow-y:auto;font-family:'IBM Plex Mono',monospace;border:1px solid var(--border)}
+.pf{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:7px;flex-shrink:0;flex-wrap:wrap}
+
+/* ══════════════════════════════════════
+   MODALS
+══════════════════════════════════════ */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999999;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
+.modal-bg.on{display:flex}
+.modal{background:var(--surface);border-radius:var(--rxl);border:1px solid var(--border);width:580px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15);animation:modal-in .2s ease}
+@keyframes modal-in{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
+.mh{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
+.mh h3{font-size:16px;font-weight:700}
+.mb{padding:20px 22px}
+.mf{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:var(--surface)}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:13px 18px}
+.fg-full{grid-column:1/-1}
+.fg-sect{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);grid-column:1/-1;padding-top:6px;display:flex;align-items:center;gap:8px}
+.fg-sect::after{content:'';flex:1;height:1px;background:var(--border)}
+.ff2{display:flex;flex-direction:column;gap:4px}
+.ff2 label{font-size:11px;font-weight:600;color:var(--t2)}
+.ff2 input,.ff2 select,.ff2 textarea{padding:8px 10px;font-size:12px;border:1px solid var(--border2);border-radius:var(--r);font-family:inherit;color:var(--text);background:var(--surface);transition:all .15s}
+.ff2 input:focus,.ff2 select:focus,.ff2 textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,75,140,.1)}
+.ff2 textarea{resize:vertical;min-height:70px}
+.req-star{color:var(--red);font-size:11px}
+.conf-bd{padding:18px 22px}.conf-bd p{font-size:13px;color:var(--t2);margin-top:6px;line-height:1.6}
+
+/* Import modal */
+.import-drop{border:2px dashed var(--border2);border-radius:var(--rl);padding:36px 20px;text-align:center;cursor:pointer;transition:all .15s;background:var(--s2)}
+.import-drop:hover,.import-drop.drag-over{border-color:var(--blue);background:var(--blue-lt)}
+.import-drop-ic{font-size:32px;margin-bottom:8px}
+.import-drop h4{font-size:14px;font-weight:600;margin-bottom:4px}
+.import-drop p{font-size:12px;color:var(--t3)}
+.import-preview-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.import-preview-tbl th{padding:5px 8px;background:var(--s2);font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap}
+.import-preview-tbl td{padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;max-width:120px;text-overflow:ellipsis}
+.import-alert{padding:8px 12px;border-radius:var(--r);font-size:12px;margin-top:8px}
+.import-alert.err{background:var(--red-bg);color:var(--red)}
+.import-alert.warn{background:var(--amber-bg);color:var(--amber)}
+.import-alert.ok{background:var(--green-bg);color:var(--green)}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:9000;transition:transform .25s cubic-bezier(.4,0,.2,1);pointer-events:none;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:90vw;text-align:center}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.toast.green{background:var(--green)}.toast.red{background:var(--red)}.toast.amber{background:var(--amber)}
+/* Bulk select */
+.cb-cell{width:36px;padding:6px 0 6px 12px!important;vertical-align:middle}
+.cb-wrap{display:flex;align-items:center;justify-content:center}
+input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:var(--blue)}
+.bulk-bar{display:none;align-items:center;gap:10px;padding:8px 24px;background:var(--blue-bg);border-bottom:1px solid var(--border);flex-shrink:0;animation:slideDown .15s ease}
+.bulk-bar.on{display:flex}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.bulk-count{font-size:13px;font-weight:600;color:var(--blue)}
+.bulk-hint{font-size:12px;color:var(--t2)}
+/* Card checkbox */
+.card-cb-wrap{position:absolute;top:12px;right:14px;z-index:5}
+.card-cb{width:16px;height:16px;cursor:pointer;accent-color:var(--blue)}
+.demand-card.selected{outline:2px solid var(--blue);background:var(--blue-lt)}
+
+/* ══════════════════════════════════════
+   RESPONSIVE — Tablet (≤1024px)
+══════════════════════════════════════ */
+@media(max-width:1024px){
+  :root{--sb-w:200px}
+  .kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .cg{grid-template-columns:1fr 1fr}
+  .cc.w2{grid-column:span 2}.cc.w3{grid-column:span 2}
+  .summary-strip{grid-template-columns:repeat(3,1fr)}
+  .notif-layout{grid-template-columns:260px 1fr}
+  .legend{display:none}
+  th{font-size:9px}.td{font-size:11px}
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE — Mobile (≤768px)
+══════════════════════════════════════ */
+@media(max-width:768px){
+  html,body{overflow:hidden}
+  .app{flex-direction:column}
+
+  /* Hide desktop sidebar, show mobile nav */
+  .sb{position:fixed;left:0;top:0;bottom:0;z-index:400;transform:translateX(-100%);width:260px!important;box-shadow:var(--sh-md)}
+  .mob-topbar{display:flex}
+  .mob-bottom-nav{display:flex}
+
+  /* Main adjusts for top+bottom bars */
+  .main{padding-top:var(--topbar-h);padding-bottom:var(--mobile-nav-h);height:100vh}
+  .topbar{display:none}
+
+  /* Pages scroll properly */
+  .page{height:calc(100vh - var(--topbar-h) - var(--mobile-nav-h));overflow-y:auto}
+
+  /* Summary strip 2 col */
+  .summary-strip{grid-template-columns:repeat(2,1fr);padding:12px 14px 0}
+  .summary-strip .mc:last-child{display:none}
+  .mc .mv{font-size:22px}
+
+  /* Hide table, show cards */
+  .tbl-outer{display:none}
+  .card-list{display:flex}
+
+  /* Filter bar */
+  .qf-bar{padding:10px 14px 0;gap:6px}
+  .srch{max-width:none;flex:1}
+  .qf-divider{display:none}
+  .sel-hide-mob{display:none}
+  .age-tabs{padding:8px 14px 0}
+
+  /* Dashboard */
+  .dash-inner{padding:12px 14px 80px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .cg{grid-template-columns:1fr}
+  .cc.w2,.cc.w3{grid-column:span 1}
+
+  /* Notifications */
+  .notif-layout{grid-template-columns:1fr;padding:12px 14px 80px}
+  .ep-wrap{display:none}
+
+  /* Panel full screen on mobile */
+  .panel{width:100%;border-left:none;border-top:1px solid var(--border);top:var(--topbar-h)}
+
+  /* Modals */
+  .modal{border-radius:var(--rl) var(--rl) 0 0;position:fixed;bottom:0;left:0;right:0;max-height:90vh;width:100%;margin:0}
+  .modal-bg{align-items:flex-end;padding:0}
+
+  /* Toast */
+  .toast{bottom:calc(var(--mobile-nav-h) + 10px);font-size:12px;padding:9px 16px}
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE — Small Mobile (≤400px)
+══════════════════════════════════════ */
+@media(max-width:400px){
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .summary-strip{grid-template-columns:1fr 1fr}
+  .mc .mv{font-size:20px}
+  .fg{grid-template-columns:1fr}
+  .fg-full{grid-column:1}
+}
+</style>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+</head>
+<body>
+
+<!-- LOADER -->
+<div class="loader" id="loader">
+  <div class="loader-logo">Nationwide MCA</div>
+  <div class="loader-name">Demand Tracker</div>
+  <div class="spin"></div>
+  <div class="loader-msg" id="loader-msg">Connecting to live database…</div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app" style="display:none">
+
+<!-- Mobile Top Bar -->
+<div class="mob-topbar" id="mob-topbar">
+  <button class="mob-menu-btn" onclick="toggleMobMenu()" aria-label="Menu">☰</button>
+  <div class="mob-brand">
+    <div class="name">NW MCA Tracker</div>
+    <div class="sub" id="mob-sub">Open Demands</div>
+  </div>
+  <div class="mob-actions">
+    <button class="mob-action-btn" onclick="openAdd()" title="Add demand">＋</button>
+    <button class="mob-action-btn" onclick="refreshData()" title="Refresh">↻</button>
+  </div>
+</div>
+<div class="mob-overlay" id="mob-overlay" onclick="closeMobMenu()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sb" id="sb">
+  <div class="sb-top">
+    <div class="sb-brand">
+      <div class="tag">Nationwide MCA</div>
+      <div class="name">Demand Tracker</div>
+    </div>
+    <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this)">
+      <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
+      <span class="ni-badge blue" id="sb-open">—</span>
+    </div>
+    <div class="ni" id="nav-all" onclick="showAll(this)">
+      <span class="ni-ic">≡</span><span class="ni-lbl">All Demands</span>
+    </div>
+    <div class="ni" id="nav-dashboard" onclick="goPage('dashboard',this)">
+      <span class="ni-ic">▦</span><span class="ni-lbl">Dashboard</span>
+    </div>
+    <div class="ni" id="nav-notif" onclick="goPage('notif',this)">
+      <span class="ni-ic">✉</span><span class="ni-lbl">Notifications</span>
+      <span class="ni-badge red" id="sb-notif" style="display:none">0</span>
+    </div>
+    <div class="nsect">Actions</div>
+    <div class="ni" onclick="openAdd();closeMobMenu()"><span class="ni-ic">＋</span><span class="ni-lbl">Add Demand</span></div>
+    <div class="ni" onclick="event.stopPropagation();openImport()"><span class="ni-ic">⬆</span><span class="ni-lbl">Import CSV</span></div>
+    <div class="ni" onclick="refreshData()"><span class="ni-ic">↻</span><span class="ni-lbl">Refresh Data</span></div>
+    <div class="ni" onclick="exportCSV()"><span class="ni-ic">↓</span><span class="ni-lbl">Export CSV</span></div>
+    <div class="ni" onclick="goPage('tracker',document.getElementById('nav-tracker'));setTimeout(()=>{document.getElementById('f-st').value='';filterChanged();selectAllVisible();},100)" style="color:var(--red)"><span class="ni-ic">☑</span><span class="ni-lbl">Select All Demands</span></div>
+    <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>
+    <div class="ni" onclick="toggleDebugPanel()" style="color:#58a6ff;font-size:12px"><span class="ni-ic">🔬</span><span class="ni-lbl">Action Recorder</span></div>
+    <div class="ni" onclick="event.stopPropagation();confDeleteAll()" style="color:var(--red);font-weight:600"><span class="ni-ic">🗑</span><span class="ni-lbl">Delete All Demands</span></div>
+    <div class="nsect">Filters</div>
+    <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
+    <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
+    <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
+    <div class="ni" onclick="quickFilter('thisweek')"><span class="ni-ic">📅</span><span class="ni-lbl">Due This Week</span></div>
+  </nav>
+  <div class="sb-foot">
+    <div class="sb-user" id="sb-user">NW MCA Tracker</div>
+    <div class="sb-date" id="sb-date"></div>
+    <div class="sb-version">v4.6 · Flow Fix</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main" id="main">
+
+  <!-- Desktop Topbar -->
+  <div class="topbar" id="topbar">
+    <div class="topbar-left">
+      <h1 id="tb-title">Open Demands</h1>
+      <p>Nationwide Mutual — GSP-MCA · Real-time shared database</p>
+    </div>
+    <div class="topbar-right">
+      <div class="legend" id="tb-legend">
+        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>A–C Overdue</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#d4860a"></div>D–E Warning</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#c9a800"></div>F–G Soon</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>On track</div>
+      </div>
+      <span class="sync-pill ok" id="sync-pill">● Live</span>
+      <button class="btn ghost sm" onclick="openImport()" id="nav-import" title="Import CSV" style="font-size:12px;padding:5px 12px;margin-right:6px">⬆ Import CSV</button><button onclick="toggleDebugPanel()" id="debug-toggle-btn" title="Action Recorder" style="background:#161b22;border:1px solid #30363d;color:#58a6ff;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;margin-right:6px">🔬 Recorder</button><button class="btn primary" id="tb-add" onclick="openAdd()">＋ Add Demand</button>
+    </div>
+  </div>
+
+  <!-- ══ TRACKER PAGE ══ -->
+  <div class="page on" id="page-tracker">
+    <div class="summary-strip" id="metrics"></div>
+    <div class="qf-bar">
+      <div class="srch"><span class="srch-ic">🔍</span><input type="text" id="q" id="f-search" placeholder="Search ID, skills, BSA, team…" oninput="filterChanged()"></div>
+      <div class="qf-divider"></div>
+      <select id="f-st" onchange="filterChanged()"><option value="">All statuses</option><option>Open</option><option>Closed</option><option>Cancel</option><option>On Hold</option></select>
+      <select id="f-ty" onchange="filterChanged()" class="sel-hide-mob"><option value="">All types</option><option>New</option><option>Backfill</option><option>Sell Bill</option></select>
+      <select id="f-bsa" onchange="filterChanged()"><option value="">All BSAs</option></select>
+      <select id="f-sl" onchange="filterChanged()" class="sel-hide-mob"><option value="">All SLs</option></select>
+      <select id="f-loc" onchange="filterChanged()" class="sel-hide-mob"><option value="">All locations</option><option>Offshore</option><option>Onsite</option><option>Canada</option><option>Mexico</option></select>
+      <span class="rcount-pill" id="rcount">—</span>
+    </div>
+    <div id="bulk-bar" class="bulk-bar">
+      <input type="checkbox" class="row-cb" id="cb-all" onchange="toggleRow(this)" style="width:15px;height:15px;accent-color:var(--blue)">
+      <span class="bulk-count" id="bulk-count">0 selected</span>
+      <span class="bulk-hint">of <span id="bulk-total">0</span> demands</span>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button class="btn sm" onclick="selectAllVisible()" style="font-size:11px">Select All Visible</button>
+        <button class="btn sm" onclick="clearSelection()" style="font-size:11px">Clear</button>
+        <button class="btn danger sm" id="bulk-del-btn" onclick="confBulkDelete()" style="font-size:11px" disabled>🗑 Delete Selected</button>
+      </div>
+    </div>
+    <div id="active-filter-bar" style="display:none;align-items:center;padding:6px 24px;background:var(--blue-bg);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px"></div>
+    <div class="age-tabs" id="atabs"></div>
+
+    <!-- Desktop table -->
+    <div class="tbl-outer">
+      <table>
+        <thead><tr>
+          <th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">☐</th>
+          <th style="width:52px" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
+          <th style="width:80px" onclick="sortBy('demand_status')">Status<i class="si" id="si-st">↕</i></th>
+          <th style="width:148px" onclick="sortBy('profile_status')">Profile Status<i class="si" id="si-ps">↕</i></th>
+          <th style="width:65px" onclick="sortBy('demand_type')">Type<i class="si" id="si-ty">↕</i></th>
+          <th style="width:80px" onclick="sortBy('bsa')">BSA<i class="si" id="si-bsa">↕</i></th>
+          <th style="width:95px" onclick="sortBy('team_name')">Team<i class="si" id="si-team">↕</i></th>
+          <th style="width:138px" onclick="sortBy('skills')">Skills<i class="si" id="si-sk">↕</i></th>
+          <th style="width:65px" onclick="sortBy('location')">Location<i class="si" id="si-loc">↕</i></th>
+          <th style="width:70px" onclick="sortBy('service_line')">Svc Line<i class="si" id="si-sl">↕</i></th>
+          <th style="width:82px" onclick="sortBy('target_date')">Target<i class="si" id="si-tgt">↕</i></th>
+          <th style="width:65px" onclick="sortBy('ageing_days')">Ageing<i class="si" id="si-age">↕</i></th>
+          <th style="width:95px">Profile</th>
+          <th style="width:108px" onclick="sortBy('fg_form_number')">FG / JP ID<i class="si" id="si-fg">↕</i></th>
+          <th style="width:108px">Actions</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Mobile card list -->
+    <div class="card-list" id="card-list"></div>
+  </div>
+
+  <!-- ══ DASHBOARD PAGE ══ -->
+  <div class="page" id="page-dashboard">
+    <div class="dash-inner">
+      <div class="kpi-grid" id="kpis"></div>
+      <div class="cg" id="charts-grid"></div>
+    </div>
+  </div>
+
+  <!-- ══ NOTIFICATIONS PAGE ══ -->
+  <div class="page" id="page-notif">
+    <div class="notif-layout">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="np">
+          <h3>📬 Recipients</h3>
+          <div class="ff" style="margin-bottom:4px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+              <label>Leadership Report Recipients</label>
+              <button onclick="saveLeadershipRecipients()" style="font-size:10px;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--blue-bg);color:var(--blue);cursor:pointer">Save</button>
+            </div>
+            <div class="tag-box" id="leader-tag-box" onclick="document.getElementById('leader-tag-inp').focus()" style="border-color:var(--blue)">
+              <span class="rtag" style="background:var(--blue-bg);color:var(--blue)">Srikanth.Bura@cognizant.com<span class="rx" onclick="removeLeaderTag(this)">×</span></span>
+              <input class="rtag-inp" id="leader-tag-inp" placeholder="Add leadership email, press Enter…" onkeydown="addLeaderTag(event)">
+            </div>
+            <div style="font-size:10px;color:var(--t3);margin-top:3px">Weekly leadership report is sent to these recipients every Monday at 9 AM</div>
+          </div>
+          <div class="ff">
+            <label>To — Email Recipients</label>
+            <div class="tag-box" id="tag-box" onclick="document.getElementById('tag-inp').focus()">
+              <span class="rtag">manager@cognizant.com<span class="rx" onclick="removeTag(this)">×</span></span>
+              <input class="rtag-inp" id="tag-inp" placeholder="Add email, press Enter…" onkeydown="addTag(event)">
+            </div>
+          </div>
+          <div class="ff"><label>CC</label><input type="text" id="notif-cc" value="sepm@nationwide.com"></div>
+          <div class="ff"><label>Digest Time</label><select id="notif-digest-time"><option value="12:00 AM (Midnight)">12:00 AM (Midnight)</option><option value="1:00 AM">1:00 AM</option><option value="2:00 AM">2:00 AM</option><option value="3:00 AM">3:00 AM</option><option value="4:00 AM">4:00 AM</option><option value="5:00 AM">5:00 AM</option><option value="6:00 AM">6:00 AM</option><option value="7:00 AM">7:00 AM</option><option value="8:00 AM">8:00 AM</option><option value="9:00 AM" selected>9:00 AM</option><option value="10:00 AM">10:00 AM</option><option value="11:00 AM">11:00 AM</option><option value="12:00 PM (Noon)">12:00 PM (Noon)</option><option value="1:00 PM">1:00 PM</option><option value="2:00 PM">2:00 PM</option><option value="3:00 PM">3:00 PM</option><option value="4:00 PM">4:00 PM</option><option value="5:00 PM">5:00 PM</option><option value="6:00 PM">6:00 PM</option><option value="7:00 PM">7:00 PM</option><option value="8:00 PM">8:00 PM</option><option value="9:00 PM">9:00 PM</option><option value="10:00 PM">10:00 PM</option><option value="11:00 PM">11:00 PM</option></select></div>
+        </div>
+        <div class="np">
+          <h3>🔔 Alert Triggers</h3>
+          <div class="tog-row"><div class="tog-info"><div class="tt">New demand added</div><div class="ts">Instant alert on creation</div></div><label class="tog"><input type="checkbox" id="t-new" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Demand cancelled</div><div class="ts">Alert on cancellation</div></div><label class="tog"><input type="checkbox" id="t-cancel" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Demand closed / fulfilled</div><div class="ts">Alert when resource joins</div></div><label class="tog"><input type="checkbox" id="t-close" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Overdue daily digest</div><div class="ts">A/B ageing demands each morning</div></div><label class="tog"><input type="checkbox" id="t-ovd" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Pipeline summary</div><div class="ts">Morning snapshot email</div></div><label class="tog"><input type="checkbox" id="t-digest" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Weekly leadership report</div><div class="ts">BSA-level summary every Monday at digest time</div></div><label class="tog"><input type="checkbox" id="t-weekly" checked><span class="tog-sl"></span></label></div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn primary" style="flex:1" onclick="saveNotifSettings()">Save Settings</button>
+            <button class="btn ghost sm" style="color:var(--blue);border-color:var(--blue);padding:0 14px;white-space:nowrap" onclick="sendWeeklyReport(true)" title="Send weekly leadership report now">📊 Send Now</button>
+          </div>
+        </div>
+        <div class="np" style="flex:1">
+          <h3>📋 Activity Log</h3>
+          <div class="notif-log" id="notif-log"><div style="font-size:12px;color:var(--t3);padding:10px 0;text-align:center">Loading…</div></div>
+        </div>
+      </div>
+      <div class="ep-wrap">
+        <div class="ep-bar">
+          <div class="ep-dots"><div class="ep-dot" style="background:#ff5f57"></div><div class="ep-dot" style="background:#febc2e"></div><div class="ep-dot" style="background:#28c840"></div></div>
+          <span style="font-size:12px;font-weight:600;flex:1;text-align:center;color:var(--t2)">📧 Email Preview</span>
+          <select id="prev-type" onchange="renderEmailPrev()"><option value="digest">Daily Digest</option><option value="new">New Demand</option><option value="cancel">Cancellation</option><option value="closed">Demand Closed</option><option value="overdue">Overdue Alert</option></select>
+        </div>
+        <div class="ep-body" id="ep-body"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- Mobile Bottom Nav -->
+<nav class="mob-bottom-nav" id="mob-bottom-nav">
+  <div class="mob-nav-item-wrap" onclick="goPage('tracker',null);closeMobMenu()">
+    <button class="mob-nav-item on" id="mbn-tracker">
+      <span class="mn-ic">◉</span>Demands
+    </button>
+  </div>
+  <div class="mob-nav-item-wrap" onclick="goPage('dashboard',null);closeMobMenu()">
+    <button class="mob-nav-item" id="mbn-dashboard"><span class="mn-ic">▦</span>Dashboard</button>
+  </div>
+  <div class="mob-nav-item-wrap" onclick="openAdd();closeMobMenu()">
+    <button class="mob-nav-item" style="color:var(--blue)"><span class="mn-ic" style="font-size:22px">＋</span>Add</button>
+  </div>
+  <div class="mob-nav-item-wrap" onclick="goPage('notif',null);closeMobMenu()">
+    <button class="mob-nav-item" id="mbn-notif"><span class="mn-ic">✉</span>Alerts</button>
+  </div>
+  <div class="mob-nav-item-wrap" onclick="toggleMobMenu()">
+    <button class="mob-nav-item"><span class="mn-ic">⋯</span>More</button>
+  </div>
+</nav>
+
+</div><!-- /app -->
+
+<!-- Detail Panel -->
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="ph">
+    <div class="ph-info"><div class="ph-tag">Demand Details</div><div class="ph-title" id="panel-title">—</div></div>
+    <button class="btn ghost sm icon-btn" onclick="closePanel()">✕</button>
+  </div>
+  <div class="pb" id="panel-body"></div>
+  <div class="pf" id="panel-foot"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div class="mh"><h3 id="modal-title">Add Demand</h3><button class="btn ghost sm icon-btn" onclick="closeModal()">✕</button></div>
+    <div class="mb" id="modal-body"></div>
+    <div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" id="modal-save" onclick="saveDemand()">Add Demand</button></div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-bg" id="conf-bg">
+  <div class="modal" style="max-width:380px">
+    <div class="mh"><h3 id="conf-title">Confirm</h3><button class="btn ghost sm icon-btn" onclick="closeConf()">✕</button></div>
+    <div class="conf-bd" id="conf-body"></div>
+    <div class="mf"><button class="btn" onclick="closeConf()">Keep as is</button><button class="btn danger" id="conf-ok">Confirm</button></div>
+  </div>
+</div>
+
+<!-- Delete All Modal -->
+<div class="modal-bg" id="del-all-bg">
+  <div class="modal" style="max-width:420px">
+    <div class="mh" style="background:var(--red-bg)">
+      <h3 style="color:var(--red)">🗑 Delete All Demands</h3>
+      <button class="btn ghost sm icon-btn" onclick="closeDelAll()">✕</button>
+    </div>
+    <div class="mb">
+      <div style="background:var(--red-bg);border-left:4px solid var(--red);border-radius:0 var(--r) var(--r) 0;padding:12px 14px;font-size:13px;color:var(--red);font-weight:500;margin-bottom:14px">
+        ⚠ This will permanently delete ALL demand records from SharePoint. This cannot be undone.
+      </div>
+      <div id="del-all-preview" style="font-size:13px;color:var(--t2);line-height:1.8;margin-bottom:12px"></div>
+      <div style="background:var(--s2);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--t2);margin-bottom:10px">
+        💡 <strong>Tip:</strong> Click <strong>Export CSV</strong> in the sidebar first to keep a backup before deleting.
+      </div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:6px">Type <strong>DELETE ALL</strong> to confirm:</div>
+      <input type="text" id="del-all-confirm-input" placeholder="Type DELETE ALL here"
+        style="width:100%;padding:9px 12px;border:1.5px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:inherit;color:var(--text)"
+        oninput="checkDelAllInput()" onpaste="setTimeout(checkDelAllInput,10)">
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeDelAll()">Cancel</button>
+      <button class="btn danger" id="del-all-btn" disabled onclick="doDeleteAll()" style="opacity:.4;cursor:not-allowed">
+        🗑 Delete All Demands
+      </button>
+    </div>
+  </div>
+
+<!-- Import Overlay — fixed position, always on top -->
+<div id="imp-overlay" style="display:none">
+  <div style="max-width:680px;width:100%;margin:0 auto;background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.3)">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <h2 style="font-size:18px;font-weight:600;color:var(--blue);margin-bottom:2px">⬆ Import Demands from CSV</h2>
+        <div style="font-size:12px;color:var(--t3)">Upload your CSV file to import demands into SharePoint</div>
+      </div>
+      <button onclick="closeImpOverlay()" style="background:var(--s2);border:none;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--t2)">✕</button>
+    </div>
+
+    <!-- Instructions -->
+    <div style="background:var(--blue-bg);color:var(--blue);font-size:12px;padding:12px 16px;border-radius:8px;margin-bottom:18px;line-height:1.8">
+      <strong>How to prepare your file:</strong><br>
+      Open <strong>Query_SP_Jan2026_FINAL_v2.xlsx</strong> in Excel →
+      File → Save As → <strong>CSV (Comma delimited)</strong> → save to Desktop<br>
+      Then drop the CSV file below.
+    </div>
+
+    <!-- Drop zone -->
+    <div id="imp-drop"
+      onclick="document.getElementById('imp-file').click()"
+      ondragover="event.preventDefault();document.getElementById('imp-drop').style.background='var(--blue-bg)';document.getElementById('imp-drop').style.borderColor='var(--blue)'"
+      ondragleave="document.getElementById('imp-drop').style.background='';document.getElementById('imp-drop').style.borderColor=''"
+      ondrop="handleImpDrop(event)"
+      style="border:2px dashed #ccc;border-radius:10px;padding:36px 20px;text-align:center;cursor:pointer;margin-bottom:16px;transition:.2s">
+      <div style="font-size:36px;margin-bottom:10px">📄</div>
+      <div style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:4px">Drop CSV file here or click to browse</div>
+      <div style="font-size:12px;color:var(--t3)">Accepts tracker export format or SharePoint query sheet format</div>
+      <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="handleImpSelect(event)">
+    </div>
+
+    <!-- Alerts -->
+    <div id="imp-alerts" style="margin-bottom:12px"></div>
+
+    <!-- Preview -->
+    <div id="imp-preview" style="display:none;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:600;color:var(--t1)" id="imp-summary"></div>
+        <button onclick="clearImp()" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--t2)">✕ Clear</button>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:200px">
+        <table class="import-preview-tbl"><thead id="imp-thead"></thead><tbody id="imp-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="imp-progress" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:28px;margin-bottom:10px">⏳</div>
+      <div style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:12px" id="imp-prog-msg">Importing…</div>
+      <div style="background:var(--s2);border-radius:20px;height:10px;overflow:hidden">
+        <div id="imp-prog-bar" style="height:100%;background:var(--blue);width:0%;transition:width .4s;border-radius:20px"></div>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div id="imp-done" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:40px;margin-bottom:10px">✅</div>
+      <div style="font-size:15px;font-weight:600;color:var(--green);margin-bottom:16px" id="imp-done-msg"></div>
+      <button onclick="closeImpOverlay();renderAll()" style="background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:500">
+        View Demands →
+      </button>
+    </div>
+
+    <!-- Footer buttons -->
+    <div id="imp-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
+      <button onclick="closeImpOverlay()" style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--t1)">Cancel</button>
+      <button id="imp-run-btn" style="display:none;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-weight:500" onclick="runImport()">
+        Import Demands →
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════
+const PS_LIST=['3. Internal Screening','4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending','4.3 Profiles Submitted in Review with NW','4.4 External Profiles selected - Cognizant onboarding pending','6. NW Onboarding'];
+const DT_LIST=['New','Backfill','Sell Bill'];
+const BSA_LIST=['Annuities','IDS','S&I','ESS','CSS','Pet Tech','PLS','ADS','EI&M','FIT','RST','Group Benefits','Life Tech','CLS','Customer Solutions','IIR','EDO','DAC','Agri Business','Tech ops','EIM'];
+const SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting','ISG (GW)','Moment (Content)','Moment (Salesforce)','Moment(Contact Center)','ISG-SAP','IoT CS','ISG (OIPA)','EPS (Oracle)','EPS (IPM)','EPS','Moment (DXP)','SNBG','Consulting','ISG (EIS)','ISG GW','EPS-CRM','ISG (BFS)','Moment (Digital Learning)','ISG','ISG-GW','ISG (Group Benefits)'];
+const LOC_LIST=['Offshore','Onsite','Canada','Mexico'];
+const ST_LIST=['Open','Closed','Cancel','On Hold'];
+const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Coming up in 1 week','H) Coming up in 2 weeks','I) Not due yet'];
+// ── Microsoft 365 Configuration ──
+const SP_SITE_URL  = 'https://cognizantonline.sharepoint.com/sites/NWMCADemandTracker';
+const SP_LIST_ID   = '13d692ad-1d24-4091-8c46-00811d17c6e2';
+const SP_HOSTNAME  = 'cognizantonline.sharepoint.com';
+const SP_SITE_PATH = '/sites/NWMCADemandTracker';
+const REDIRECT_URI = 'https://YOUR_GITHUB_USERNAME.github.io/nw-mca-tracker/';  // Replace YOUR_GITHUB_USERNAME with your actual GitHub username
+
+// Azure AD App Registration — PKCE Flow
+const AZURE_CLIENT_ID = '6e9a85b8-194f-49ca-b524-ead2d8508f5a';
+const AZURE_TENANT_ID = 'de08c407-19b9-427d-9fe8-edf254300ca7';
+const SCOPES = ['https://graph.microsoft.com/.default'];
+
+let USER_NAME = 'NW MCA Tracker';
+let msalApp = null;
+let graphToken = null;
+let tokenExpiry = 0;
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let demands=[], sortField='ageing_days', sortDir='desc', activeAg='', activeSpecial='', editId=null;
+let selectedIds=new Set(), bulkMode=false;
+let charts={}, notifLog=[], currentPage='tracker';
+
+// ═══════════════════════════════════════
+// MICROSOFT GRAPH API
+// All data stored in SharePoint Lists
+// inside your Cognizant M365 tenant
+// ═══════════════════════════════════════
+
+// ══════════════════════════════════════════════════════
+// AUTHENTICATION — PKCE Flow (correct for browser SPAs)
+// User signs in with Cognizant M365 account — no secret needed
+// ══════════════════════════════════════════════════════
+
+async function initMSAL(){
+  msalApp = new msal.PublicClientApplication({
+    auth:{
+      clientId:    AZURE_CLIENT_ID,
+      authority:   `https://login.microsoftonline.com/${AZURE_TENANT_ID}`,
+      redirectUri: 'https://YOUR_GITHUB_USERNAME.github.io/nw-mca-tracker/'
+    },
+    cache:{ cacheLocation:'sessionStorage', storeAuthStateInCookie:false }
+  });
+  await msalApp.initialize();
+  const resp = await msalApp.handleRedirectPromise();
+  if(resp && resp.accessToken){
+    graphToken  = resp.accessToken;
+    tokenExpiry = Date.now() + 3500000;
+    USER_NAME   = resp.account.name || 'NW MCA User';
+    return true;
+  }
+  const accounts = msalApp.getAllAccounts();
+  if(accounts.length > 0){
+    try{
+      const r = await msalApp.acquireTokenSilent({ scopes:SCOPES, account:accounts[0] });
+      graphToken  = r.accessToken;
+      tokenExpiry = Date.now() + 3500000;
+      USER_NAME   = accounts[0].name || 'NW MCA User';
+      return true;
+    }catch(e){ return false; }
+  }
+  return false;
+}
+
+async function signIn(){
+  await msalApp.loginRedirect({ scopes: SCOPES });
+}
+
+async function ensureToken(){
+  if(graphToken && Date.now() < tokenExpiry - 60000) return;
+  if(!msalApp) return;
+  const accounts = msalApp.getAllAccounts();
+  if(!accounts.length){ await signIn(); return; }
+  try{
+    const r = await msalApp.acquireTokenSilent({ scopes:SCOPES, account:accounts[0] });
+    graphToken  = r.accessToken;
+    tokenExpiry = Date.now() + 3500000;
+  }catch(e){
+    await msalApp.acquireTokenRedirect({ scopes:SCOPES, account:accounts[0] });
+  }
+}
+
+
+// ── Graph API base fetch ──
+async function gFetch(url, method='GET', body=null){
+  await ensureToken();
+  const opts={
+    method,
+    headers:{'Authorization':'Bearer '+graphToken,'Content-Type':'application/json'}
+  };
+  if(body) opts.body=JSON.stringify(body);
+  // 30-second timeout to prevent silent hangs (one 59s call seen in debug log)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 30000);
+  opts.signal = controller.signal;
+  let r;
+  try{ r=await fetch(url, opts); }
+  catch(e){ clearTimeout(timeoutId); if(e.name==='AbortError') throw new Error('Request timed out after 30s'); throw e; }
+  clearTimeout(timeoutId);
+  if(!r.ok){
+    const e=await r.text();
+    let msg=e;
+    try{
+      const j=JSON.parse(e);
+      msg=j.error?.message||j.error?.code||e;
+      // Log full SP error for debugging
+      console.error('SP API Error:', r.status, r.url, j.error||e);
+    }catch(x){ console.error('SP API Error:', r.status, r.url, e.substring(0,200)); }
+    throw new Error(`HTTP ${r.status}: ${msg}`);
+  }
+  return method==='DELETE'?null:r.json();
+}
+
+// Base URL for the Demands list
+const LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${SP_LIST_ID}`;
+const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
+
+// ── Map SharePoint item to demand object ──
+function mapItem(item){
+  if(!item) return null;
+  const f = item.fields || {};
+  // Log SP field names on first read (helps debug column name issues)
+  if(!window._spLogged){ window._spLogged=true; console.log('SP fields returned:', Object.keys(f)); }
+  return {
+    id:                 String(item.id),            // SP internal item ID — stored as string for type-safe comparison
+    demand_id:          f.Title || '',              // Title column = Demand ID
+    so_id:              f.SO_ID || '',
+    demand_status:      f.Demand_Status || 'Open',
+    profile_status:     f.Profile_Status || '',
+    demand_type:        f.Demand_Type || '',
+    location:           f.Location || '',
+    service_line:       f.Service_Line || '',
+    demand_added_on:    f.Demand_Added_On ? f.Demand_Added_On.split('T')[0] : '',
+    target_date:        f.Target_Date ? f.Target_Date.split('T')[0] : '',
+    demand_closure_date:f.Demand_Closure_Date ? f.Demand_Closure_Date.split('T')[0] : '',
+    ageing_days:        Number(f.Ageing_Days) || 0,
+    ageing_group:       f.Ageing_Group || '',
+    bsa:                f.BSA || '',
+    team_name:          f.Team_Name || '',
+    sepm_sel:           f.SEPM_SEL || '',
+    skills:             f.Skills || '',
+    profile_name:       f.Profile_Name || '',
+    backfill_resource:  f.Backfill_Resource || '',
+    status_updates:     f.Status_Updates || '',
+    tier1_program:      f.Tier1_Program || '',
+    fg_form_number:     f.FG_Form_Number || '',
+    fieldglass_status:  f.Fieldglass_Status || '',
+    updated_by:         f.Updated_By || '',
+    type:               'MCA',
+  };
+}
+
+
+// ── Map demand object to SharePoint fields ──
+function mapFields(d){
+  // Maps tracker data object to exact SharePoint field names
+  // Confirmed from SP List Settings screenshot (May 2026)
+  // SP Columns: Title(text), SO_ID, Demand_Status(choice), Profile_Status(choice),
+  //   Demand_Type(choice), Location(choice), Service_Line(choice),
+  //   Demand_Added_On(date), Target_Date(date), Demand_Closure_Date(date),
+  //   Ageing_Days(number), Ageing_Group(text), Profile_Name(multitext),
+  //   Backfill_Resource(text), Status_Updates(multitext), Tier1_Program(text),
+  //   FG_Form_Number(text), Fieldglass_Status(text), Updated_By(text),
+  //   BSA(choice), Team_Name(text), SEPM_SEL(text), Skills(multitext)
+
+  const f = {};
+
+  // Title = Demand ID (the Title column is displayed as "Demand_ID" in SP)
+  if(d.demand_id!==undefined && d.demand_id)
+    f.Title = String(d.demand_id);
+
+  // Text / Choice fields — only send when non-empty (choice columns reject empty string)
+  const addText = (spCol, val) => { if(val!==undefined && val!==null && val!=='') f[spCol]=String(val); };
+  const addChoice = (spCol, val) => { if(val!==undefined && val!==null && String(val).trim()!=='') f[spCol]=String(val).trim(); };
+
+  addText  ('SO_ID',              d.so_id);
+  addChoice('Demand_Status',      d.demand_status);
+  addChoice('Profile_Status',     d.profile_status);
+  addChoice('Demand_Type',        d.demand_type);
+  addChoice('Location',           d.location);
+  addChoice('Service_Line',       d.service_line);
+  addChoice('BSA',                d.bsa);
+  addText  ('Team_Name',          d.team_name);
+  addText  ('SEPM_SEL',           d.sepm_sel);
+  addText  ('Skills',             d.skills);
+  addText  ('Ageing_Group',       d.ageing_group);
+  addText  ('Profile_Name',       d.profile_name);
+  addText  ('Backfill_Resource',  d.backfill_resource);
+  addText  ('Status_Updates',     d.status_updates);
+  addText  ('Tier1_Program',      d.tier1_program);
+  addText  ('FG_Form_Number',     d.fg_form_number);
+  addText  ('Fieldglass_Status',  d.fieldglass_status);
+  addText  ('Updated_By',         d.updated_by || USER_NAME);
+
+  // Date fields — SP requires ISO 8601 with time: "2026-05-19T00:00:00Z"
+  const addDate = (spCol, val) => {
+    if(!val) return;
+    try{
+      const s = String(val).trim();
+      // Already has time component
+      if(s.includes('T')) { f[spCol]=s.endsWith('Z')?s:s+'Z'; return; }
+      // YYYY-MM-DD format
+      if(/^\d{4}-\d{2}-\d{2}$/.test(s)) { f[spCol]=s+'T00:00:00Z'; return; }
+      // MM/DD/YYYY format
+      const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if(m) { f[spCol]=`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T00:00:00Z`; return; }
+      // Try native parse
+      const dt=new Date(s);
+      if(!isNaN(dt)) f[spCol]=dt.toISOString().split('.')[0]+'Z';
+    }catch(e){ console.warn('Date parse failed:',spCol,val); }
+  };
+  addDate('Demand_Added_On',    d.demand_added_on);
+  addDate('Target_Date',        d.target_date);
+  addDate('Demand_Closure_Date',d.demand_closure_date);
+
+  // Number fields — SP Number columns require actual numbers
+  if(d.ageing_days!==undefined && d.ageing_days!==null)
+    f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
+
+  // Remove any undefined/null/empty values as safety net
+  Object.keys(f).forEach(k => {
+    if(f[k]===null || f[k]===undefined || f[k]==='') delete f[k];
+  });
+
+  if(!window._mfLogged){window._mfLogged=true;console.log('mapFields sample (logged once):', JSON.stringify(f));}
+  return {fields: f};
+}
+
+
+// ── sbQ: Read all items from a list ──
+async function sbQ(table, query=''){
+  // Only 'demands' and 'notifications' tables used
+  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
+  // Fetch all pages (Graph paginates at 200 items)
+  let items=[], url=base+'/items?$expand=fields&$top=200';
+  while(url){
+    const data=await gFetch(url);
+    items=[...items,...(data.value||[])];
+    url=data['@odata.nextLink']||null;
+  }
+  const mapped=items.map(mapItem);
+  // Sort by demand_id desc if demands
+  if(table==='demands') mapped.sort((a,b)=>Number(a.demand_id)-Number(b.demand_id));
+  if(table==='notifications') mapped.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  return mapped;
+}
+
+// ── sbIns: Create a new item ──
+async function sbIns(table, data){
+  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
+
+  if(table!=='demands'){
+    // Write to Notifications list with confirmed SP column names
+    try{
+      const r = await gFetch(base+'/items','POST',{fields:{
+        Title:       String(data.title||data.type||'notification'),
+        NotifType:   String(data.type||''),
+        DemandId:    String(data.demand_id||''),
+        Title2:      String(data.title||''),
+        Subtitle:    String(data.subtitle||''),
+        TriggeredBy: String(data.triggered_by||USER_NAME||''),
+        Recipients:  String(data.recipients||''),
+        EmailBody:   String(data.email_body||'')
+      }});
+      console.log('✓ Notification written to SP:', data.type, data.demand_id);
+      return r ? [r] : [];
+    }catch(e){
+      console.warn('Notification write failed:', e.message);
+    }
+    return [];
+  }
+
+  // Step 1: POST with unique temp title to avoid duplicate Title constraint
+  const tempTitle = 'TEMP_' + Date.now();
+  let newItem;
+  try{
+    newItem = await gFetch(base+'/items','POST',{fields:{Title: tempTitle}});
+  }catch(e){
+    throw new Error('Cannot create item in SharePoint: '+e.message);
+  }
+  if(!newItem?.id) throw new Error('SharePoint did not return item ID after POST');
+
+  // Step 2: PATCH all real fields onto the new item
+  const fields = mapFields(data).fields;
+  // Always set Title to the demand_id (Title IS the demand ID in SP)
+  fields.Title = data.demand_id ? String(data.demand_id) : tempTitle;
+  console.log('sbIns PATCH fields:', Object.keys(fields), 'Title=', fields.Title);
+
+  // Try all fields at once — if 400, try field by field to isolate bad field
+  try{
+    await gFetch(base+'/items/'+newItem.id+'/fields','PATCH', fields);
+  }catch(e){
+    console.warn('Bulk PATCH failed, trying one by one:', e.message);
+    for(const [k,v] of Object.entries(fields)){
+      try{ await gFetch(base+'/items/'+newItem.id+'/fields','PATCH',{[k]:v}); }
+      catch(e2){ console.warn('SP rejected field:', k, '=', JSON.stringify(v), '→', e2.message); }
+    }
+  }
+
+  // Step 3: GET the final created item
+  try{
+    const created = await gFetch(base+'/items/'+newItem.id+'?$expand=fields');
+    return [mapItem(created)];
+  }catch(e){
+    return [mapItem(newItem)];
+  }
+}
+
+
+// ── sbUpd: Update an existing item by SharePoint item ID ──
+async function sbUpd(table, match, data){
+  const spId = String(match.split('id=eq.')[1]||'');
+  if(!spId) throw new Error('sbUpd: missing SP item ID in: '+match);
+  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
+  const fields = mapFields(data).fields;
+  if(Object.keys(fields).length===0) return;
+  // Try all at once first
+  try{
+    await gFetch(base+'/items/'+spId+'/fields','PATCH', fields);
+  }catch(e){
+    // Field-by-field fallback
+    console.warn('Bulk PATCH failed on update, trying field by field:', e.message);
+    for(const [k,v] of Object.entries(fields)){
+      try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v}); }
+      catch(e2){ console.warn('SP rejected field on update:', k,'=',JSON.stringify(v),'→',e2.message); }
+    }
+  }
+}
+
+
+// ── sbDel: Delete an item by SharePoint item ID ──
+async function sbDel(table, match){
+  const spId = String(match.split('id=eq.')[1]||'');
+  const base  = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
+  await gFetch(base+'/items/'+String(spId),'DELETE');
+}
+
+// ═══════════════════════════════════════
+// LOADER
+// ═══════════════════════════════════════
+function showLoader(msg){document.getElementById('loader-msg').textContent=msg||'Loading…';document.getElementById('loader').classList.remove('hidden')}
+function hideLoader(){document.getElementById('loader').classList.add('hidden')}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+// NOTE: 'A listener indicated async response' errors are from browser EXTENSIONS not this app.
+window.addEventListener('load', async()=>{
+  try{
+    showLoader('Signing in to Microsoft 365…');
+    const signedIn = await initMSAL();
+    if(!signedIn){
+      showLoader('Redirecting to Cognizant sign-in…');
+      await signIn();
+      return;
+    }
+    showLoader('Loading demands from SharePoint…');
+    const data = await sbQ('demands','');
+    demands = data;
+    hideLoader();
+    document.getElementById('app').style.display='flex';
+    document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    document.getElementById('f-st').value='Open';
+    renderAll();
+    setInterval(silentRefresh, 30000);
+    toast('Connected to SharePoint ✓','green');
+  }catch(e){
+    hideLoader();
+    document.getElementById('loader-msg').textContent='';
+    document.getElementById('loader').innerHTML += `
+      <div style="max-width:420px;background:#fff;border-radius:12px;padding:24px;border:1px solid #e0ddd4;margin-top:16px;text-align:left">
+        <div style="font-size:14px;font-weight:600;color:#8c1f1f;margin-bottom:8px">Sign-in failed</div>
+        <div style="font-size:12px;color:#5c5a52;line-height:1.8;margin-bottom:14px">
+          ${e.message}<br><br>
+          <strong>Most likely fix:</strong> Ask IT to add
+          <strong>https://YOUR_GITHUB_USERNAME.github.io/nw-mca-tracker</strong>
+          as a Redirect URI in the Azure AD App Registration under Authentication.
+        </div>
+        <button onclick="location.reload()" style="background:#1a4b8c;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px">Retry</button>
+      </div>`;
+  }
+});
+
+async function refreshData(){
+  setSyncStatus('saving','↻ Refreshing…');
+  try{
+    const data=await sbQ('demands','');
+    demands=data;renderAll();setSyncStatus('ok','● Live');
+    try{ loadNotifSettings(); }catch(e){}
+    toast('Data refreshed ✓','green');
+  }catch(e){setSyncStatus('err','⚠ Error');toast('Refresh failed','red')}
+}
+async function silentRefresh(){
+  // Check if it's Monday and time matches digest setting
+  const now = new Date();
+  const isMonday = now.getDay()===1;
+  if(isMonday){
+    try{
+      const saved=JSON.parse(localStorage.getItem('nwmca_notif_settings')||'{}');
+      const digestTime=saved.digestTime||'9:00 AM';
+      const [timePart,ampm]=(digestTime+' AM').split(' ');
+      const [hh]=timePart.split(':');
+      let targetHour=parseInt(hh);
+      if(ampm==='PM'&&targetHour!==12) targetHour+=12;
+      if(ampm==='AM'&&targetHour===12) targetHour=0;
+      const isDigestHour=now.getHours()===targetHour;
+      const lastSent=localStorage.getItem('nwmca_weekly_sent');
+      const sentToday=lastSent&&new Date(lastSent).toDateString()===now.toDateString();
+      if(isDigestHour && !sentToday && (saved.triggers?.weekly!==false)){
+        localStorage.setItem('nwmca_weekly_sent', now.toISOString());
+        sendWeeklyReport(false);
+      }
+    }catch(e){}
+  }
+  try{
+    const data=await sbQ('demands','');
+    if(JSON.stringify(data)!==JSON.stringify(demands)){demands=data;renderAll();toast('↻ Updated by another user','')}
+  }catch(e){}
+}
+function setSyncStatus(cls,msg){const el=document.getElementById('sync-pill');el.className='sync-pill '+cls;el.textContent=msg}
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function goPage(id,el){
+  currentPage=id;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
+  document.querySelectorAll('.mob-nav-item').forEach(n=>n.classList.remove('on'));
+  document.getElementById('page-'+id).classList.add('on');
+  if(el)el.classList.add('on');
+  // Mobile bottom nav
+  const mbn=document.getElementById('mbn-'+id);
+  if(mbn)mbn.classList.add('on');
+  // Sidebar active
+  const sbn=document.getElementById('nav-'+id);
+  if(sbn)sbn.classList.add('on');
+  // Topbar title
+  const titles={tracker:'Open Demands',dashboard:'Management Dashboard',notif:'Notifications & Alerts',import:'Import CSV'};
+  document.getElementById('tb-title').textContent=titles[id]||id;
+  document.getElementById('mob-sub').textContent=titles[id]||id;
+  // Show/hide topbar elements
+  const isTracker=id==='tracker';
+  if(document.getElementById('tb-legend'))document.getElementById('tb-legend').style.display=isTracker?'flex':'none';
+  if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
+  // Page-specific init
+  if(id==='dashboard')setTimeout(renderDash,60);
+  if(id==='notif'){loadNotifLog();setTimeout(renderEmailPrev,60)}
+  closeMobMenu();
+}
+function showAll(el){
+  document.getElementById('f-st').value='';
+  activeAg=''; activeSpecial='';
+  goPage('tracker',el||document.getElementById('nav-tracker'));
+  renderAll();
+}
+function quickFilter(type){
+  goPage('tracker',document.getElementById('nav-tracker'));
+  ['f-st','f-ty','f-bsa','f-sl','f-loc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('q').value='';
+  activeAg=''; activeSpecial='';
+  if(type==='overdue'){document.getElementById('f-st').value='Open';activeSpecial='overdue';}
+  else if(type==='noprofile'){document.getElementById('f-st').value='Open';activeSpecial='noprofile';}
+  else if(type==='interview'){document.getElementById('f-st').value='Open';activeSpecial='interview';}
+  else if(type==='thisweek'){document.getElementById('f-st').value='Open';activeSpecial='thisweek';}
+  else if(type==='open'){document.getElementById('f-st').value='Open';}
+  renderAll();
+  closeMobMenu();
+}
+
+// Mobile menu
+function toggleMobMenu(){
+  const sb=document.getElementById('sb');
+  const ov=document.getElementById('mob-overlay');
+  const isOpen=sb.classList.contains('mob-open');
+  if(isOpen){sb.classList.remove('mob-open');ov.classList.remove('on')}
+  else{sb.classList.add('mob-open');ov.classList.add('on')}
+}
+function closeMobMenu(){
+  document.getElementById('sb').classList.remove('mob-open');
+  document.getElementById('mob-overlay').classList.remove('on');
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function stB(s){const m={open:'b-open',closed:'b-closed',cancel:'b-cancel','on hold':'b-hold'};return`<span class="badge ${m[(s||'').toLowerCase()]||'b-na'}">${s||'—'}</span>`}
+function tyB(t){const m={New:'b-new',Backfill:'b-backfill','Sell Bill':'b-sellbill'};return`<span class="badge ${m[t]||'b-na'}">${t||'—'}</span>`}
+function locB(l){const m={Offshore:'b-offshore',Onsite:'b-onsite',Canada:'b-canada',Mexico:'b-mexico'};return`<span class="badge ${m[(l||'').trim()]||'b-na'}">${l||'—'}</span>`}
+function ageB(days,ag){
+  let cls='ao';
+  if(ag){if(ag.startsWith('A)')||ag.startsWith('B)'))cls='ac';else if(ag.startsWith('C)'))cls='ah';else if(ag.startsWith('D)')||ag.startsWith('E)'))cls='am';else if(ag.startsWith('F)')||ag.startsWith('G)'))cls='al';}
+  const d=typeof days==='number'?(days>0?'+'+Math.round(days)+'d':Math.round(days)+'d'):'—';
+  return`<span class="age-badge ${cls}">${d}</span>`;
+}
+function rowCls(ag){if(!ag)return'';if(ag.startsWith('A)')||ag.startsWith('B)')||ag.startsWith('C)'))return'ov';if(ag.startsWith('D)')||ag.startsWith('E)'))return'wa';if(ag.startsWith('F)')||ag.startsWith('G)'))return'so';return'ok'}
+function fmt(v){if(!v)return'—';return String(v).substring(0,10)}
+
+// ═══════════════════════════════════════
+// TRACKER RENDER
+// ═══════════════════════════════════════
+function getFiltered(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const fs=document.getElementById('f-st').value;
+  const ft=document.getElementById('f-ty').value;
+  const fb=document.getElementById('f-bsa').value;
+  const fsl=document.getElementById('f-sl').value;
+  const fl=document.getElementById('f-loc').value;
+  return demands.filter(d=>{
+    if(fs&&(d.demand_status||'').toLowerCase()!==fs.toLowerCase())return false;
+    if(ft&&d.demand_type!==ft)return false;
+    if(fb&&d.bsa!==fb)return false;
+    if(fsl&&d.service_line!==fsl)return false;
+    if(fl&&(d.location||'').trim().toLowerCase()!==fl.toLowerCase())return false;
+    if(activeAg&&d.ageing_group!==activeAg)return false;
+    if(q){const h=[d.demand_id,d.skills,d.bsa,d.team_name,d.profile_name,d.service_line,d.sepm_sel,d.fg_form_number].join(' ').toLowerCase();if(!h.includes(q))return false}
+    if(activeSpecial==='noprofile'&&(d.profile_name||'').trim())return false;
+    if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
+    if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
+    if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)))return false;
+    return true;
+  });
+}
+function getSorted(a){
+  return[...a].sort((x,y)=>{
+    let av=x[sortField],bv=y[sortField];
+    if(av==null)av='';if(bv==null)bv='';
+    if(typeof av==='number'&&typeof bv==='number')return sortDir==='asc'?av-bv:bv-av;
+    return sortDir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));
+  });
+}
+function sortBy(f){
+  const mp={demand_id:'si-id',demand_status:'si-st',profile_status:'si-ps',demand_type:'si-ty',bsa:'si-bsa',team_name:'si-team',skills:'si-sk',location:'si-loc',service_line:'si-sl',target_date:'si-tgt',ageing_days:'si-age',fg_form_number:'si-fg'};
+  if(sortField===f)sortDir=sortDir==='asc'?'desc':'asc';else{sortField=f;sortDir='desc'}
+  document.querySelectorAll('.si').forEach(i=>i.textContent='↕');
+  document.querySelectorAll('th').forEach(t=>t.classList.remove('srt'));
+  const sid=mp[f];if(sid){const el=document.getElementById(sid);if(el){el.textContent=sortDir==='asc'?'↑':'↓';el.parentElement.classList.add('srt')}}
+  renderTbl();
+}
+function renderMetrics(){
+  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const noP=open.filter(d=>!d.profile_name);
+  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const bsas=new Set(open.map(d=>d.bsa)).size;
+  document.getElementById('metrics').innerHTML=`
+    <div class="mc blue" onclick="quickFilter('open')" style="cursor:pointer"><div class="ml">Open Demands</div><div class="mv">${open.length}</div><div class="ms">${bsas} BSAs active</div><div class="mc-trend">◉</div></div>
+    <div class="mc red" onclick="quickFilter('overdue')" style="cursor:pointer"><div class="ml">Overdue A–C</div><div class="mv">${ov.length}</div><div class="ms">Needs immediate action</div><div class="mc-trend">⚠</div></div>
+    <div class="mc amber" onclick="quickFilter('noprofile')" style="cursor:pointer"><div class="ml">No Profile Yet</div><div class="mv">${noP.length}</div><div class="ms">Candidate needed</div><div class="mc-trend">👤</div></div>
+    <div class="mc green"><div class="ml">Closed / Fulfilled</div><div class="mv">${closed.length}</div><div class="ms">Successfully placed</div><div class="mc-trend">✓</div></div>
+    <div class="mc teal"><div class="ml">Total Records</div><div class="mv">${demands.length}</div><div class="ms">All statuses</div><div class="mc-trend">≡</div></div>`;
+  document.getElementById('sb-open').textContent=open.length;
+  document.getElementById('sb-ov').textContent=ov.length;
+  document.getElementById('sb-np').textContent=noP.length;
+  // Update mobile bottom nav badge
+  const sbn=document.getElementById('sb-notif');if(sbn&&notifLog.length)sbn.style.display='';
+}
+function renderAgeTabs(){
+  const base=getFiltered();
+  const cnt={};base.forEach(d=>{const ag=d.ageing_group||'';cnt[ag]=(cnt[ag]||0)+1});
+  const color=ag=>{if(ag.startsWith('A)')||ag.startsWith('B)')||ag.startsWith('C)'))return'red';if(ag.startsWith('D)')||ag.startsWith('E)'))return'amb';return'grn'};
+  let h=`<span class="atab ${!activeAg?'on':''}" data-ag="">All (${base.length})</span>`;
+  AGS.forEach(ag=>{if(cnt[ag])h+=`<span class="atab ${color(ag)} ${activeAg===ag?'on':''}" data-ag="${ag}"><b>${ag[0]}</b>) ${ag.substring(3)} (${cnt[ag]})</span>`;});
+  document.getElementById('atabs').innerHTML=h;
+  document.getElementById('atabs').querySelectorAll('.atab').forEach(el=>{
+    el.addEventListener('click',()=>setAg(el.dataset.ag||''));
+  });
+}
+function setAg(ag){activeAg=ag;activeSpecial='';renderTbl();renderCardList();renderAgeTabs();}
+function refreshDropdowns(){
+  const bsas=[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort();
+  const sls=[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort();
+  const bE=document.getElementById('f-bsa'),cb=bE.value;
+  bE.innerHTML='<option value="">All BSAs</option>'+bsas.map(b=>`<option${b===cb?' selected':''}>${b}</option>`).join('');
+  const sE=document.getElementById('f-sl'),cs=sE.value;
+  sE.innerHTML='<option value="">All SLs</option>'+sls.map(s=>`<option${s===cs?' selected':''}>${s}</option>`).join('');
+}
+function renderTbl(){
+  const rows=getSorted(getFiltered());
+  document.getElementById('rcount').textContent=`${rows.length} record${rows.length!==1?'s':''}`;
+  const tb=document.getElementById('tbody');
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="14"><div class="empty-state"><div class="ei">◎</div><p>No demands match the current filters.</p></div></td></tr>`;return}
+  tb.innerHTML=rows.map(d=>{
+    const pf=(d.profile_name||'').split('\n')[0]||'—';
+    const isChk=selectedIds.has(d.id);
+    return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="bulkMode?toggleRow(${d.id},event):openDetail(${d.id})">
+      <td class="cb-cell" onclick="event.stopPropagation()"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onchange="toggleRow(${d.id},event)"></div></td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
+      <td>${stB(d.demand_status)}</td>
+      <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
+      <td>${tyB(d.demand_type)}</td>
+      <td style="font-weight:600;font-size:12px">${d.bsa||'—'}</td>
+      <td style="color:var(--t2);font-size:11px" title="${d.team_name||''}">${d.team_name||'—'}</td>
+      <td style="font-size:11px" title="${d.skills||''}">${d.skills||'—'}</td>
+      <td>${locB((d.location||'').trim())}</td>
+      <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
+      <td>${ageB(d.ageing_days,d.ageing_group)}</td>
+      <td style="font-size:11px;color:var(--t2)">${pf}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
+      <td onclick="event.stopPropagation()"><div class="row-acts">
+        <button class="btn ghost sm" onclick="openEdit(${d.id})" title="Edit">✏</button>
+        ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel(${d.id})" title="Cancel">✕</button>`:''}
+        <button class="btn ghost sm" onclick="confDelete(${d.id})" title="Delete permanently" style="color:var(--t3)">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Mobile card list ──
+function renderCardList(){
+  const rows=getSorted(getFiltered());
+  const cl=document.getElementById('card-list');
+  if(!rows.length){cl.innerHTML=`<div class="empty-state"><div class="ei">◎</div><p>No demands match filters.</p></div>`;return}
+  cl.innerHTML=rows.map(d=>{
+    const rc=rowCls(d.ageing_group);
+    const pf=(d.profile_name||'').split('\n')[0];
+    const isChkC=selectedIds.has(d.id);
+    return`<div class="demand-card${isChkC?' selected':''}" onclick="bulkMode?toggleRow(${d.id},event):openDetail(${d.id})" style="position:relative">
+      <div class="dc-stripe ${rc}"></div>
+      ${bulkMode?`<div class="card-cb-wrap" onclick="event.stopPropagation()"><input type="checkbox" class="card-cb" data-id="${d.id}" ${isChkC?'checked':''} onchange="toggleRow(${d.id},event)"></div>`:''}
+      <div class="dc-header">
+        <div><div class="dc-id">#${d.demand_id}</div></div>
+        <div class="dc-badges">${stB(d.demand_status)}${tyB(d.demand_type)}${ageB(d.ageing_days,d.ageing_group)}</div>
+      </div>
+      <div class="dc-title">${d.skills||'No skills specified'}</div>
+      <div class="dc-meta">
+        <div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">${d.bsa||'—'}</div></div>
+        <div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">${d.service_line||'—'}</div></div>
+        <div><div class="dc-meta-label">Location</div><div class="dc-meta-item">${locB((d.location||'').trim())}</div></div>
+        <div><div class="dc-meta-label">Target Date</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.target_date)}</div></div>
+        ${d.team_name?`<div><div class="dc-meta-label">Team</div><div class="dc-meta-item">${d.team_name}</div></div>`:''}
+        ${d.fg_form_number?`<div><div class="dc-meta-label">FG/JP ID</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}
+      </div>
+      <div class="dc-footer">
+        <div class="dc-profile" style="color:var(--t2)">${pf?`👤 ${pf}`:'No profile yet'}</div>
+        <div class="dc-actions" onclick="event.stopPropagation()">
+          <button class="btn ghost sm" onclick="openEdit(${d.id})">Edit</button>
+          ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm danger" onclick="confCancel(${d.id})">Cancel</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function filterChanged(){activeSpecial='';renderAll();}
+function calcAgeingGroup(days){
+  if(days===null||days===undefined||isNaN(days)) return '';
+  if(days>70)  return 'A) > 10 weeks Overdue';
+  if(days>35)  return 'B) > 5 - 10 weeks Overdue';
+  if(days>21)  return 'C) 3 to 5 weeks Overdue';
+  if(days>14)  return 'D) 2 - 3 weeks Overdue';
+  if(days>7)   return 'E) 1 - 2 weeks Overdue';
+  if(days>0)   return 'F) < 1 week Overdue';
+  if(days===0) return 'G) Due Today';
+  if(days>=-7) return 'H) Coming up in 1 week';
+  if(days>=-14)return 'I) Coming up in 2 weeks';
+  return 'J) Not due yet';
+}
+function renderAll(){renderMetrics();refreshDropdowns();renderAgeTabs();renderTbl();renderCardList();renderFilterBadge();updateBulkBar();}
+function renderFilterBadge(){
+  const el=document.getElementById('active-filter-bar');
+  if(!el)return;
+  const L={overdue:'⚠ Showing overdue demands only (A–C)',noprofile:'👤 Showing demands with no profile assigned',interview:'💬 Showing demands at interview stage',thisweek:'📅 Showing demands due this week'};
+  if(activeSpecial&&L[activeSpecial]){
+    el.style.display='flex';
+    el.innerHTML='<span style="font-size:12px;font-weight:500;color:var(--blue)">'+L[activeSpecial]+'</span><button class="btn ghost sm" style="font-size:11px;padding:2px 8px;margin-left:auto" onclick="activeSpecial=\'\';renderAll()">✕ Clear</button>';
+  } else { el.style.display='none'; }
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
+function renderDash(){
+  destroyAll();
+  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const cancelled=demands.filter(d=>['cancel','cancelled'].includes((d.demand_status||'').toLowerCase()));
+  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const noP=open.filter(d=>!d.profile_name).length;
+  const atInt=open.filter(d=>['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status));
+  const profSub=open.filter(d=>d.profile_status==='4.3 Profiles Submitted in Review with NW');
+  const bsas=new Set(open.map(d=>d.bsa)).size;
+  const fulfRate=closed.length+cancelled.length>0?Math.round(closed.length/(closed.length+cancelled.length)*100):0;
+
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open Demands</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue A–C</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic amber">👤</div><div><div class="kpi-v" style="color:var(--amber)">${noP}</div><div class="kpi-l">No Profile Yet</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic purple">💬</div><div><div class="kpi-v" style="color:var(--purple)">${atInt.length}</div><div class="kpi-l">At Interview</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic teal">▦</div><div><div class="kpi-v" style="color:var(--teal)">${fulfRate}%</div><div class="kpi-l">Fulfilment Rate</div></div></div>`;
+
+  // Data calcs
+  const bsaC={};open.forEach(d=>{bsaC[d.bsa]=(bsaC[d.bsa]||0)+1});
+  const bsaE=Object.entries(bsaC).sort((a,b)=>b[1]-a[1]);
+  const maxBsa=bsaE[0]?.[1]||1;
+  const slC={};open.forEach(d=>{if(d.service_line)slC[d.service_line]=(slC[d.service_line]||0)+1});
+  const slE=Object.entries(slC).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const agC={};open.forEach(d=>{const ag=d.ageing_group||'Unknown';agC[ag]=(agC[ag]||0)+1});
+  const agColors=Object.keys(agC).map(ag=>{if(ag.startsWith('A)')||ag.startsWith('B)'))return'#b01c1c';if(ag.startsWith('C)'))return'#c44a00';if(ag.startsWith('D)')||ag.startsWith('E)'))return'#b86e00';if(ag.startsWith('F)')||ag.startsWith('G)'))return'#8c7800';return'#1a6640'});
+  const locC={Offshore:0,Onsite:0,Canada:0,Mexico:0};open.forEach(d=>{const l=(d.location||'').trim();if(locC[l]!==undefined)locC[l]++});
+  const locColors=['#185FA5','#5c1a7a','#7a2e1a','#6b5a1a'];
+  const tyC={New:0,Backfill:0,'Sell Bill':0};open.forEach(d=>{if(tyC[d.demand_type]!==undefined)tyC[d.demand_type]++});
+  const psC={};open.forEach(d=>{if(d.profile_status)psC[d.profile_status]=(psC[d.profile_status]||0)+1});
+  const psS={'3. Internal Screening':'Internal Screening','4. Customer interview':'Customer Interview','4.1 Interview Scheduled':'Interview Scheduled','4.2 Interview Completed - Decision Pending':'Decision Pending','4.3 Profiles Submitted in Review with NW':'Submitted to NW','4.4 External Profiles selected - Cognizant onboarding pending':'Ext. Selected','6. NW Onboarding':'NW Onboarding'};
+  const ovdList=open.filter(d=>(d.ageing_days||0)>0).sort((a,b)=>(b.ageing_days||0)-(a.ageing_days||0)).slice(0,8);
+  const t1C={};open.filter(d=>d.tier1_program).forEach(d=>{t1C[d.tier1_program]=(t1C[d.tier1_program]||0)+1});
+  const t1E=Object.entries(t1C).sort((a,b)=>b[1]-a[1]);
+
+  document.getElementById('charts-grid').innerHTML=`
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Pipeline by Status</div><div class="cc-sub">Open / Closed / Cancelled breakdown</div></div><div class="ch-wrap h180"><canvas id="ch-status"></canvas></div><div class="leg" id="leg-status"></div></div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Ageing Distribution</div><div class="cc-sub">Open demands by urgency group</div></div><div class="ch-wrap h180"><canvas id="ch-age"></canvas></div><div class="leg" id="leg-age"></div></div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Demand Type Split</div><div class="cc-sub">New vs Backfill vs Sell Bill</div></div><div class="ch-wrap h180"><canvas id="ch-type"></canvas></div><div class="leg" id="leg-type"></div></div>
+    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Open Demands by BSA</div><div class="cc-sub">Active pipeline per Business Service Area — click a bar to filter tracker</div></div>
+      <div style="margin-top:4px">${bsaE.map(([b,c])=>`<div class="bsa-row"><div class="bsa-name" title="${b}">${b}</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:${Math.round(c/maxBsa*100)}%"></div></div><div class="bsa-num">${c}</div></div>`).join('')}</div>
+    </div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Location Split</div><div class="cc-sub">Open demands by work location</div></div><div class="ch-wrap h200"><canvas id="ch-loc"></canvas></div><div class="leg" id="leg-loc"></div></div>
+    <div class="cc w3"><div class="cc-hd"><div class="cc-title">Recruitment Pipeline — Profile Status Funnel</div><div class="cc-sub">Where open demands sit in the hiring funnel</div></div><div class="ch-wrap h160"><canvas id="ch-pipe"></canvas></div></div>
+    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Service Line Demand Count</div><div class="cc-sub">Open demand volume by practice area</div></div><div class="ch-wrap h200"><canvas id="ch-sl"></canvas></div></div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Top Overdue Demands</div><div class="cc-sub">Highest ageing — immediate action needed</div></div>
+      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)">#${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
+    </div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Tier-1 Programs</div><div class="cc-sub">Strategic programs with open pipeline</div></div>
+      <div class="t1-list">${t1E.length?t1E.map(([k,v])=>`<div class="t1-item"><div class="t1-name">${k}</div><div class="t1-cnt">${v}</div></div>`).join(''):'<p style="font-size:12px;color:var(--t3);padding:8px 0">None in open demands</p>'}</div>
+    </div>
+    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Pipeline Health Summary</div><div class="cc-sub">Account-level metrics — all time</div></div>
+      <table class="summ-tbl">
+        <tr><td>Total demands in database</td><td>${demands.length}</td><td>All statuses</td></tr>
+        <tr><td>Currently open</td><td style="color:var(--blue)">${open.length}</td><td>Active pipeline</td></tr>
+        <tr><td>Overdue (A–C)</td><td style="color:var(--red)">${ov.length}</td><td style="color:var(--red)">⚠ Immediate action needed</td></tr>
+        <tr><td>Profiles submitted to NW</td><td style="color:var(--purple)">${profSub.length}</td><td>Awaiting customer decision</td></tr>
+        <tr><td>At interview stage</td><td style="color:var(--amber)">${atInt.length}</td><td>Interview scheduled/completed</td></tr>
+        <tr><td>Closed / Fulfilled</td><td style="color:var(--green)">${closed.length}</td><td>Successfully placed</td></tr>
+        <tr><td>Cancelled</td><td style="color:var(--t2)">${cancelled.length}</td><td>Withdrawn or not needed</td></tr>
+        <tr><td>Fulfilment rate</td><td style="color:var(--green)">${fulfRate}%</td><td>Closed ÷ (Closed + Cancelled)</td></tr>
+      </table>
+    </div>`;
+
+  setTimeout(()=>{
+    const tot=open.length+closed.length+cancelled.length||1;
+    charts.status=new Chart(document.getElementById('ch-status'),{type:'doughnut',data:{labels:['Open','Closed','Cancelled'],datasets:[{data:[open.length,closed.length,cancelled.length],backgroundColor:['#185FA5','#1a6640','#8c1f1f'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:d=>`${d.label}: ${d.raw} (${Math.round(d.raw/tot*100)}%)`}}},cutout:'62%'}});
+    document.getElementById('leg-status').innerHTML=[['#185FA5','Open',open.length],['#1a6640','Closed',closed.length],['#8c1f1f','Cancelled',cancelled.length]].map(([c,l,n])=>`<div class="leg-i"><div class="leg-dot" style="background:${c}"></div>${l}: <strong>${n}</strong></div>`).join('');
+    const agKeys=Object.keys(agC);
+    charts.age=new Chart(document.getElementById('ch-age'),{type:'doughnut',data:{labels:agKeys.map(k=>k.substring(0,12)),datasets:[{data:Object.values(agC),backgroundColor:agColors,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
+    document.getElementById('leg-age').innerHTML=agKeys.map((k,i)=>`<div class="leg-i"><div class="leg-dot" style="background:${agColors[i]}"></div>${k.substring(0,18)}: <strong>${agC[k]}</strong></div>`).join('');
+    charts.type=new Chart(document.getElementById('ch-type'),{type:'doughnut',data:{labels:DT_LIST,datasets:[{data:DT_LIST.map(t=>tyC[t]),backgroundColor:['#4a2d8c','#7a4a00','#0d5c52'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
+    document.getElementById('leg-type').innerHTML=DT_LIST.map((t,i)=>`<div class="leg-i"><div class="leg-dot" style="background:${['#4a2d8c','#7a4a00','#0d5c52'][i]}"></div>${t}: <strong>${tyC[t]}</strong></div>`).join('');
+    charts.loc=new Chart(document.getElementById('ch-loc'),{type:'pie',data:{labels:Object.keys(locC),datasets:[{data:Object.values(locC),backgroundColor:locColors,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+    document.getElementById('leg-loc').innerHTML=Object.keys(locC).map((l,i)=>`<div class="leg-i"><div class="leg-dot" style="background:${locColors[i]}"></div>${l}: <strong>${locC[l]}</strong></div>`).join('');
+    const psKeys=Object.keys(psC);
+    charts.pipe=new Chart(document.getElementById('ch-pipe'),{type:'bar',data:{labels:psKeys.map(k=>psS[k]||k),datasets:[{data:psKeys.map(k=>psC[k]),backgroundColor:'#185FA5',borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{font:{size:10}},grid:{display:false}}}}});
+    charts.sl=new Chart(document.getElementById('ch-sl'),{type:'bar',data:{labels:slE.map(x=>x[0]),datasets:[{data:slE.map(x=>x[1]),backgroundColor:'#0d5c52',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{ticks:{font:{size:10},autoSkip:false,maxRotation:35},grid:{display:false}}}}});
+  },80);
+}
+
+// ═══════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════
+async function loadNotifLog(){
+  // Notifications list not in SP — use in-memory log only
+  try{renderNotifLog();}catch(e){}
+}
+function renderNotifLog(){
+  const el=document.getElementById('notif-log');
+  if(!notifLog.length){el.innerHTML='<div style="font-size:12px;color:var(--t3);padding:10px 0;text-align:center">No activity yet.</div>';return}
+  const icons={add:'➕',cancel:'✕',close:'✓',update:'✎'};
+  el.innerHTML=notifLog.map(n=>`
+    <div class="nl-item">
+      <div class="nl-ic ${n.type}">${icons[n.type]||'•'}</div>
+      <div class="nl-text"><div class="nm">${n.title||'—'}</div><div class="ns">${n.subtitle||''}</div></div>
+      <div class="nl-meta"><span class="nl-sent">✓ Logged</span><span class="nl-time">${new Date(n.created_at).toLocaleTimeString()}</span></div>
+    </div>`).join('');
+}
+// ══ EMAIL NOTIFICATION RECIPIENTS ══
+// Add/remove emails for each event type
+const NOTIF_CFG={
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  weekly: {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']}, // Add leadership emails here
+};
+
+// ══ LEADERSHIP REPORT RECIPIENTS ══
+// These receive the Monday weekly dashboard email
+// Update this list with leadership email addresses
+let LEADERSHIP_RECIPIENTS = [
+  'Srikanth.Bura@cognizant.com',
+  // Add leadership recipients below:
+  // 'leader1@cognizant.com',
+  // 'leader2@cognizant.com',
+];
+async function logNotif(type,d){
+  // Check if this notification type is enabled in settings
+  const toggleMap={add:'t-new',cancel:'t-cancel',close:'t-close',update:'t-new'};
+  const toggleId = toggleMap[type];
+  if(toggleId){
+    const tog = document.getElementById(toggleId);
+    if(tog && !tog.checked){
+      console.log('Notification suppressed (toggle off):', type);
+      return;
+    }
+  }
+  const cfg=NOTIF_CFG[type]||{label:type,to:[]};
+  const titles={
+    add:    `New demand #${d.demand_id} added — ${d.bsa}`,
+    cancel: `Demand #${d.demand_id} cancelled — ${d.bsa}`,
+    close:  `Demand #${d.demand_id} closed — ${d.bsa}`,
+    update: `Demand #${d.demand_id} updated — ${d.bsa}`
+  };
+  const subs={
+    add:    `${d.skills||'—'} · ${d.demand_type||'—'} · ${d.service_line||'—'}`,
+    cancel: `Cancelled ${new Date().toLocaleDateString()} by ${USER_NAME}`,
+    close:  `Closed ${new Date().toLocaleDateString()} by ${USER_NAME}`,
+    update: `Profile: ${d.profile_status||'—'} · Updated by ${USER_NAME}`
+  };
+  notifLog.unshift({type,demand_id:d.demand_id,bsa:d.bsa,
+    title:titles[type]||type,subtitle:subs[type]||'',
+    triggered_by:USER_NAME,created_at:new Date().toISOString()});
+  if(notifLog.length>50) notifLog.pop();
+  // Only log to SP Notifications list if it exists — silently skip if not
+  try{
+    await sbIns('notifications',{
+      type,demand_id:d.demand_id,
+      title:titles[type]||type,
+      subtitle:subs[type]||'',
+      triggered_by:USER_NAME,
+      recipients:cfg.to.join(';')
+    });
+  }catch(e){
+    // Notifications list may not exist — non-critical, skip silently
+    if(!e.message.includes('404')) console.warn('Notification failed:',e.message);
+  }
+}
+function saveNotifSettings(){
+  // Collect recipient tags
+  const tags = [...document.querySelectorAll('#tag-box .rtag')].map(t=>t.textContent.replace('×','').trim()).filter(Boolean);
+  
+  // Collect CC
+  const ccEl = document.getElementById('notif-cc');
+  const cc = ccEl ? ccEl.value.trim() : '';
+  
+  // Collect digest time
+  const digestEl = document.getElementById('notif-digest-time');
+  const digestTime = digestEl ? digestEl.value : '9:00 AM';
+  
+  // Collect toggle states
+  const settings = {
+    recipients: tags,
+    cc: cc,
+    digestTime: digestTime,
+    triggers: {
+      add:    document.getElementById('t-new')?.checked    ?? true,
+      cancel: document.getElementById('t-cancel')?.checked ?? true,
+      close:  document.getElementById('t-close')?.checked  ?? true,
+      overdue:document.getElementById('t-ovd')?.checked    ?? true,
+      pipeline:document.getElementById('t-pip')?.checked   ?? true,
+      weekly: document.getElementById('t-wkly')?.checked   ?? false,
+    }
+  };
+  
+  // Save to localStorage (persists across sessions)
+  localStorage.setItem('nwmca_notif_settings', JSON.stringify(settings));
+  
+  // Update live NOTIF_CFG so next logNotif() uses these recipients
+  const allTo = tags;
+  if(allTo.length > 0){
+    NOTIF_CFG.add.to    = settings.triggers.add    ? allTo : [];
+    NOTIF_CFG.cancel.to = settings.triggers.cancel ? allTo : [];
+    NOTIF_CFG.close.to  = settings.triggers.close  ? allTo : [];
+    NOTIF_CFG.update.to = settings.triggers.add    ? allTo : [];
+  }
+  
+  console.log('Notification settings saved:', settings);
+  toast('Notification settings saved ✓ — recipients: '+allTo.join(', '),'green');
+}
+
+function loadNotifSettings(){
+  // Load saved settings from localStorage
+  try{
+    const raw = localStorage.getItem('nwmca_notif_settings');
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    
+    // Restore recipient tags
+    if(s.recipients && s.recipients.length){
+      const box = document.getElementById('tag-box');
+      const inp = document.getElementById('tag-inp');
+      if(box && inp){
+        // Remove existing placeholder tags
+        box.querySelectorAll('.rtag').forEach(t=>t.remove());
+        // Add saved recipients
+        s.recipients.forEach(email=>{
+          const span = document.createElement('span');
+          span.className = 'rtag';
+          span.innerHTML = `${email}<span class="rx" onclick="removeTag(this)">×</span>`;
+          box.insertBefore(span, inp);
+        });
+      }
+    }
+    
+    // Restore CC
+    if(s.cc){
+      const ccEl = document.getElementById('notif-cc');
+      if(ccEl) ccEl.value = s.cc;
+    }
+    
+    // Restore digest time
+    if(s.digestTime){
+      const digestEl = document.getElementById('notif-digest-time');
+      if(digestEl) digestEl.value = s.digestTime;
+    }
+    
+    // Restore toggle states
+    const toggleMap = {
+      't-new':s.triggers?.add,'t-cancel':s.triggers?.cancel,
+      't-close':s.triggers?.close,'t-ovd':s.triggers?.overdue,
+      't-pip':s.triggers?.pipeline,'t-wkly':s.triggers?.weekly
+    };
+    Object.entries(toggleMap).forEach(([id,val])=>{
+      const el = document.getElementById(id);
+      if(el && val !== undefined) el.checked = val;
+    });
+    
+    // Update live NOTIF_CFG
+    if(s.recipients && s.recipients.length){
+      NOTIF_CFG.add.to    = s.triggers?.add    ? s.recipients : [];
+      NOTIF_CFG.cancel.to = s.triggers?.cancel ? s.recipients : [];
+      NOTIF_CFG.close.to  = s.triggers?.close  ? s.recipients : [];
+      NOTIF_CFG.update.to = s.triggers?.add    ? s.recipients : [];
+    }
+    
+    console.log('Notification settings loaded:', s);
+  }catch(e){ console.warn('Could not load notification settings:', e.message); }
+}
+function addLeaderTag(e){
+  if(e.key!=='Enter'&&e.key!==',') return;
+  e.preventDefault();
+  const inp=document.getElementById('leader-tag-inp');
+  const val=inp.value.trim();
+  if(!val||!val.includes('@')) return;
+  const box=document.getElementById('leader-tag-box');
+  const span=document.createElement('span');
+  span.className='rtag';
+  span.style.cssText='background:var(--blue-bg);color:var(--blue)';
+  span.innerHTML=`${val}<span class="rx" onclick="removeLeaderTag(this)">×</span>`;
+  box.insertBefore(span,inp);
+  inp.value='';
+}
+function removeLeaderTag(el){
+  el.parentElement.remove();
+}
+function saveLeadershipRecipients(){
+  const tags=[...document.querySelectorAll('#leader-tag-box .rtag')]
+    .map(t=>t.textContent.replace('×','').trim()).filter(Boolean);
+  LEADERSHIP_RECIPIENTS=tags;
+  localStorage.setItem('nwmca_leadership_recipients', JSON.stringify(tags));
+  toast('Leadership recipients saved: '+tags.join(', '),'green');
+}
+function loadLeadershipRecipients(){
+  try{
+    const raw=localStorage.getItem('nwmca_leadership_recipients');
+    if(!raw) return;
+    const tags=JSON.parse(raw);
+    LEADERSHIP_RECIPIENTS=tags;
+    const box=document.getElementById('leader-tag-box');
+    const inp=document.getElementById('leader-tag-inp');
+    if(!box||!inp) return;
+    box.querySelectorAll('.rtag').forEach(t=>t.remove());
+    tags.forEach(email=>{
+      const span=document.createElement('span');
+      span.className='rtag';
+      span.style.cssText='background:var(--blue-bg);color:var(--blue)';
+      span.innerHTML=`${email}<span class="rx" onclick="removeLeaderTag(this)">×</span>`;
+      box.insertBefore(span,inp);
+    });
+  }catch(e){}
+}
+function addTag(e){if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.trim().replace(/,$/,'');if(v&&v.includes('@')){const s=document.createElement('span');s.className='rtag';s.innerHTML=`${v}<span class="rx" onclick="removeTag(this)">×</span>`;e.target.before(s);e.target.value=''}}}
+function removeTag(el){el.parentElement.remove()}
+
+function renderEmailPrev(){
+  const type=document.getElementById('prev-type').value;
+  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const s=demands[0]||{};
+  const hdr=(t,sub,col='#1a4b8c')=>`<div class="em-hd" style="background:${col}"><div class="eh-tag">Cognizant · Nationwide MCA</div><h2>${t}</h2><div class="eh-sub">${sub}</div></div>`;
+  const ft=`<div class="em-ft">Automated notification · NW MCA Demand Tracker · ${new Date().toLocaleDateString()}</div>`;
+  let html='';
+  if(type==='digest'){
+    const bsaMap=open.reduce((a,d)=>{a[d.bsa]=(a[d.bsa]||0)+1;return a},{});
+    html=`<div class="em">${hdr('Daily Demand Digest','Pipeline summary · '+new Date().toLocaleDateString())}
+    <div class="em-bd"><div class="em-kpis"><div class="em-kpi"><div class="ev">${open.length}</div><div class="el">Open</div></div><div class="em-kpi"><div class="ev" style="color:#8c1f1f">${ov.length}</div><div class="el">Overdue</div></div><div class="em-kpi"><div class="ev" style="color:#1a6640">${closed.length}</div><div class="el">Closed</div></div></div>
+    <div class="em-st">⚠ Critical Overdue Demands (A–C)</div>
+    ${ov.slice(0,5).map(d=>`<div class="em-row"><span><strong>#${d.demand_id}</strong> · ${d.bsa} · ${d.skills}</span><span style="color:#8c1f1f;font-size:11px">${d.ageing_group}</span></div>`).join('')}
+    ${ov.length>5?`<div style="font-size:11px;color:#888;padding:4px 0">+ ${ov.length-5} more overdue demands</div>`:''}
+    <br><div class="em-st">📊 Open Demands by BSA</div>
+    ${Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([b,c])=>`<div class="em-row"><span>${b}</span><strong>${c}</strong></div>`).join('')}
+    </div>${ft}</div>`;
+  }else if(type==='new'){
+    html=`<div class="em">${hdr('🆕 New Demand Added','Immediate attention required','#1a6640')}
+    <div class="em-bd"><div style="background:#e6f4ec;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px">Demand <strong>#${s.demand_id}</strong> has been added to the tracker and requires resourcing action.</div>
+    <div class="em-st">Demand Details</div>
+    ${[['Demand ID','#'+s.demand_id],['BSA',s.bsa],['Team',s.team_name||'—'],['Skills Required',s.skills],['Location',s.location],['Service Line',s.service_line],['Demand Type',s.demand_type],['Target Start Date',fmt(s.target_date)],['SEPM/SEL',s.sepm_sel||'—'],['FG/JP ID',s.fg_form_number||'—']].map(([l,v])=>`<div class="em-row"><span style="color:#666">${l}</span><strong>${v||'—'}</strong></div>`).join('')}
+    </div>${ft}</div>`;
+  }else if(type==='cancel'){
+    html=`<div class="em">${hdr('❌ Demand Cancelled','For your records','#8c1f1f')}
+    <div class="em-bd"><div style="background:#faeaea;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px;color:#8c1f1f">Demand <strong>#${s.demand_id}</strong> has been <strong>cancelled</strong> and closed as of today.</div>
+    ${[['Demand ID','#'+s.demand_id],['BSA',s.bsa],['Skills',s.skills],['Type',s.demand_type],['Cancelled On',new Date().toLocaleDateString()],['Last Profile Status',s.profile_status]].map(([l,v])=>`<div class="em-row"><span style="color:#666">${l}</span><strong>${v||'—'}</strong></div>`).join('')}
+    </div>${ft}</div>`;
+  }else if(type==='closed'){
+    html=`<div class="em">${hdr('✅ Demand Fulfilled!','Great news from the NW MCA team','#1a6640')}
+    <div class="em-bd"><div style="background:#e6f4ec;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px;color:#1a6640">🎉 Demand <strong>#${s.demand_id}</strong> has been <strong>successfully fulfilled</strong>. The resource is being onboarded.</div>
+    ${[['Demand ID','#'+s.demand_id],['BSA',s.bsa],['Skills',s.skills],['Profile Selected',s.profile_name||'—'],['Service Line',s.service_line],['Closure Date',new Date().toLocaleDateString()]].map(([l,v])=>`<div class="em-row"><span style="color:#666">${l}</span><strong>${v||'—'}</strong></div>`).join('')}
+    </div>${ft}</div>`;
+  }else if(type==='overdue'){
+    html=`<div class="em">${hdr(`⚠ ${ov.length} Overdue Demands Require Action`,'Daily overdue alert · '+new Date().toLocaleDateString(),'#7a4a00')}
+    <div class="em-bd"><div style="background:#fef3e2;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px"><strong>${ov.length} demands</strong> have passed their target start dates and need immediate attention.</div>
+    <div class="em-st">Overdue Demand Details</div>
+    ${ov.slice(0,10).map(d=>`<div class="em-ev"><div class="em-ev-dot" style="background:#8c1f1f"></div><div style="flex:1"><strong>#${d.demand_id}</strong> · ${d.bsa} · ${d.skills}<div style="font-size:10px;color:#888;margin-top:1px">${d.ageing_group} · Target: ${fmt(d.target_date)} · ${d.service_line}</div></div></div>`).join('')}
+    ${ov.length>10?`<div style="font-size:11px;color:#888;padding:5px 0">+ ${ov.length-10} more overdue demands</div>`:''}
+    </div>${ft}</div>`;
+  }
+  document.getElementById('ep-body').innerHTML=html;
+}
+
+// ═══════════════════════════════════════
+// DETAIL PANEL
+// ═══════════════════════════════════════
+function openDetail(id){
+  const d=demands.find(x=>String(x.id)===String(id));if(!d)return;
+  document.getElementById('panel-title').textContent=`#${d.demand_id} — ${d.bsa||'Unknown BSA'}`;
+  document.getElementById('panel-body').innerHTML=`
+    <div class="ps"><div class="ps-title">Status & Classification</div>
+      <div class="dg">
+        <div class="di"><div class="dl">Demand Status</div><div class="dv">${stB(d.demand_status)}</div></div>
+        <div class="di"><div class="dl">Demand Type</div><div class="dv">${tyB(d.demand_type)}</div></div>
+        <div class="di full"><div class="dl">Profile Status</div><div class="dv">${d.profile_status||'—'}</div></div>
+        <div class="di"><div class="dl">Ageing</div><div class="dv">${ageB(d.ageing_days,d.ageing_group)}</div></div>
+        <div class="di"><div class="dl">Ageing Group</div><div class="dv" style="font-size:11px;color:var(--t3)">${d.ageing_group||'—'}</div></div>
+      </div>
+    </div>
+    <div class="ps"><div class="ps-title">Demand Details</div>
+      <div class="dg">
+        <div class="di"><div class="dl">BSA</div><div class="dv" style="font-weight:600">${d.bsa||'—'}</div></div>
+        <div class="di"><div class="dl">Team Name</div><div class="dv">${d.team_name||'—'}</div></div>
+        <div class="di full"><div class="dl">Skills Required</div><div class="dv" style="white-space:pre-wrap;line-height:1.6">${d.skills||'—'}</div></div>
+        <div class="di"><div class="dl">Location</div><div class="dv">${locB((d.location||'').trim())}</div></div>
+        <div class="di"><div class="dl">Service Line</div><div class="dv">${d.service_line||'—'}</div></div>
+        <div class="di"><div class="dl">SEPM / SEL</div><div class="dv">${d.sepm_sel||'—'}</div></div>
+        <div class="di"><div class="dl">SO ID</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${d.so_id||'—'}</div></div>
+        ${d.tier1_program?`<div class="di full"><div class="dl">Tier-1 Program</div><div class="dv" style="color:var(--purple);font-weight:600">${d.tier1_program}</div></div>`:''}
+        ${d.fg_form_number?`<div class="di"><div class="dl">FG Form / JP ID</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}
+        ${d.fieldglass_status?`<div class="di"><div class="dl">Fieldglass Status</div><div class="dv">${d.fieldglass_status}</div></div>`:''}
+      </div>
+    </div>
+    <div class="ps"><div class="ps-title">Dates</div>
+      <div class="dg">
+        <div class="di"><div class="dl">Added On</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.demand_added_on)}</div></div>
+        <div class="di"><div class="dl">Target Start Date</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.target_date)}</div></div>
+        ${d.demand_closure_date?`<div class="di"><div class="dl">Closure Date</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.demand_closure_date)}</div></div>`:''}
+        ${d.updated_by?`<div class="di full"><div class="dl">Last Updated By</div><div class="dv">${d.updated_by} · ${new Date(d.updated_at).toLocaleString()}</div></div>`:''}
+      </div>
+    </div>
+    <div class="ps"><div class="ps-title">Profile Information</div>
+      <div class="dg">
+        <div class="di full"><div class="dl">Profile Name(s)</div><div class="dv" style="white-space:pre-wrap;line-height:1.6">${d.profile_name||'No profile assigned'}</div></div>
+        ${d.backfill_resource?`<div class="di full"><div class="dl">Current Resource (Backfill)</div><div class="dv">${d.backfill_resource}</div></div>`:''}
+      </div>
+    </div>
+    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>`:''}`;
+  document.getElementById('panel-foot').innerHTML=`
+    <button class="btn" onclick="closePanel()">Close</button>
+    <button class="btn primary" onclick="closePanel();openEdit(${id})">✏ Edit</button>
+    ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn danger" onclick="closePanel();confCancel(${id})">✕ Cancel</button>`:''}
+    <button class="btn ghost sm" onclick="confDelete(${id})" style="color:var(--t3);margin-left:auto" title="Delete permanently">🗑 Delete</button>`;
+  document.getElementById('panel').classList.add('on');
+  document.getElementById('overlay').classList.add('on');
+}
+function closePanel(){document.getElementById('panel').classList.remove('on');document.getElementById('overlay').classList.remove('on')}
+
+// ═══════════════════════════════════════
+// ADD / EDIT FORM
+// ═══════════════════════════════════════
+function sel(id,opts,val,onch=''){return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${opts.map(o=>`<option${o===(val||'')?` selected`:``}>${o}</option>`).join('')}</select>`}
+function rlbl(t){return`${t} <span class="req-star">*</span>`}
+function autoCalcTarget(){
+  const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
+  if(a&&t&&a.value){const dt=new Date(a.value);dt.setDate(dt.getDate()+21);t.value=dt.toISOString().split('T')[0]}
+}
+function onStatusChange(){
+  const stEl=document.getElementById('m-st');
+  const psEl=document.getElementById('m-ps');
+  const clEl=document.getElementById('m-closed');
+  const hint=document.getElementById('m-st-hint');
+  if(!stEl)return;
+  const st=stEl.value.toLowerCase();
+  const today=new Date().toISOString().split('T')[0];
+  if(st==='closed'){
+    if(psEl){psEl.value='6. NW Onboarding';psEl.style.borderColor='var(--green)';}
+    if(clEl){clEl.value=today;clEl.style.borderColor='var(--green)';}
+    if(hint)hint.innerHTML='<span style="color:var(--green);font-weight:500">&#10003; Profile Status set to NW Onboarding &middot; Closure Date set to today</span>';
+  } else if(st==='cancel'){
+    if(clEl){clEl.value=today;clEl.style.borderColor='var(--amber)';}
+    if(psEl)psEl.style.borderColor='';
+    if(hint)hint.innerHTML='<span style="color:var(--amber);font-weight:500">&#10003; Closure Date set to today</span>';
+  } else {
+    if(psEl)psEl.style.borderColor='';
+    if(clEl)clEl.style.borderColor='';
+    if(hint)hint.innerHTML='';
+  }
+}
+function onTypeChange(){
+  const tyEl=document.getElementById('m-ty');
+  const bfEl=document.getElementById('m-bf');
+  const bfLbl=document.getElementById('m-bf-label');
+  if(!tyEl)return;
+  const isBackfill=tyEl.value==='Backfill';
+  if(bfLbl)bfLbl.innerHTML=isBackfill?'Current Resource (Backfill) <span class="req-star">*</span>':'Current Resource (Backfill)';
+  if(bfEl){bfEl.style.borderColor='';bfEl.placeholder=isBackfill?'Required for Backfill demands':'';}
+}
+function makeForm(d,isNew){
+  const today=new Date().toISOString().split('T')[0];
+  const addedVal=d.demand_added_on||today;
+  let tgtVal=d.target_date||'';
+  if(isNew){const dt=new Date(addedVal);dt.setDate(dt.getDate()+21);tgtVal=dt.toISOString().split('T')[0]}
+  return`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:8px 12px;border-radius:var(--r);margin-bottom:16px;font-weight:500">
+    Fields marked <span class="req-star">*</span> are mandatory
+  </div>
+  <div class="fg">
+    <div class="fg-sect">Status & Classification</div>
+    <div class="ff2"><label>Status</label>${sel('st',ST_LIST,d.demand_status,'onStatusChange()')}<div id="m-st-hint" style="font-size:10px;margin-top:3px"></div></div>
+    <div class="ff2"><label>Demand Type</label>${sel('ty',DT_LIST,d.demand_type,'onTypeChange()')}</div>
+    <div class="ff2 fg-full"><label>Profile Status</label>${sel('ps',PS_LIST,d.profile_status)}</div>
+    <div class="fg-sect">Demand Details</div>
+    <div class="ff2"><label>${rlbl('BSA')}</label>${sel('bsa',[''].concat(BSA_LIST),d.bsa)}</div>
+    <div class="ff2"><label>${rlbl('Service Line')}</label>${sel('sl',[''].concat(SL_LIST),d.service_line)}</div>
+    <div class="ff2"><label>Team Name</label><input id="m-team" value="${(d.team_name||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2"><label>SEPM / SEL</label><input id="m-sepm" value="${(d.sepm_sel||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2 fg-full"><label>${rlbl('Skills Required')}</label><textarea id="m-sk">${d.skills||''}</textarea></div>
+    <div class="ff2"><label>${rlbl('Location')}</label>${sel('loc',[''].concat(LOC_LIST),d.location)}</div>
+    <div class="ff2"><label>SO ID</label><input id="m-soid" value="${d.so_id||''}"></div>
+    <div class="fg-sect">Dates</div>
+    <div class="ff2"><label>${rlbl('Demand Added On')}</label><input type="date" id="m-added" value="${addedVal}" onchange="autoCalcTarget()"></div>
+    <div class="ff2"><label>${rlbl('Target Start Date')} <span style="font-size:10px;color:var(--t3);font-weight:400">(auto +21 days · editable)</span></label><input type="date" id="m-tgt" value="${tgtVal}"></div>
+    <div class="ff2"><label>Closure Date</label><input type="date" id="m-closed" value="${d.demand_closure_date||''}"></div>
+    <div class="ff2"><label>Ageing Group</label>${sel('ag',[''].concat(AGS),d.ageing_group)}</div>
+    <div class="fg-sect">Profile Information</div>
+    <div class="ff2 fg-full"><label>Profile Name(s)</label><input id="m-prof" value="${(d.profile_name||'').split('\n')[0].replace(/"/g,'&quot;')}"></div>
+    <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
+  </div>`;
+}
+function gv(id){const e=document.getElementById(id);return e?e.value.trim():''}
+function openAdd(){
+  editId=null;
+  const titleEl = document.getElementById('modal-title');
+  const saveEl  = document.getElementById('modal-save');
+  const bodyEl  = document.getElementById('modal-body');
+  const bgEl    = document.getElementById('modal-bg');
+  if(!titleEl||!saveEl||!bodyEl||!bgEl){ console.error('Add modal elements missing'); return; }
+  titleEl.textContent = 'Add New Demand';
+  saveEl.textContent  = 'Add Demand';
+  bodyEl.innerHTML    = makeForm({}, true);
+  bgEl.classList.add('on');
+}
+function openEdit(id){
+  editId=id;
+  const d=demands.find(x=>String(x.id)===String(id)); if(!d){ toast('Demand not found','red'); return; }
+  const titleEl=document.getElementById('modal-title');
+  const saveEl =document.getElementById('modal-save');
+  const bodyEl =document.getElementById('modal-body');
+  const bgEl   =document.getElementById('modal-bg');
+  if(!titleEl||!saveEl||!bodyEl||!bgEl){ console.error('Edit modal elements missing'); return; }
+  titleEl.textContent = `Edit Demand #${d.demand_id}`;
+  saveEl.textContent  = 'Save Changes';
+  bodyEl.innerHTML    = makeForm(d, false);
+  bgEl.classList.add('on');
+  setTimeout(()=>{ try{onTypeChange();}catch(e){} }, 80);
+}
+async function saveDemand(){
+  const sk=gv('m-sk'),bsa=gv('m-bsa'),sl=gv('m-sl'),loc=gv('m-loc'),added=gv('m-added'),tgt=gv('m-tgt');
+  const ty=gv('m-ty'), bf=gv('m-bf'), st=(gv('m-st')||'open').toLowerCase();
+  const today=new Date().toISOString().split('T')[0];
+  const errs=[];
+  if(!added)errs.push('Demand Added On');
+  if(!sk)errs.push('Skills Required');
+  if(!bsa)errs.push('BSA');
+  if(!sl)errs.push('Service Line');
+  if(!loc)errs.push('Location');
+  if(!tgt)errs.push('Target Start Date');
+  // Rule 3: Backfill must have current resource
+  if(ty==='Backfill'&&!bf)errs.push('Current Resource (required for Backfill)');
+  if(errs.length){
+    ['m-sk','m-bsa','m-sl','m-loc','m-added','m-tgt'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.borderColor=el.value.trim()?'':'var(--red)'});
+    const bfEl=document.getElementById('m-bf');
+    if(ty==='Backfill'&&!bf&&bfEl)bfEl.style.borderColor='var(--red)';
+    toast('Required: '+errs.join(' · '),'red');return;
+  }
+  ['m-sk','m-bsa','m-sl','m-loc','m-added','m-tgt','m-bf'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.borderColor=''});
+  // Rule 1: Closed → profile status = NW Onboarding + closure date = today
+  const psEl=document.getElementById('m-ps');
+  const clEl=document.getElementById('m-closed');
+  if(st==='closed'){
+    if(psEl)psEl.value='6. NW Onboarding';
+    if(clEl&&!clEl.value)clEl.value=today;
+  }
+  // Rule 2: Cancel → closure date = today
+  if(st==='cancel'){
+    if(clEl&&!clEl.value)clEl.value=today;
+  }
+  const finalClosure=gv('m-closed')||((st==='closed'||st==='cancel')?today:null);
+  const today2=new Date();
+  const tgtDate=tgt?new Date(tgt):null;
+  const ageingDays=tgtDate?Math.floor((today2-tgtDate)/(1000*60*60*24)):0;
+  // Get status with correct casing for SP choice column
+  const rawSt = gv('m-st') || 'Open';
+  // Map to exact SP choice values
+  const statusMap = {'open':'Open','closed':'Closed','cancel':'Cancel','on hold':'On Hold'};
+  const normSt = statusMap[rawSt.toLowerCase()] || rawSt;
+  // Build payload — strip null/empty values to prevent SP 400
+  const _p = {
+    demand_status: normSt,
+    profile_status: gv('m-ps'),
+    ageing_days: ageingDays,
+    demand_type: ty,
+    bsa: bsa,
+    service_line: sl,
+    team_name: gv('m-team'),
+    sepm_sel: gv('m-sepm'),
+    skills: sk,
+    location: loc,
+    so_id: gv('m-soid'),
+    demand_added_on: added,
+    target_date: tgt,
+    demand_closure_date: finalClosure,
+    ageing_group: gv('m-ag') || calcAgeingGroup(ageingDays),
+    profile_name: gv('m-prof'),
+    backfill_resource: bf,
+    tier1_program: gv('m-t1'),
+    fg_form_number: gv('m-fg'),
+    status_updates: gv('m-upd'),
+    updated_by: USER_NAME,
+  };
+  // Strip null/undefined/empty — SP rejects them on required choice columns
+  const payload = {};
+  Object.keys(_p).forEach(k => { if(_p[k]!==null && _p[k]!==undefined && _p[k]!=='') payload[k]=_p[k]; });
+  setSyncStatus('saving','↻ Saving…');
+  console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
+  try{
+    if(editId){
+      const d=demands.find(x=>String(x.id)===String(editId));
+      const prev=d?d.demand_status:'';
+      await sbUpd('demands','id=eq.'+editId,payload);
+      const idx=demands.findIndex(x=>String(x.id)===String(editId));
+      demands[idx]={...demands[idx],...payload};
+      const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
+      if(ns!==os){if(ns==='cancel')logNotif('cancel',demands[idx]);else if(ns==='closed')logNotif('close',demands[idx]);}
+      else{ logNotif('update',demands[idx]); } // notify on any edit
+      toast(`Demand #${demands[idx].demand_id} updated ✓`,'green');
+    }else{
+      // Get next ID from local demands array (Title column = demand ID)
+      const maxId = demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a, 3000);
+      payload.demand_id = maxId + 1;
+      payload.ageing_days = 0;
+      const res=await sbIns('demands',payload);
+      const nd=Array.isArray(res)?res[0]:res;
+      if(nd)demands.push(nd);
+      if(document.getElementById('t-new')?.checked)logNotif('add',nd||payload);
+      toast('New demand added ✓','green');
+    }
+    setSyncStatus('ok','● Live');
+    closeModal();renderAll();
+  }catch(e){
+    setSyncStatus('err','⚠ Error');
+    console.error('saveDemand error:', e.message);
+    toast('Save failed: '+(e.message||'error').substring(0,120),'red');
+  }
+}
+
+// ═══════════════════════════════════════
+// CANCEL & DELETE
+// ═══════════════════════════════════════
+async function confCancel(id){
+  const d=demands.find(x=>String(x.id)===String(id));
+  if(!d){toast('Demand not found','red');return;}
+  document.getElementById('conf-title').textContent=`Cancel Demand #${d.demand_id}?`;
+  document.getElementById('conf-body').innerHTML=`<p>Mark the demand for <strong>${d.skills||'—'}</strong> (${d.bsa||'—'}) as cancelled with today as closure date.</p>`;
+  document.getElementById('conf-ok').textContent='Cancel Demand';
+  document.getElementById('conf-ok').onclick=()=>{doCancel(id);closeConf()};
+  const _cbg=document.getElementById('conf-bg'); if(_cbg) _cbg.classList.add('on');
+}
+async function doCancel(id){
+  const d=demands.find(x=>String(x.id)===String(id));
+  if(!d){toast('Demand not found','red');return;}
+  const payload={demand_status:'Cancel',demand_closure_date:new Date().toISOString().split('T')[0]+'T00:00:00Z',updated_by:USER_NAME};
+  setSyncStatus('saving','↻ Saving…');
+  try{
+    await sbUpd('demands','id=eq.'+id,payload);
+    const idx=demands.findIndex(x=>String(x.id)===String(id));
+    demands[idx]={...demands[idx],...payload};
+    if(document.getElementById('t-cancel')?.checked)logNotif('cancel',demands[idx]);
+    setSyncStatus('ok','● Live');
+    toast(`Demand #${d.demand_id} cancelled`,'amber');
+    renderAll();
+  }catch(e){
+    setSyncStatus('err','⚠ Error');
+    console.error('doCancel error:', e.message);
+    toast('Cancel failed: '+(e.message||'').substring(0,80),'red');
+  }
+}
+async function confDelete(id){
+  const d=demands.find(x=>String(x.id)===String(id));
+  if(!d){toast('Demand not found','red');return;}
+  document.getElementById('conf-title').textContent=`Delete Demand #${d.demand_id}?`;
+  document.getElementById('conf-body').innerHTML=`<p>This will <strong>permanently delete</strong> demand #${d.demand_id} (${d.skills||'—'} · ${d.bsa||'—'}) from the shared database.<br><br>This action <strong>cannot be undone</strong>.</p>`;
+  document.getElementById('conf-ok').textContent='Delete permanently';
+  document.getElementById('conf-ok').onclick=()=>{doDelete(id);closeConf()};
+  const _cbg=document.getElementById('conf-bg'); if(_cbg) _cbg.classList.add('on');
+}
+async function doDelete(id){
+  const d=demands.find(x=>String(x.id)===String(id));
+  if(!d){toast('Demand not found','red');return;}
+  setSyncStatus('saving','↻ Deleting…');
+  try{
+    await sbDel('demands','id=eq.'+id);
+    demands=demands.filter(x=>String(x.id)!==String(id));
+    setSyncStatus('ok','● Live');
+    toast(`Demand #${d.demand_id} deleted`,'');
+    renderAll();
+  }catch(e){
+    setSyncStatus('err','⚠ Error');
+    console.error('doDelete error:', e.message);
+    toast('Delete failed: '+(e.message||'').substring(0,80),'red');
+  }
+}
+function closeModal(){const _mbgr=document.getElementById('modal-bg'); if(_mbgr) _mbgr.classList.remove('on');editId=null}
+function closeConf(){const el=document.getElementById('conf-bg');el.classList.remove('on');document.getElementById('conf-ok').textContent='Confirm'}
+function closeAllModals(){closeModal();closeConf();closePanel()}
+
+// ═══════════════════════════════════════
+// IMPORT CSV
+// ═══════════════════════════════════════
+function openImport(){
+  // Close any other open overlays/modals first
+  try{ const obg=document.getElementById('del-all-bg'); if(obg) obg.classList.remove('on'); }catch(e){}
+  try{ const mbg=document.getElementById('modal-bg'); if(mbg) mbg.classList.remove('on'); }catch(e){}
+  try{ closeMobMenu(); }catch(e){}
+  importRows=[];
+  try{ clearImp(); }catch(e){}
+  var ov = document.getElementById('imp-overlay');
+  if(!ov){ console.error('imp-overlay element missing'); return; }
+  ov.style.display     = 'block';
+  ov.style.position    = 'fixed';
+  ov.style.top         = '0';
+  ov.style.left        = '0';
+  ov.style.right       = '0';
+  ov.style.bottom      = '0';
+  ov.style.width       = '100vw';
+  ov.style.height      = '100vh';
+  ov.style.background  = 'rgba(0,0,0,0.65)';
+  ov.style.zIndex      = '9999999';
+  ov.style.overflowY   = 'auto';
+  ov.style.padding     = '20px';
+}
+function closeImport(){ closeImpOverlay(); }
+function closeImpOverlay(){
+  var ov = document.getElementById('imp-overlay');
+  if(ov){
+    ov.style.display     = 'none';
+    ov.style.position    = '';
+    ov.style.top         = '';
+    ov.style.left        = '';
+    ov.style.right       = '';
+    ov.style.bottom      = '';
+    ov.style.width       = '';
+    ov.style.height      = '';
+    ov.style.background  = '';
+    ov.style.zIndex      = '';
+    ov.style.overflowY   = '';
+    ov.style.padding     = '';
+  }
+  importRows=[];
+}
+function clearImp(){
+  importRows=[];
+  const ids=['imp-preview','imp-progress','imp-done'];
+  ids.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  const inp=document.getElementById('imp-file'); if(inp) inp.value='';
+  const drop=document.getElementById('imp-drop');
+  if(drop){drop.style.borderColor='';drop.style.background='';}
+  const btn=document.getElementById('imp-run-btn'); if(btn) btn.style.display='none';
+  const foot=document.getElementById('imp-footer'); if(foot) foot.style.display='flex';
+  const alerts=document.getElementById('imp-alerts'); if(alerts) alerts.innerHTML='';
+}
+
+function handleImpDrop(e){
+  e.preventDefault();
+  const drop=document.getElementById('imp-drop');
+  if(drop){drop.style.borderColor='';drop.style.background='';}
+  const f=e.dataTransfer.files[0];
+  if(f&&f.name.endsWith('.csv')) parseImpCSV(f);
+  else toast('Please drop a .csv file','red');
+}
+
+function handleImpSelect(e){
+  const f=e.target.files[0];
+  if(f) parseImpCSV(f);
+}
+
+function parseImpCSV(file){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const text=ev.target.result;
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2){toast('CSV must have a header row and data rows','red');return;}
+
+    // Parse header — normalise to lowercase internal keys
+    const rawHdrs=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+    const colMap={
+      'demand_id':'demand_id','Demand_ID':'demand_id','Title':'demand_id','title':'demand_id',
+      'so_id':'so_id','SO_ID':'so_id',
+      'demand_status':'demand_status','Demand_Status':'demand_status',
+      'profile_status':'profile_status','Profile_Status':'profile_status',
+      'demand_type':'demand_type','Demand_Type':'demand_type',
+      'bsa':'bsa','BSA':'bsa',
+      'team_name':'team_name','Team_Name':'team_name',
+      'sepm_sel':'sepm_sel','SEPM_SEL':'sepm_sel','semp_sel':'sepm_sel','SEMP_SEL':'sepm_sel',
+      'skills':'skills','Skills':'skills',
+      'location':'location','Location':'location','on/of':'location','ON/OF':'location',
+      'service_line':'service_line','Service_Line':'service_line',
+      'demand_added_on':'demand_added_on','Demand_Added_On':'demand_added_on','demand added on date':'demand_added_on',
+      'target_date':'target_date','Target_Date':'target_date','Targeting for?':'target_date',
+      'demand_closure_date':'demand_closure_date','Demand_Closure_Date':'demand_closure_date',
+      'ageing_days':'ageing_days','Ageing_Days':'ageing_days',
+      'ageing_group':'ageing_group','Ageing_Group':'ageing_group',
+      'profile_name':'profile_name','Profile_Name':'profile_name',
+      'backfill_resource':'backfill_resource','Backfill_Resource':'backfill_resource',
+      'status_updates':'status_updates','Status_Updates':'status_updates',
+      'tier1_program':'tier1_program','Tier1_Program':'tier1_program',
+      'fg_form_number':'fg_form_number','FG_Form_Number':'fg_form_number',
+      'fieldglass_status':'fieldglass_status','Fieldglass_Status':'fieldglass_status',
+      'updated_by':'updated_by','Updated_By':'updated_by',
+      'Item Type':null,'Path':null,
+    };
+    const mappedHdrs=rawHdrs.map(h=>colMap.hasOwnProperty(h)?colMap[h]:h.toLowerCase().replace(/[^a-z0-9_]/g,'_'));
+
+    const parsed=[],errors=[],warns=[];
+    for(let i=1;i<lines.length;i++){
+      if(!lines[i].trim()) continue;
+      // Parse CSV row respecting quoted fields
+      const cols=[];let cur='',inQ=false;
+      for(const ch of lines[i]){
+        if(ch==='"'){inQ=!inQ;}
+        else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}
+        else cur+=ch;
+      }
+      cols.push(cur.trim());
+
+      const row={};
+      mappedHdrs.forEach((mh,j)=>{
+        if(mh) row[mh]=(cols[j]||'').replace(/^"|"$/g,'').trim()||null;
+      });
+
+      // Normalise dates: MM/DD/YYYY → YYYY-MM-DD
+      ['demand_added_on','target_date','demand_closure_date'].forEach(dc=>{
+        if(row[dc]){
+          const m=row[dc].match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if(m) row[dc]=`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+          if(isNaN(new Date(row[dc]).getTime())) row[dc]=null;
+        }
+      });
+
+      // Validate mandatory fields
+      const missing=[];
+      if(!row.demand_added_on) missing.push('demand_added_on');
+      if(!row.skills)          missing.push('skills');
+      if(!row.bsa)             missing.push('bsa');
+      if(!row.service_line)    missing.push('service_line');
+      if(!row.location)        missing.push('location');
+      if(missing.length){errors.push(`Row ${i}: missing ${missing.join(', ')}`);continue;}
+
+      // Auto target date
+      if(!row.target_date&&row.demand_added_on){
+        try{const dt=new Date(row.demand_added_on);dt.setDate(dt.getDate()+21);row.target_date=dt.toISOString().split('T')[0];warns.push(`Row ${i}: target_date auto-set (+21 days)`);}catch(e){}
+      }
+
+      if(!row.demand_status) row.demand_status='Open';
+      if(!row.demand_type)   row.demand_type='New';
+      row.type='MCA'; row.updated_by=USER_NAME;
+      if(row.demand_id) row.demand_id=parseInt(row.demand_id)||null;
+      parsed.push(row);
+    }
+
+    importRows=parsed;
+
+    // Show preview
+    const previewCols=['demand_status','bsa','demand_type','skills','location','service_line','demand_added_on','target_date'];
+    const previewHdrs=['Status','BSA','Type','Skills','Location','Service Line','Added On','Target'];
+    document.getElementById('imp-thead').innerHTML=`<tr>${previewHdrs.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+    document.getElementById('imp-tbody').innerHTML=parsed.slice(0,10).map(r=>`<tr>${previewCols.map(c=>`<td title="${r[c]||''}">${(r[c]||'—').toString().substring(0,25)}</td>`).join('')}</tr>`).join('');
+
+    let alertHtml='';
+    if(errors.length) alertHtml+=`<div style="background:var(--red-bg);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">⚠ ${errors.length} rows skipped (missing required fields)</div>`;
+    if(warns.length)  alertHtml+=`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">ℹ ${warns.length} rows: target date auto-calculated</div>`;
+    if(parsed.length) alertHtml+=`<div style="background:var(--green-bg);color:var(--green);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">✓ ${parsed.length} demands ready to import${parsed.length>10?' (showing first 10 in preview)':''}</div>`;
+    document.getElementById('imp-alerts').innerHTML=alertHtml;
+
+    document.getElementById('imp-summary').textContent=`${parsed.length} demand${parsed.length!==1?'s':''} validated`;
+    document.getElementById('imp-preview').style.display='block';
+    const runBtn=document.getElementById('imp-run-btn');
+    if(runBtn) runBtn.style.display=parsed.length?'block':'none';
+  };
+  reader.readAsText(file);
+}
+
+async function runImport(){
+  if(!importRows.length) return;
+  const total=importRows.length;
+  document.getElementById('imp-preview').style.display='none';
+  document.getElementById('imp-progress').style.display='block';
+  const foot=document.getElementById('imp-footer'); if(foot) foot.style.display='none';
+  document.getElementById('imp-prog-msg').textContent=`Importing 0 of ${total}…`;
+
+  let success=0,failed=0;
+  for(let i=0;i<importRows.length;i++){
+    const row=importRows[i];
+    try{
+      if(row.demand_id){
+        const ex=demands.find(d=>d.demand_id===row.demand_id);
+        if(ex){
+          await sbUpd('demands','id=eq.'+ex.id,row);
+          const idx=demands.findIndex(d=>d.id===ex.id);
+          demands[idx]={...demands[idx],...row};
+        }else{
+          const res=await sbIns('demands',row);
+          const nd=Array.isArray(res)?res[0]:res;
+          if(nd) demands.push(nd);
+        }
+      }else{
+        const maxId=demands.reduce((a,b)=>b.demand_id>a?b.demand_id:a,3000);
+        row.demand_id=maxId+success+1; row.ageing_days=0;
+        const res=await sbIns('demands',row);
+        const nd=Array.isArray(res)?res[0]:res;
+        if(nd) demands.push(nd);
+      }
+      success++;
+    }catch(e){failed++;console.warn('Import row failed',row.demand_id,e.message);}
+
+    // Update progress
+    const pct=Math.round((i+1)/total*100);
+    document.getElementById('imp-prog-bar').style.width=pct+'%';
+    document.getElementById('imp-prog-msg').textContent=`Importing ${i+1} of ${total}… (${pct}%)`;
+  }
+
+  // Show done
+  document.getElementById('imp-progress').style.display='none';
+  document.getElementById('imp-done').style.display='block';
+  const msg=failed>0
+    ?`Imported ${success} demands · ${failed} failed`
+    :`All ${success} demands imported successfully ✓`;
+  document.getElementById('imp-done-msg').textContent=msg;
+  renderAll();
+  toast(msg, failed>0?'amber':'green');
+}
+
+
+// ═══════════════════════════════════════
+// CONNECTIVITY DIAGNOSTICS
+// ═══════════════════════════════════════
+async function runDiagnostics(){
+  const results = [];
+  const log = (label, ok, detail) => {
+    results.push({label, ok, detail});
+    console.log((ok?'✓':'✗')+' '+label+':', detail);
+  };
+
+  // TEST 1: Token claims
+  try{
+    const parts = graphToken ? graphToken.split('.') : [];
+    if(parts.length===3){
+      const claims = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+      log('Token audience', claims.aud==='https://graph.microsoft.com', 'aud='+claims.aud);
+      log('Token scopes', !!(claims.scp||claims.roles), 'scp='+(claims.scp||claims.roles||'none'));
+      log('Token expiry', (claims.exp*1000)>Date.now(), 'expires='+new Date(claims.exp*1000).toLocaleTimeString());
+    } else {
+      log('Token present', false, 'No token found — not authenticated');
+    }
+  }catch(e){ log('Token parse', false, e.message); }
+
+  // TEST 2: GET /me — basic Graph API access
+  try{
+    const me = await gFetch('https://graph.microsoft.com/v1.0/me');
+    log('GET /me (Graph API access)', true, me.displayName+' · '+me.mail);
+  }catch(e){ log('GET /me', false, e.message); }
+
+  // TEST 3: GET demands list — read access
+  const listBase = LIST_BASE();
+  try{
+    const items = await gFetch(listBase+'/items?$top=1&$expand=fields');
+    log('GET demands list (read)', true, (items.value||[]).length+' item(s) returned');
+  }catch(e){ log('GET demands list', false, e.message); }
+
+  // TEST 4: PATCH existing item — write access test
+  try{
+    const items = await gFetch(listBase+'/items?$top=1&$expand=fields');
+    const item = (items.value||[])[0];
+    if(item){
+      const currentTitle = item.fields.Title||item.fields.Demand_ID||'test';
+      await gFetch(listBase+'/items/'+item.id+'/fields','PATCH',{Title:String(currentTitle)});
+      log('PATCH existing item (write)', true, 'Write access CONFIRMED ✓');
+    } else {
+      // No items — try POST
+      const created = await gFetch(listBase+'/items','POST',{fields:{Title:'DIAG_TEST'}});
+      if(created && created.id){
+        await gFetch(listBase+'/items/'+created.id,'DELETE');
+        log('POST+DELETE test item (write)', true, 'Write access CONFIRMED ✓');
+      }
+    }
+  }catch(e){ log('Write access test', false, 'WRITE BLOCKED: '+e.message); }
+
+  // TEST 5: Check site permissions
+  try{
+    const perms = await gFetch('https://graph.microsoft.com/v1.0/sites/'+SP_HOSTNAME+':'+SP_SITE_PATH+':/permissions');
+    const grants = (perms.value||[]).map(p=>p.grantedToIdentities?.[0]?.application?.displayName+':'+p.roles?.join(','));
+    log('Site permissions', perms.value?.length>0, grants.join(' | ')||'no grants found');
+  }catch(e){ log('Site permissions', false, e.message); }
+
+  // Show results
+  const html = results.map(r=>
+    `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px">
+      <span style="font-size:16px">${r.ok?'✅':'❌'}</span>
+      <div>
+        <div style="font-weight:600;color:${r.ok?'#1a6640':'#8c1f1f'}">${r.label}</div>
+        <div style="color:#5c5a52;font-size:12px;word-break:break-all">${r.detail}</div>
+      </div>
+    </div>`
+  ).join('');
+
+  const existing = document.getElementById('diag-modal');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'diag-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="font-size:16px;font-weight:600;color:#1a4b8c">🔍 Connectivity Diagnostics</h3>
+        <button onclick="document.getElementById('diag-modal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
+      </div>
+      ${html}
+      <div style="margin-top:16px;padding:12px;background:#f5f4ef;border-radius:8px;font-size:12px;color:#5c5a52">
+        <strong>If Write access is BLOCKED:</strong><br>
+        1. Check your SharePoint site role — you need Member or Owner (not Visitor)<br>
+        2. Ask IT to verify the Sites.Selected site grant was set to "write" not "read"<br>
+        3. Ask IT to add you as a Site Member at cognizantonline.sharepoint.com/sites/NWMCADemandTracker
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function toggleBulkMode(){bulkMode=!bulkMode;selectedIds.clear();renderAll();updateBulkBar();}
+function selectAllVisible(){getFiltered().forEach(d=>selectedIds.add(d.id));renderAll();updateBulkBar();}
+function clearSelection(){selectedIds.clear();bulkMode=false;renderAll();updateBulkBar();}
+function toggleRow(id,e){if(e)e.stopPropagation();if(selectedIds.has(String(id)))selectedIds.delete(String(id));else selectedIds.add(String(id));updateBulkBar();renderAll();}
+function updateBulkBar(){
+  const bar=document.getElementById('bulk-bar');const cnt=document.getElementById('bulk-count');if(!bar)return;
+  const n=selectedIds.size;
+  if(n>0){bar.style.display='flex';if(cnt)cnt.textContent=n+' selected';}
+  else{bar.style.display='none';}
+}
+async function doBulkDelete(){
+  const ids=[...selectedIds];if(!ids.length)return;
+  setSyncStatus('saving','↻ Deleting…');
+  let done=0,failed=0;
+  for(const id of ids){
+    try{await sbDel('demands','id=eq.'+id);demands=demands.filter(x=>String(x.id)!==String(id));selectedIds.delete(String(id));done++;}
+    catch(e){failed++;}
+  }
+  clearSelection();setSyncStatus('ok','● Live');renderAll();
+  toast(failed?`Deleted ${done}, ${failed} failed`:`${done} demand${done!==1?'s':''} deleted ✓`,'green');
+}
+function confDeleteAll(){
+  // Close any other open overlays first to prevent conflicts
+  closeImpOverlay();
+  const obg=document.getElementById('modal-bg');
+  if(obg) obg.classList.remove('on');
+  const total=demands.length;
+  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open').length;
+  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed').length;
+  const cancel=demands.filter(d=>(d.demand_status||'').toLowerCase()==='cancel').length;
+  const prev=document.getElementById('del-all-preview');
+  if(prev)prev.innerHTML=`<div style="font-size:13px;line-height:2;color:var(--t2)">Total: <strong style="color:var(--red)">${total}</strong> &nbsp;·&nbsp; Open: <strong>${open}</strong> &nbsp;·&nbsp; Closed: <strong>${closed}</strong> &nbsp;·&nbsp; Cancelled: <strong>${cancel}</strong></div>`;
+  const inp=document.getElementById('del-all-confirm-input');const btn=document.getElementById('del-all-btn');
+  if(inp){inp.value='';inp.style.borderColor='';}if(btn){btn.disabled=true;btn.style.opacity='.4';}
+  const bg=document.getElementById('del-all-bg');if(bg)bg.classList.add('on');
+}
+function checkDelAllInput(){
+  const inp=document.getElementById('del-all-confirm-input');const btn=document.getElementById('del-all-btn');
+  if(!inp||!btn)return;
+  const ok=inp.value.trim().toUpperCase()==='DELETE ALL';
+  btn.disabled=!ok;btn.style.opacity=ok?'1':'.4';
+  inp.style.borderColor=inp.value.trim()?(ok?'var(--green)':'var(--red)'):'';
+}
+function closeDelAll(){const bg=document.getElementById('del-all-bg');if(bg)bg.classList.remove('on');}
+async function doDeleteAll(){
+  const total=demands.length;if(!total){toast('No demands','');closeDelAll();return;}
+  closeDelAll();showLoader(`Deleting all ${total} demands…`);
+  let done=0,failed=0;const ids=[...demands.map(d=>d.id)];
+  for(let i=0;i<ids.length;i+=5){
+    const batch=ids.slice(i,i+5);
+    await Promise.all(batch.map(async id=>{try{await sbDel('demands','id=eq.'+id);done++;}catch(e){failed++;}}));
+    const lm=document.getElementById('loader-msg');if(lm)lm.textContent=`Deleting… ${Math.min(i+5,ids.length)} of ${total}`;
+  }
+  demands=[];selectedIds.clear();bulkMode=false;
+  hideLoader();renderAll();
+  toast(failed?`Deleted ${done}, ${failed} failed`:`All ${done} deleted ✓`,'green');
+}
+// ══ WEEKLY LEADERSHIP REPORT ══
+async function sendWeeklyReport(manual=false){
+  if(!demands.length){ toast('No demands loaded — refresh first','red'); return; }
+
+  const open    = demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const closed  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const cancel  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='cancel');
+  const overdue = open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const noProfile = open.filter(d=>!(d.profile_name||'').trim());
+
+  // BSA breakdown
+  const bsaMap = open.reduce((a,d)=>{ a[d.bsa]=(a[d.bsa]||0)+1; return a; }, {});
+  const bsaTop = Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // Ageing breakdown
+  const ageMap = {
+    'Critical (A-C)': open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
+    'Warning (D-E)':  open.filter(d=>['D)','E)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
+    'Soon (F-G)':     open.filter(d=>['F)','G)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
+    'On Track (H-I)': open.filter(d=>['H)','I)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
+  };
+
+  // SL breakdown
+  const slMap = open.reduce((a,d)=>{ if(d.service_line){a[d.service_line]=(a[d.service_line]||0)+1;} return a; }, {});
+  const slTop = Object.entries(slMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  // Service Line bar chart HTML
+  const maxSL = slTop[0]?.[1] || 1;
+  const slColors = ['#1d9e75','#0f6e56','#5dcaa5','#9fe1cb','#e1f5ee','#085041','#04342c','#9FE1CB'];
+  const slBars = slTop.map(([sl,c],i)=>{
+    const pct = Math.round((c/maxSL)*100);
+    const col = slColors[i] || '#1d9e75';
+    const shortSL = sl.length > 22 ? sl.substring(0,22)+'…' : sl;
+    return `<tr><td style="text-align:right;padding:3px 8px 3px 0;font-size:11px;color:#555;width:140px;white-space:nowrap">${shortSL}</td>
+      <td style="padding:3px 0"><div style="background:#f0f0f0;border-radius:3px;height:14px;width:160px"><div style="background:${col};height:14px;border-radius:3px;width:${pct}%"></div></div></td>
+      <td style="padding:3px 0 3px 8px;font-size:11px;font-weight:700;color:${col}">${c}</td></tr>`;
+  }).join('');
+
+  const today = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const weekEnd = today;
+
+  // Build the email HTML body (email-safe, no JavaScript, table-based charts)
+  const maxBsa = bsaTop[0]?.[1] || 1;
+  const maxAge = Math.max(...Object.values(ageMap)) || 1;
+
+  const bsaBars = bsaTop.map(([b,c])=>{
+    const pct = Math.round((c/maxBsa)*100);
+    const colors = ['#1a4b8c','#185fa5','#378add','#85b7eb','#b5d4f4','#e6f1fb'];
+    const col = colors[bsaTop.findIndex(x=>x[0]===b)] || '#1a4b8c';
+    return `<tr><td style="text-align:right;padding:3px 8px 3px 0;font-size:11px;color:#555;width:90px;white-space:nowrap">${b}</td>
+      <td style="padding:3px 0"><div style="background:#f0f0f0;border-radius:3px;height:14px;width:200px"><div style="background:${col};height:14px;border-radius:3px;width:${pct}%"></div></div></td>
+      <td style="padding:3px 0 3px 8px;font-size:11px;font-weight:700;color:${col}">${c}</td></tr>`;
+  }).join('');
+
+  const ageCols = {'Critical (A-C)':'#8c1f1f','Warning (D-E)':'#d29922','Soon (F-G)':'#639922','On Track (H-I)':'#1d9e75'};
+  const ageBars = Object.entries(ageMap).map(([label,c])=>{
+    const pct = Math.round((c/maxAge)*100);
+    const col = ageCols[label]||'#888';
+    return `<tr><td style="text-align:right;padding:3px 8px 3px 0;font-size:11px;color:#555;width:100px">${label}</td>
+      <td style="padding:3px 0"><div style="background:#f0f0f0;border-radius:3px;height:14px;width:180px"><div style="background:${col};height:14px;border-radius:3px;width:${pct}%"></div></div></td>
+      <td style="padding:3px 0 3px 8px;font-size:11px;font-weight:700;color:${col}">${c}</td></tr>`;
+  }).join('');
+
+  const overdueRows = overdue.slice(0,5).map(d=>
+    `<tr style="border-bottom:1px solid #f5f5f5">
+      <td style="padding:5px 8px;font-weight:700">#${d.demand_id}</td>
+      <td style="padding:5px 8px;color:#555">${d.bsa||'—'}</td>
+      <td style="padding:5px 8px;color:#555">${(d.skills||'—').substring(0,25)}</td>
+      <td style="padding:5px 8px;color:#8c1f1f;font-size:11px">${d.ageing_group||'—'}</td>
+      <td style="padding:5px 8px;color:#555">${d.sepm_sel||'—'}</td>
+    </tr>`).join('');
+
+  const emailBody = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;font-size:13px">
+<table width="600" cellpadding="0" cellspacing="0" style="margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0">
+  <tr><td style="background:#1a4b8c;padding:20px 24px;color:white">
+    <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin-bottom:6px">Cognizant · Nationwide MCA · Weekly Report</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">NW MCA Demand Pipeline</div>
+    <div style="font-size:12px;opacity:.8">Week ending ${weekEnd} · Prepared for NW MCA Leadership</div>
+  </td></tr>
+
+  <tr><td style="padding:16px 24px;background:#fff">
+    <!-- KPIs -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
+      <tr>
+        <td width="25%" style="padding:4px"><div style="background:#f0f4ff;border-radius:6px;padding:12px;text-align:center;border:1px solid #dde8ff">
+          <div style="font-size:28px;font-weight:700;color:#1a4b8c">${open.length}</div>
+          <div style="font-size:11px;color:#666;margin-top:3px">Open Demands</div>
+        </div></td>
+        <td width="25%" style="padding:4px"><div style="background:#fdf0f0;border-radius:6px;padding:12px;text-align:center;border:1px solid #f5cccc">
+          <div style="font-size:28px;font-weight:700;color:#8c1f1f">${overdue.length}</div>
+          <div style="font-size:11px;color:#666;margin-top:3px">Overdue (A–C)</div>
+        </div></td>
+        <td width="25%" style="padding:4px"><div style="background:#fef8ec;border-radius:6px;padding:12px;text-align:center;border:1px solid #f5dfa0">
+          <div style="font-size:28px;font-weight:700;color:#7a4a00">${noProfile.length}</div>
+          <div style="font-size:11px;color:#666;margin-top:3px">No Profile Yet</div>
+        </div></td>
+        <td width="25%" style="padding:4px"><div style="background:#eaf4ec;border-radius:6px;padding:12px;text-align:center;border:1px solid #b8dfc0">
+          <div style="font-size:28px;font-weight:700;color:#1a6640">${closed.length}</div>
+          <div style="font-size:11px;color:#666;margin-top:3px">Closed / Fulfilled</div>
+        </div></td>
+      </tr>
+    </table>
+
+    <!-- BSA Chart -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888;border-bottom:1px solid #eee;padding-bottom:5px;margin-bottom:8px">Open Demands by BSA</div>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:14px">${bsaBars}</table>
+
+    <!-- Ageing Chart -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888;border-bottom:1px solid #eee;padding-bottom:5px;margin-bottom:8px">Ageing Distribution</div>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:14px">${ageBars}</table>
+
+    <!-- Overdue Table -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888;border-bottom:1px solid #eee;padding-bottom:5px;margin-bottom:8px">Top Overdue Demands — Immediate Action Required</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;margin-bottom:14px">
+      <tr style="background:#f0f4ff">
+        <th style="padding:6px 8px;text-align:left;font-weight:600;color:#444">ID</th>
+        <th style="padding:6px 8px;text-align:left;font-weight:600;color:#444">BSA</th>
+        <th style="padding:6px 8px;text-align:left;font-weight:600;color:#444">Skills</th>
+        <th style="padding:6px 8px;text-align:left;font-weight:600;color:#444">Ageing</th>
+        <th style="padding:6px 8px;text-align:left;font-weight:600;color:#444">SEPM</th>
+      </tr>
+      ${overdueRows}
+    </table>
+
+    <!-- Service Line Breakdown -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888;border-bottom:1px solid #eee;padding-bottom:5px;margin-bottom:8px;margin-top:14px">Open Demands by Service Line</div>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:14px">${slBars}</table>
+
+    <!-- CTA button -->
+    <div style="text-align:center;padding:8px 0 4px">
+      <a href="https://YOUR_GITHUB_USERNAME.github.io/nw-mca-tracker" style="background:#1a4b8c;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700">View Full Dashboard →</a>
+    </div>
+  </td></tr>
+
+  <tr><td style="background:#f0f0f0;padding:10px 24px;font-size:10px;color:#aaa;text-align:center">
+    NW MCA Demand Tracker · Cognizant GSP-MCA · Auto-generated weekly report · Do not reply
+  </td></tr>
+</table></body></html>`;
+
+  // Save settings first from UI
+  const savedRaw = localStorage.getItem('nwmca_notif_settings');
+  const savedSettings = savedRaw ? JSON.parse(savedRaw) : {};
+  const recipients = LEADERSHIP_RECIPIENTS.length > 0
+    ? LEADERSHIP_RECIPIENTS
+    : (savedSettings.recipients || [USER_NAME]);
+
+  // Write to SP Notifications list — Power Automate picks this up
+  try{
+    setSyncStatus('saving','↻ Sending report…');
+    // Build compact summary for SP (Subtitle field)
+    const bsaSummary = bsaTop.map(([b,c])=>`${b}:${c}`).join('|');
+    const slSummary  = slTop.map(([s,c])=>`${s}:${c}`).join('|');
+    const ageSummary = Object.entries(ageMap).map(([k,v])=>`${k}:${v}`).join('|');
+    const overdueList= overdue.slice(0,5).map(d=>`#${d.demand_id}(${d.bsa},${d.ageing_group})`).join('|');
+
+    // Step 0: Delete previous weekly notification items so PA always reads the latest
+    try{
+      const notifBase = NOTIF_LIST_BASE();
+      const oldItems = await gFetch(notifBase+"/items?$expand=fields&$filter=fields/NotifType eq 'weekly'&$top=10");
+      const toDelete = (oldItems?.value||[]);
+      for(const item of toDelete){
+        try{
+          await gFetch(notifBase+'/items/'+item.id,'DELETE');
+          console.log('Deleted old weekly item:', item.id);
+        }catch(e){ console.warn('Could not delete old weekly item:', e.message); }
+      }
+    }catch(e){ console.warn('Cleanup of old weekly items failed:', e.message); }
+
+    // Step 1: Create the notification item with empty EmailBody
+    const weeklyId = 'WEEKLY_'+Date.now();
+    const todayISO = new Date().toISOString().split('T')[0];
+
+    const created = await sbIns('notifications',{
+      type:        'weekly',
+      demand_id:   weeklyId,
+      title:       `NW MCA Weekly Leadership Report — Week ending ${weekEnd}`,
+      subtitle:    `Open:${open.length}|Overdue:${overdue.length}|NoProfile:${noProfile.length}|Closed:${closed.length}`,
+      triggered_by: USER_NAME,
+      recipients:  recipients.join(';'),
+      email_body:  '',
+    });
+
+    // Step 2: PATCH EmailBody separately — retry up to 3 times
+    const createdItem = Array.isArray(created) ? created[0] : created;
+    if(createdItem && createdItem.id){
+      let patched = false;
+      for(let attempt=1; attempt<=3; attempt++){
+        try{
+          await new Promise(r=>setTimeout(r, attempt*1000)); // wait 1-3 seconds before retry
+          const notifBase = NOTIF_LIST_BASE();
+          await gFetch(notifBase+'/items/'+createdItem.id+'/fields','PATCH',{
+            EmailBody: emailBody
+          });
+          console.log(`✓ EmailBody written to SP (attempt ${attempt}) — ID: ${createdItem.id}, length: ${emailBody.length} chars`);
+          patched = true;
+          break;
+        }catch(e){
+          console.warn(`EmailBody PATCH attempt ${attempt} failed:`, e.message);
+        }
+      }
+      if(!patched){
+        console.error('EmailBody could not be written after 3 attempts — Power Automate will send empty email');
+        toast('Warning: Email body may be empty — try Send Now again','amber');
+      } else {
+        // Verify the EmailBody was saved by reading it back
+        try{
+          const verify = await gFetch(NOTIF_LIST_BASE()+'/items/'+createdItem.id+'?$expand=fields');
+          const savedLen = (verify?.fields?.EmailBody||'').length;
+          console.log('✓ Verified EmailBody in SP:', savedLen, 'chars saved');
+          if(savedLen < 100) console.warn('EmailBody appears too short — may not have saved correctly');
+        }catch(e){}
+      }
+    } else {
+      console.error('No item ID returned from sbIns — EmailBody not written');
+    }
+    setSyncStatus('ok','● Live');
+    toast(manual
+      ? `Weekly report written to SP ✓ — Power Automate weekly flow will send in 1–2 mins`
+      : `Weekly report auto-sent to ${recipients.length} leadership recipient(s) ✓`,'green');
+    console.log('Weekly report complete.');
+    console.log('IMPORTANT: Make sure the General Notifications flow has a condition to SKIP NotifType=weekly');
+    console.log('Otherwise the general flow will also fire and send an empty email.');
+    console.log('Weekly report written to SP Notifications. Recipients:', recipients.join(', '));
+    console.log('Email body HTML (paste into Power Automate):', emailBody.substring(0,200)+'...');
+    // Store email body for Power Automate reference
+    window._lastWeeklyReportHTML = emailBody;
+  }catch(e){
+    setSyncStatus('ok','● Live');
+    toast('Failed to send report: '+e.message,'red');
+    console.error('Weekly report failed:', e.message);
+  }
+}
+
+function exportCSV(){
+  const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
+  const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent([hdrs.join(','),...rows].join('\n'));
+  a.download='NW_MCA_Demands_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+  toast(`${demands.length} records exported ✓`,'green');
+}
+
+// ═══════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════
+let toastTimer;
+function toast(msg,type=''){
+  clearTimeout(toastTimer);
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+(type||'');
+  t.classList.add('on');
+  toastTimer=setTimeout(()=>t.classList.remove('on'),3000);
+}
+
+// ══════════════════════════════════════════════════════════
+// EMBEDDED ACTION RECORDER
+// Records every user action, API call, modal open/close
+// Toggle with the 🔬 button in bottom-right corner
+// ══════════════════════════════════════════════════════════
+const DBG = {
+  events: [],
+  filter: null,
+  panelOpen: false,
+
+  log(type, icon, label, detail='', extra=null){
+    const e={
+      id: Date.now()+Math.random(),
+      type, icon, label, detail, extra,
+      time: new Date(),
+    };
+    this.events.unshift(e);
+    if(this.events.length>500) this.events.pop();
+    this.render(e);
+    const _dc=document.getElementById('dbg-count'); if(_dc) _dc.textContent=this.events.length+' events';
+    return e.id;
+  },
+
+  render(e){
+    if(!this.panelOpen) return;
+    if(this.filter && e.type!==this.filter) return;
+    const log=document.getElementById('dbg-log');
+    if(!log) return;
+    const hms=e.time.toTimeString().slice(0,8);
+    const div=document.createElement('div');
+    div.className='dbg-entry';
+    div.id='dbg-e-'+e.id;
+    div.onclick=()=>this.showDetail(e);
+    div.innerHTML=
+      `<span class="dbg-t">${hms}</span>`+
+      `<span class="dbg-ic">${e.icon}</span>`+
+      `<span class="dbg-lbl dbg-${e.type}">${e.label}</span>`+
+      `<span class="dbg-dur">${e.detail?e.detail.substring(0,40):''}</span>`;
+    log.appendChild(div); log.scrollTop=log.scrollHeight;
+  },
+
+  showDetail(e){
+    const lines=[
+      'Time:    '+e.time.toLocaleTimeString(),
+      'Type:    '+e.type,
+      'Label:   '+e.label,
+      'Detail:  '+e.detail,
+      e.extra ? 'Data: '+JSON.stringify(e.extra,null,2).substring(0,400) : '',
+    ].filter(Boolean).join('\n');
+    alert(lines);
+  },
+
+  renderAll(){
+    const log=document.getElementById('dbg-log');
+    if(!log) return;
+    log.innerHTML='';
+    const filtered = this.filter
+      ? this.events.filter(e=>e.type===this.filter)
+      : this.events;
+    filtered.forEach(e=>this.render(e));
+  },
+
+  clear(){
+    this.events=[];
+    const log=document.getElementById('dbg-log');
+    if(log) log.innerHTML='';
+    const dc=document.getElementById('dbg-count');
+    if(dc) dc.textContent='0 events';
+  },
+
+  export(){
+    const lines=this.events.map(e=>
+      `[${e.time.toISOString()}] [${e.type.toUpperCase()}] ${e.icon} ${e.label} — ${e.detail}`
+    );
+    const blob=new Blob([lines.join('\n')],{type:'text/plain'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='nw_mca_debug_'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.txt';
+    a.click();
+  }
+};
+
+// ── Public functions wired to buttons ──
+function toggleDebugPanel(){
+  const panel=document.getElementById('debug-panel');
+  const btn=document.getElementById('debug-toggle-btn');
+  DBG.panelOpen=!DBG.panelOpen;
+  panel.style.display=DBG.panelOpen?'flex':'none'; if(DBG.panelOpen) panel.style.flexDirection='column';
+  btn.style.background=DBG.panelOpen?'#1f3f6e':'#161b22';
+  if(DBG.panelOpen) DBG.renderAll();
+}
+function dbgFilter(type){
+  DBG.filter=type;
+  document.querySelectorAll('.dbg-tab').forEach(t=>t.classList.remove('dbg-tab-active'));
+  const id='dbg-tab-'+(type||'all');
+  const el=document.getElementById(id);
+  if(el) el.classList.add('dbg-tab-active');
+  DBG.renderAll();
+}
+function dbgClear(){ DBG.clear(); }
+function dbgExport(){ DBG.export(); }
+
+// ── INTERCEPT all key functions ──
+// Wrap each function so every call is recorded after DOM ready
+document.addEventListener('DOMContentLoaded', function(){
+  const _wrap=(name,fn,type,icon)=>{
+    return function(...args){
+      DBG.log(type,icon,name+'('+args.map(a=>typeof a==='object'?'[obj]':String(a).substring(0,30)).join(', ')+')',
+        'Called at '+(new Date().toLocaleTimeString()));
+      return fn.apply(this,args);
+    };
+  };
+
+  // UI functions
+  const uiFns=['openAdd','openEdit','openDetail','openImport','closeImport','closeImpOverlay',
+    'closeModal','closeConf','closePanel','closeDelAll','goPage','showAll','quickFilter',
+    'filterChanged','toggleBulkMode','selectAllVisible','clearSelection',
+    'renderAll','renderDash','runDiagnostics'];
+  uiFns.forEach(name=>{
+    if(typeof window[name]==='function')
+      window[name]=_wrap(name,window[name],'click','🖱');
+  });
+
+  // Modal functions
+  const modalFns=['confCancel','confDelete','confDeleteAll','confBulkDelete'];
+  modalFns.forEach(name=>{
+    if(typeof window[name]==='function')
+      window[name]=_wrap(name,window[name],'modal','🪟');
+  });
+
+  // Action functions (async) — wrap differently
+  const asyncFns=['saveDemand','doCancel','doDelete','doBulkDelete','doDeleteAll','runImport','refreshData'];
+  asyncFns.forEach(name=>{
+    if(typeof window[name]==='function'){
+      const orig=window[name];
+      window[name]=async function(...args){
+        const eid=DBG.log('click','⚡',name+'('+args.map(a=>String(a).substring(0,20)).join(',')+')','Starting…');
+        const t0=Date.now();
+        try{
+          const result=await orig.apply(this,args);
+          DBG.log('ok','✅',name+' completed','Done in '+(Date.now()-t0)+'ms');
+          return result;
+        }catch(e){
+          DBG.log('error','❌',name+' FAILED',e.message,{error:e.message,stack:e.stack?.split('\n')[1]});
+          throw e;
+        }
+      };
+    }
+  });
+
+  // Intercept gFetch to record all API calls (gFetch defined in main script)
+  if(typeof window.gFetch==='function'){
+    const origGFetch=window.gFetch;
+    window.gFetch=async function(url,method='GET',body=null){
+      const short=url.split('/').slice(-3).join('/');
+      const t0=Date.now();
+      DBG.log('api','☁',`${method} ${short}`,'Waiting…',{url,method,body:body?JSON.stringify(body).substring(0,100):null});
+      try{
+        const result=await origGFetch.call(this,url,method,body);
+        const dur=Date.now()-t0;
+        const items=result?.value?.length;
+        DBG.log('ok','✅',`${method} OK ${short}`,
+          `${dur}ms${items!==undefined?' · '+items+' items':''}`,
+          {url,method,duration:dur+'ms',items});
+        return result;
+      }catch(e){
+        const dur=Date.now()-t0;
+        DBG.log('error','❌',`${method} FAILED ${short}`,
+          e.message.substring(0,80)+' ('+dur+'ms)',
+          {url,method,duration:dur+'ms',error:e.message});
+        throw e;
+      }
+    };
+  }
+
+  // Intercept mapFields to record what is sent to SP
+  if(typeof window.mapFields==='function'){
+    const origMapFields=window.mapFields;
+    window.mapFields=function(d){
+      const result=origMapFields.call(this,d);
+      const fields=result?.fields||{};
+      const fieldNames=Object.keys(fields);
+      DBG.log('sp','📋','mapFields called',
+        fieldNames.length+' fields: '+fieldNames.join(', '),
+        {fields:JSON.stringify(fields,null,2).substring(0,400)});
+      return result;
+    };
+  }
+
+  // (classList.add interception removed — caused compatibility issues)
+
+  DBG.log('info','🔬','Action Recorder ready','All functions are being monitored. Click 🔬 to open panel.');
+});
+
+// ── Test suite ──
+async function dbgRunTests(){
+  DBG.clear();
+  DBG.log('info','▶','Running all tests…','Tests: Read, POST, PATCH, DELETE');
+
+  // Test read
+  try{
+    const r=await gFetch(LIST_BASE()+'/items?$expand=fields&$top=3');
+    DBG.log('ok','✅','READ test PASSED',r?.value?.length+' items returned');
+  }catch(e){DBG.log('error','❌','READ test FAILED',e.message);}
+
+  // Test POST (create)
+  let testId=null;
+  try{
+    const r=await gFetch(LIST_BASE()+'/items','POST',{fields:{Title:'DBG_TEST_'+Date.now()}});
+    testId=r?.id;
+    DBG.log('ok','✅','POST (create) test PASSED','Item created: '+testId);
+  }catch(e){DBG.log('error','❌','POST (create) test FAILED',e.message);}
+
+  // Test PATCH fields one by one
+  if(testId){
+    const fields={
+      Demand_Status:'Open', Demand_Type:'New', BSA:'Annuities',
+      Location:'Offshore', Service_Line:'QEA', Skills:'Debug test',
+      Demand_Added_On:'2026-05-19T00:00:00Z',Target_Date:'2026-06-09T00:00:00Z',
+      Ageing_Days:0, Updated_By:'Debug'
+    };
+    for(const [k,v] of Object.entries(fields)){
+      try{
+        await gFetch(LIST_BASE()+'/items/'+testId+'/fields','PATCH',{[k]:v});
+        DBG.log('ok','✅','PATCH field OK: '+k,JSON.stringify(v));
+      }catch(e){
+        DBG.log('error','❌','PATCH field FAILED: '+k,e.message+' value='+JSON.stringify(v));
+      }
+    }
+    // Delete test item
+    try{
+      await gFetch(LIST_BASE()+'/items/'+testId,'DELETE');
+      DBG.log('ok','✅','DELETE test PASSED','Test item removed');
+    }catch(e){DBG.log('error','❌','DELETE test FAILED',e.message);}
+  }
+
+  DBG.log('info','✅','All tests complete','Check ❌ entries for root causes');
+}
+
+</script>
+
+<!-- ══════════════════════════════════════════
+     EMBEDDED DEBUG PANEL
+══════════════════════════════════════════ -->
+<div id="debug-panel" style="display:none;position:fixed;top:0;right:0;width:480px;height:100vh;background:#0d1117;border-left:2px solid #30363d;z-index:99999;flex-direction:column;font-family:monospace;box-shadow:-4px 0 20px rgba(0,0,0,.5)">
+
+  <!-- Debug panel header -->
+  <div style="background:#161b22;border-bottom:1px solid #30363d;padding:6px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <span style="font-size:12px;font-weight:600;color:#58a6ff">🔬 Action Recorder</span>
+    <span style="font-size:10px;color:#8b949e" id="dbg-count">0 events</span>
+    <span style="font-size:10px;color:#3fb950;animation:dbg-blink 1s infinite" id="dbg-rec">● Recording</span>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      <button onclick="dbgRunTests()" style="background:#1f3f6e;border:1px solid #1f6feb;color:#58a6ff;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer">▶ Test All</button>
+      <button onclick="dbgClear()" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer">Clear</button>
+      <button onclick="dbgExport()" style="background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer">Export</button>
+      <button onclick="toggleDebugPanel()" style="background:#3d1f1f;border:1px solid #da3633;color:#f85149;padding:2px 10px;border-radius:4px;font-size:11px;cursor:pointer">✕ Close</button>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div style="background:#161b22;border-bottom:1px solid #21262d;padding:4px 10px;display:flex;gap:4px;flex-shrink:0;overflow-x:auto" id="dbg-tabs">
+    <button onclick="dbgFilter(null)" class="dbg-tab dbg-tab-active" id="dbg-tab-all">All</button>
+    <button onclick="dbgFilter('click')" class="dbg-tab" id="dbg-tab-click">🖱 Clicks</button>
+    <button onclick="dbgFilter('api')" class="dbg-tab" id="dbg-tab-api">☁ API</button>
+    <button onclick="dbgFilter('error')" class="dbg-tab" id="dbg-tab-error">❌ Errors</button>
+    <button onclick="dbgFilter('modal')" class="dbg-tab" id="dbg-tab-modal">🪟 Modals</button>
+    <button onclick="dbgFilter('sp')" class="dbg-tab" id="dbg-tab-sp">📋 SP Fields</button>
+  </div>
+
+  <!-- Log -->
+  <div id="dbg-log" style="flex:1;overflow-y:auto;font-size:11px;line-height:1.6"></div>
+</div>
+
+<!-- Debug toggle button (always visible) -->
+<button id="debug-toggle-btn" onclick="toggleDebugPanel()" 
+  style="position:fixed;bottom:16px;right:16px;background:#161b22;border:1px solid #30363d;color:#58a6ff;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;z-index:99998;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"
+  title="Toggle Debug Console">🔬</button>
+
+<style>
+@keyframes dbg-blink{0%,100%{opacity:1}50%{opacity:.3}}
+.dbg-tab{background:none;border:none;color:#8b949e;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap}
+.dbg-tab:hover{background:#21262d;color:#e6edf3}
+.dbg-tab-active{background:#1f3f6e!important;color:#58a6ff!important}
+.dbg-entry{display:flex;gap:6px;padding:3px 10px;border-bottom:1px solid #21262d;cursor:pointer}
+.dbg-entry:hover{background:#1c2128}
+.dbg-t{color:#8b949e;font-size:10px;white-space:nowrap;flex-shrink:0;width:64px}
+.dbg-ic{flex-shrink:0;width:18px;text-align:center}
+.dbg-lbl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbg-dur{color:#8b949e;font-size:10px;flex-shrink:0}
+.dbg-ok{color:#3fb950}
+.dbg-err{color:#f85149}
+.dbg-warn{color:#d29922}
+.dbg-info{color:#8b949e}
+.dbg-click{color:#58a6ff}
+.dbg-modal{color:#a371f7}
+.dbg-sp{color:#79c0ff}
+</style>
+
+</body>
+</html>
