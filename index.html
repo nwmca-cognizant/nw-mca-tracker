@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.8 · Import Fixed</div>
+    <div class="sb-version">v4.8 · Final</div>
   </div>
 </aside>
 
@@ -777,82 +777,6 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     </div>
   </div>
 
-<!-- Import Overlay — fixed position, always on top -->
-<div id="imp-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.65);z-index:9999999;overflow-y:auto;padding:20px;box-sizing:border-box;">
-  <div style="max-width:680px;width:100%;margin:0 auto;background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.3)">
-
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div>
-        <h2 style="font-size:18px;font-weight:600;color:var(--blue);margin-bottom:2px">⬆ Import Demands from CSV</h2>
-        <div style="font-size:12px;color:var(--t3)">Upload your CSV file to import demands into SharePoint</div>
-      </div>
-      <button onclick="closeImpOverlay()" style="background:var(--s2);border:none;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--t2)">✕</button>
-    </div>
-
-    <!-- Instructions -->
-    <div style="background:var(--blue-bg);color:var(--blue);font-size:12px;padding:12px 16px;border-radius:8px;margin-bottom:18px;line-height:1.8">
-      <strong>How to prepare your file:</strong><br>
-      Open <strong>Query_SP_Jan2026_FINAL_v2.xlsx</strong> in Excel →
-      File → Save As → <strong>CSV (Comma delimited)</strong> → save to Desktop<br>
-      Then drop the CSV file below.
-    </div>
-
-    <!-- Drop zone -->
-    <div id="imp-drop"
-      onclick="document.getElementById('imp-file').click()"
-      ondragover="event.preventDefault();document.getElementById('imp-drop').style.background='var(--blue-bg)';document.getElementById('imp-drop').style.borderColor='var(--blue)'"
-      ondragleave="document.getElementById('imp-drop').style.background='';document.getElementById('imp-drop').style.borderColor=''"
-      ondrop="handleImpDrop(event)"
-      style="border:2px dashed #ccc;border-radius:10px;padding:36px 20px;text-align:center;cursor:pointer;margin-bottom:16px;transition:.2s">
-      <div style="font-size:36px;margin-bottom:10px">📄</div>
-      <div style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:4px">Drop CSV file here or click to browse</div>
-      <div style="font-size:12px;color:var(--t3)">Accepts tracker export format or SharePoint query sheet format</div>
-      <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="handleImpSelect(event)">
-    </div>
-
-    <!-- Alerts -->
-    <div id="imp-alerts" style="margin-bottom:12px"></div>
-
-    <!-- Preview -->
-    <div id="imp-preview" style="display:none;margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:600;color:var(--t1)" id="imp-summary"></div>
-        <button onclick="clearImp()" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--t2)">✕ Clear</button>
-      </div>
-      <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:200px">
-        <table class="import-preview-tbl"><thead id="imp-thead"></thead><tbody id="imp-tbody"></tbody></table>
-      </div>
-    </div>
-
-    <!-- Progress -->
-    <div id="imp-progress" style="display:none;text-align:center;padding:20px 0">
-      <div style="font-size:28px;margin-bottom:10px">⏳</div>
-      <div style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:12px" id="imp-prog-msg">Importing…</div>
-      <div style="background:var(--s2);border-radius:20px;height:10px;overflow:hidden">
-        <div id="imp-prog-bar" style="height:100%;background:var(--blue);width:0%;transition:width .4s;border-radius:20px"></div>
-      </div>
-    </div>
-
-    <!-- Done -->
-    <div id="imp-done" style="display:none;text-align:center;padding:20px 0">
-      <div style="font-size:40px;margin-bottom:10px">✅</div>
-      <div style="font-size:15px;font-weight:600;color:var(--green);margin-bottom:16px" id="imp-done-msg"></div>
-      <button onclick="closeImpOverlay();renderAll()" style="background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:500">
-        View Demands →
-      </button>
-    </div>
-
-    <!-- Footer buttons -->
-    <div id="imp-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
-      <button onclick="closeImpOverlay()" style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--t1)">Cancel</button>
-      <button id="imp-run-btn" style="display:none;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-weight:500" onclick="runImport()">
-        Import Demands →
-      </button>
-    </div>
-
-  </div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1660,11 +1584,11 @@ function renderNotifLog(){
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 const SL_POC_MAP={
-  'ADM':             ['Vasudev.Majji@cognizant.com'],
-  'QEA':             ['qea-poc@cognizant.com'],
-  'IDE':             ['ide-poc@cognizant.com'],
-  'AIA':             ['aia-poc@cognizant.com'],
-  'CIS':             ['cis-poc@cognizant.com'],
+  'ADM':             ['srikanth.bura@cognizant'],
+  'QEA':             ['srikanth.bura@cognizant'],
+  'IDE':             ['srikanth.bura@cognizant'],
+  'AIA':             ['srikanth.bura@cognizant'],
+  'CIS':             ['srikanth.bura@cognizant'],
   'IPA Consulting':  ['ipa-poc@cognizant.com'],
   'ISG (GW)':        ['isg-poc@cognizant.com'],
   // Add more: 'Service Line Name': ['poc@cognizant.com'],
@@ -3220,5 +3144,83 @@ function toast(msg,type=''){
 .dbg-sp{color:#79c0ff}
 </style>
 
+
+<!-- Import Overlay (moved to body root) -->
+<!-- Import Overlay — fixed position, always on top -->
+<div id="imp-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.65);z-index:9999999;overflow-y:auto;padding:20px;box-sizing:border-box;">
+  <div style="max-width:680px;width:100%;margin:0 auto;background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.3)">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <h2 style="font-size:18px;font-weight:600;color:var(--blue);margin-bottom:2px">⬆ Import Demands from CSV</h2>
+        <div style="font-size:12px;color:var(--t3)">Upload your CSV file to import demands into SharePoint</div>
+      </div>
+      <button onclick="closeImpOverlay()" style="background:var(--s2);border:none;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--t2)">✕</button>
+    </div>
+
+    <!-- Instructions -->
+    <div style="background:var(--blue-bg);color:var(--blue);font-size:12px;padding:12px 16px;border-radius:8px;margin-bottom:18px;line-height:1.8">
+      <strong>How to prepare your file:</strong><br>
+      Open <strong>Query_SP_Jan2026_FINAL_v2.xlsx</strong> in Excel →
+      File → Save As → <strong>CSV (Comma delimited)</strong> → save to Desktop<br>
+      Then drop the CSV file below.
+    </div>
+
+    <!-- Drop zone -->
+    <div id="imp-drop"
+      onclick="document.getElementById('imp-file').click()"
+      ondragover="event.preventDefault();document.getElementById('imp-drop').style.background='var(--blue-bg)';document.getElementById('imp-drop').style.borderColor='var(--blue)'"
+      ondragleave="document.getElementById('imp-drop').style.background='';document.getElementById('imp-drop').style.borderColor=''"
+      ondrop="handleImpDrop(event)"
+      style="border:2px dashed #ccc;border-radius:10px;padding:36px 20px;text-align:center;cursor:pointer;margin-bottom:16px;transition:.2s">
+      <div style="font-size:36px;margin-bottom:10px">📄</div>
+      <div style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:4px">Drop CSV file here or click to browse</div>
+      <div style="font-size:12px;color:var(--t3)">Accepts tracker export format or SharePoint query sheet format</div>
+      <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="handleImpSelect(event)">
+    </div>
+
+    <!-- Alerts -->
+    <div id="imp-alerts" style="margin-bottom:12px"></div>
+
+    <!-- Preview -->
+    <div id="imp-preview" style="display:none;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:600;color:var(--t1)" id="imp-summary"></div>
+        <button onclick="clearImp()" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--t2)">✕ Clear</button>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:200px">
+        <table class="import-preview-tbl"><thead id="imp-thead"></thead><tbody id="imp-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="imp-progress" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:28px;margin-bottom:10px">⏳</div>
+      <div style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:12px" id="imp-prog-msg">Importing…</div>
+      <div style="background:var(--s2);border-radius:20px;height:10px;overflow:hidden">
+        <div id="imp-prog-bar" style="height:100%;background:var(--blue);width:0%;transition:width .4s;border-radius:20px"></div>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div id="imp-done" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:40px;margin-bottom:10px">✅</div>
+      <div style="font-size:15px;font-weight:600;color:var(--green);margin-bottom:16px" id="imp-done-msg"></div>
+      <button onclick="closeImpOverlay();renderAll()" style="background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:500">
+        View Demands →
+      </button>
+    </div>
+
+    <!-- Footer buttons -->
+    <div id="imp-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
+      <button onclick="closeImpOverlay()" style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--t1)">Cancel</button>
+      <button id="imp-run-btn" style="display:none;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-weight:500" onclick="runImport()">
+        Import Demands →
+      </button>
+    </div>
+
+  </div>
+</div>
 </body>
 </html>
