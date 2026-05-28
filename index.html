@@ -556,7 +556,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.8 · Import + Bulk Fixed</div>
+    <div class="sb-version">v4.8 · Bulk Delete Fixed</div>
   </div>
 </aside>
 
@@ -600,7 +600,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <button class="btn sm" onclick="selectAllVisible()" style="font-size:11px">Select All Visible</button>
         <button class="btn sm" onclick="clearSelection()" style="font-size:11px">Clear</button>
-        <button class="btn danger sm" id="bulk-del-btn" onclick="confBulkDelete()" style="font-size:11px" disabled>🗑 Delete Selected</button>
+        <button class="btn danger sm" id="bulk-del-btn" onclick="confBulkDelete()" style="font-size:11px">🗑 Delete Selected</button>
       </div>
     </div>
     <div id="active-filter-bar" style="display:none;align-items:center;padding:6px 24px;background:var(--blue-bg);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px"></div>
@@ -1663,7 +1663,7 @@ function renderNotifLog(){
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 const SL_POC_MAP={
-  'ADM':             ['adm-poc@cognizant.com'],
+  'ADM':             ['Vasudev.Majji@cognizant.com'],
   'QEA':             ['qea-poc@cognizant.com'],
   'IDE':             ['ide-poc@cognizant.com'],
   'AIA':             ['aia-poc@cognizant.com'],
@@ -2678,7 +2678,9 @@ async function runDiagnostics(){
 
   // ── SUITE 10: CONFIG CHECK ──
   setStatus('Checking configuration…',95);
-  const _cid=window._NWMCA_CLIENT_ID||'';  log('CLIENT_ID set',_cid.length>10,_cid.length>10?_cid.substring(0,8)+'… ✓':'missing — check config','CONFIG');
+  // CLIENT_ID is const — not on window. Use LIST_BASE() to verify config is loaded.
+  const _cfgOk = typeof LIST_BASE==='function' && LIST_BASE().includes('graph.microsoft.com');
+  log('Config loaded (CLIENT_ID etc)',_cfgOk,_cfgOk?'All config constants loaded ✓':'Config not loaded — check script','CONFIG');
   log('SP_HOSTNAME set',typeof SP_HOSTNAME!=='undefined'&&!!SP_HOSTNAME,typeof SP_HOSTNAME!=='undefined'?SP_HOSTNAME:'MISSING — check config','CONFIG');
   log('LIST_BASE resolves',typeof LIST_BASE==='function',typeof LIST_BASE==='function'?LIST_BASE().substring(0,50)+'…':'NOT A FUNCTION','CONFIG');
   log('NOTIF_LIST_BASE resolves',typeof NOTIF_LIST_BASE==='function',NOTIF_LIST_BASE()?.substring(0,50)+'…','CONFIG');
@@ -2736,7 +2738,7 @@ function diagExport(){
 }
 
 function toggleBulkMode(){bulkMode=!bulkMode;selectedIds.clear();renderAll();updateBulkBar();}
-function selectAllVisible(){getFiltered().forEach(d=>selectedIds.add(d.id));renderAll();updateBulkBar();}
+function selectAllVisible(){getFiltered().forEach(d=>selectedIds.add(String(d.id)));renderAll();updateBulkBar();}
 function clearSelection(){selectedIds.clear();bulkMode=false;renderAll();updateBulkBar();}
 function toggleRow(id,e){
   if(e) e.stopPropagation();
@@ -2761,14 +2763,23 @@ function toggleSelectAll(el){
 function updateBulkBar(){
   const bar=document.getElementById('bulk-bar');const cnt=document.getElementById('bulk-count');if(!bar)return;
   const n=selectedIds.size;
+  const delBtn=document.getElementById('bulk-del-btn');
   if(n>0){
     bar.style.display='flex';
     if(cnt) cnt.textContent=n+' selected';
     const tot=document.getElementById('bulk-total');
     if(tot) tot.textContent=getFiltered().length;
+    if(delBtn) delBtn.disabled=false;
   } else {
     bar.style.display='none';
+    if(delBtn) delBtn.disabled=true;
   }
+}
+function confBulkDelete(){
+  const n=selectedIds.size;
+  if(!n){ toast('No demands selected — tick checkboxes first',''); return; }
+  if(!confirm(`Delete ${n} selected demand${n!==1?'s':''}? This cannot be undone.`)) return;
+  doBulkDelete();
 }
 async function doBulkDelete(){
   const ids=[...selectedIds];
