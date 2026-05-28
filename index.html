@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+function closeImpOverlay(){
+  const ov=document.getElementById('imp-overlay');
+  if(ov) ov.style.display='none';
+}<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -553,7 +556,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.7 · Bulk Fix</div>
+    <div class="sb-version">v4.8 · Import + Bulk Fixed</div>
   </div>
 </aside>
 
@@ -778,7 +781,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   </div>
 
 <!-- Import Overlay — fixed position, always on top -->
-<div id="imp-overlay" style="display:none">
+<div id="imp-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.65);z-index:9999999;overflow-y:auto;padding:20px;box-sizing:border-box;">
   <div style="max-width:680px;width:100%;margin:0 auto;background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.3)">
 
     <!-- Header -->
@@ -1464,9 +1467,9 @@ function renderTbl(){
   if(!rows.length){tb.innerHTML=`<tr><td colspan="14"><div class="empty-state"><div class="ei">◎</div><p>No demands match the current filters.</p></div></td></tr>`;return}
   tb.innerHTML=rows.map(d=>{
     const pf=(d.profile_name||'').split('\n')[0]||'—';
-    const isChk=selectedIds.has(d.id);
-    return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="bulkMode?toggleRow(${d.id},event):openDetail(${d.id})">
-      <td class="cb-cell" onclick="event.stopPropagation()"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onchange="toggleRow(${d.id},event)"></div></td>
+    const isChk=selectedIds.has(String(d.id));
+    return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
+      <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
@@ -1660,7 +1663,7 @@ function renderNotifLog(){
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 const SL_POC_MAP={
-  'ADM':             ['Vasudev.Majji@cognizant.com'],
+  'ADM':             ['adm-poc@cognizant.com'],
   'QEA':             ['qea-poc@cognizant.com'],
   'IDE':             ['ide-poc@cognizant.com'],
   'AIA':             ['aia-poc@cognizant.com'],
@@ -2270,13 +2273,9 @@ function openImport(){
     return;
   }
   // Force all styles inline — overrides any CSS class hiding it
-  // cssText is the correct way to force styles — setAttribute doesn't support !important
-  ov.style.cssText = 'display:block;position:fixed;top:0;left:0;right:0;bottom:0;'+
-    'width:100vw;height:100vh;background:rgba(0,0,0,0.65);z-index:9999999;'+
-    'overflow-y:auto;padding:20px;box-sizing:border-box;';
-  ov.style.setProperty('display','block','important');
-  ov.style.setProperty('z-index','9999999','important');
-  console.log('openImport called — overlay z-index:', ov.style.zIndex, 'display:', ov.style.display);
+  // Simply toggle display — all other styles already set in HTML
+  ov.style.display = 'block';
+  console.log('openImport: overlay shown');
 }
 function closeImport(){ closeImpOverlay(); }
 function closeImpOverlay(){
@@ -2571,7 +2570,7 @@ async function runDiagnostics(){
   const SP_COLS=['Title','SO_ID','Demand_Status','Profile_Status','Demand_Type','Location',
     'Service_Line','Demand_Added_On','Target_Date','Demand_Closure_Date','Ageing_Days',
     'Ageing_Group','Profile_Name','Backfill_Resource','Status_Updates','Tier1_Program',
-    'FG_Form_Number','Fieldglass_Status','Updated_By','BSA','Team_Name','SEPM_SEL','Skills'];
+    'FG_Form_Number','Updated_By','BSA','Team_Name','SEPM_SEL','Skills'];
   if(items.length){
     // Check columns across ALL items (some cols may be empty on item[0])
     const allFields=new Set();
@@ -2679,7 +2678,7 @@ async function runDiagnostics(){
 
   // ── SUITE 10: CONFIG CHECK ──
   setStatus('Checking configuration…',95);
-  log('CLIENT_ID set',typeof CLIENT_ID!=='undefined'&&CLIENT_ID.length>10,typeof CLIENT_ID!=='undefined'?CLIENT_ID.substring(0,8)+'…':'missing — check config','CONFIG');
+  const _cid=window._NWMCA_CLIENT_ID||'';  log('CLIENT_ID set',_cid.length>10,_cid.length>10?_cid.substring(0,8)+'… ✓':'missing — check config','CONFIG');
   log('SP_HOSTNAME set',typeof SP_HOSTNAME!=='undefined'&&!!SP_HOSTNAME,typeof SP_HOSTNAME!=='undefined'?SP_HOSTNAME:'MISSING — check config','CONFIG');
   log('LIST_BASE resolves',typeof LIST_BASE==='function',typeof LIST_BASE==='function'?LIST_BASE().substring(0,50)+'…':'NOT A FUNCTION','CONFIG');
   log('NOTIF_LIST_BASE resolves',typeof NOTIF_LIST_BASE==='function',NOTIF_LIST_BASE()?.substring(0,50)+'…','CONFIG');
@@ -2762,8 +2761,14 @@ function toggleSelectAll(el){
 function updateBulkBar(){
   const bar=document.getElementById('bulk-bar');const cnt=document.getElementById('bulk-count');if(!bar)return;
   const n=selectedIds.size;
-  if(n>0){bar.style.display='flex';if(cnt)cnt.textContent=n+' selected';}
-  else{bar.style.display='none';}
+  if(n>0){
+    bar.style.display='flex';
+    if(cnt) cnt.textContent=n+' selected';
+    const tot=document.getElementById('bulk-total');
+    if(tot) tot.textContent=getFiltered().length;
+  } else {
+    bar.style.display='none';
+  }
 }
 async function doBulkDelete(){
   const ids=[...selectedIds];
