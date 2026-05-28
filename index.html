@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.7 · Full Fix</div>
+    <div class="sb-version">v4.7 · Bulk Fix</div>
   </div>
 </aside>
 
@@ -591,7 +591,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <span class="rcount-pill" id="rcount">—</span>
     </div>
     <div id="bulk-bar" class="bulk-bar">
-      <input type="checkbox" class="row-cb" id="cb-all" onchange="toggleRow(this)" style="width:15px;height:15px;accent-color:var(--blue)">
+      <input type="checkbox" class="row-cb" id="cb-all" onchange="toggleSelectAll(this)" style="width:15px;height:15px;accent-color:var(--blue)">
       <span class="bulk-count" id="bulk-count">0 selected</span>
       <span class="bulk-hint">of <span id="bulk-total">0</span> demands</span>
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
@@ -1059,7 +1059,8 @@ function mapFields(d){
   addText  ('Status_Updates',     d.status_updates);
   addText  ('Tier1_Program',      d.tier1_program);
   addText  ('FG_Form_Number',     d.fg_form_number);
-  addText  ('Fieldglass_Status',  d.fieldglass_status);
+  // Fieldglass_Status column not present in SP list — skip
+  // addText('Fieldglass_Status', d.fieldglass_status);
   addText  ('Updated_By',         d.updated_by || USER_NAME);
 
   // Date fields — SP requires ISO 8601 with time: "2026-05-19T00:00:00Z"
@@ -1659,7 +1660,7 @@ function renderNotifLog(){
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 const SL_POC_MAP={
-  'ADM':             ['adm-poc@cognizant.com'],
+  'ADM':             ['Vasudev.Majji@cognizant.com'],
   'QEA':             ['qea-poc@cognizant.com'],
   'IDE':             ['ide-poc@cognizant.com'],
   'AIA':             ['aia-poc@cognizant.com'],
@@ -2269,12 +2270,13 @@ function openImport(){
     return;
   }
   // Force all styles inline — overrides any CSS class hiding it
-  ov.setAttribute('style',
-    'display:block!important;position:fixed!important;top:0!important;left:0!important;'+
-    'right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;'+
-    'background:rgba(0,0,0,0.65)!important;z-index:9999999!important;'+
-    'overflow-y:auto!important;padding:20px!important;');
-  console.log('openImport: overlay displayed, element:', ov);
+  // cssText is the correct way to force styles — setAttribute doesn't support !important
+  ov.style.cssText = 'display:block;position:fixed;top:0;left:0;right:0;bottom:0;'+
+    'width:100vw;height:100vh;background:rgba(0,0,0,0.65);z-index:9999999;'+
+    'overflow-y:auto;padding:20px;box-sizing:border-box;';
+  ov.style.setProperty('display','block','important');
+  ov.style.setProperty('z-index','9999999','important');
+  console.log('openImport called — overlay z-index:', ov.style.zIndex, 'display:', ov.style.display);
 }
 function closeImport(){ closeImpOverlay(); }
 function closeImpOverlay(){
@@ -2538,7 +2540,7 @@ async function runDiagnostics(){
       const claims=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
       const exp=new Date(claims.exp*1000);
       const mins=Math.round((exp-Date.now())/60000);
-      log('Token valid','auth',`Expires in ${mins} min at ${exp.toLocaleTimeString()} · scp: ${(claims.scp||'').substring(0,60)}`,'AUTH');
+      log('Token valid',mins>0,`Expires in ${mins} min at ${exp.toLocaleTimeString()} · scp: ${(claims.scp||'').substring(0,60)}`,'AUTH');
       log('Token audience',claims.aud==='https://graph.microsoft.com','aud='+claims.aud,'AUTH');
       log('Signed in as',true,`${claims.name||'unknown'} (${claims.upn||claims.unique_name||'?'})`,'AUTH',{name:claims.name,upn:claims.upn,exp:exp.toISOString()});
     }else log('Token present',false,'No token — not authenticated','AUTH');
@@ -2677,8 +2679,8 @@ async function runDiagnostics(){
 
   // ── SUITE 10: CONFIG CHECK ──
   setStatus('Checking configuration…',95);
-  log('CLIENT_ID set',typeof window.CLIENT_ID!=='undefined'&&(window.CLIENT_ID||'').length>10,(window.CLIENT_ID||'missing').substring(0,8)+'…','CONFIG');
-  log('SP_HOSTNAME set',typeof window.SP_HOSTNAME!=='undefined',window.SP_HOSTNAME||'MISSING','CONFIG');
+  log('CLIENT_ID set',typeof CLIENT_ID!=='undefined'&&CLIENT_ID.length>10,typeof CLIENT_ID!=='undefined'?CLIENT_ID.substring(0,8)+'…':'missing — check config','CONFIG');
+  log('SP_HOSTNAME set',typeof SP_HOSTNAME!=='undefined'&&!!SP_HOSTNAME,typeof SP_HOSTNAME!=='undefined'?SP_HOSTNAME:'MISSING — check config','CONFIG');
   log('LIST_BASE resolves',typeof LIST_BASE==='function',typeof LIST_BASE==='function'?LIST_BASE().substring(0,50)+'…':'NOT A FUNCTION','CONFIG');
   log('NOTIF_LIST_BASE resolves',typeof NOTIF_LIST_BASE==='function',NOTIF_LIST_BASE()?.substring(0,50)+'…','CONFIG');
   log('USER_NAME set',!!(typeof USER_NAME!=='undefined'&&USER_NAME),USER_NAME||'MISSING — check auth','CONFIG');
@@ -2737,7 +2739,26 @@ function diagExport(){
 function toggleBulkMode(){bulkMode=!bulkMode;selectedIds.clear();renderAll();updateBulkBar();}
 function selectAllVisible(){getFiltered().forEach(d=>selectedIds.add(d.id));renderAll();updateBulkBar();}
 function clearSelection(){selectedIds.clear();bulkMode=false;renderAll();updateBulkBar();}
-function toggleRow(id,e){if(e)e.stopPropagation();if(selectedIds.has(String(id)))selectedIds.delete(String(id));else selectedIds.add(String(id));updateBulkBar();renderAll();}
+function toggleRow(id,e){
+  if(e) e.stopPropagation();
+  const sid=String(id);
+  if(selectedIds.has(sid)) selectedIds.delete(sid);
+  else selectedIds.add(sid);
+  updateBulkBar();
+  // Update select-all checkbox state
+  const cbAll=document.getElementById('cb-all');
+  if(cbAll){
+    const vis=getFiltered();
+    cbAll.checked=vis.length>0&&vis.every(d=>selectedIds.has(String(d.id)));
+    cbAll.indeterminate=selectedIds.size>0&&!cbAll.checked;
+  }
+}
+function toggleSelectAll(el){
+  const vis=getFiltered();
+  if(el.checked) vis.forEach(d=>selectedIds.add(String(d.id)));
+  else selectedIds.clear();
+  updateBulkBar();renderAll();
+}
 function updateBulkBar(){
   const bar=document.getElementById('bulk-bar');const cnt=document.getElementById('bulk-count');if(!bar)return;
   const n=selectedIds.size;
@@ -2745,15 +2766,33 @@ function updateBulkBar(){
   else{bar.style.display='none';}
 }
 async function doBulkDelete(){
-  const ids=[...selectedIds];if(!ids.length)return;
-  setSyncStatus('saving','↻ Deleting…');
+  const ids=[...selectedIds];
+  if(!ids.length){ toast('No demands selected',''); return; }
+  setSyncStatus('saving',`↻ Deleting ${ids.length}…`);
   let done=0,failed=0;
+  const errors=[];
   for(const id of ids){
-    try{await sbDel('demands','id=eq.'+id);demands=demands.filter(x=>String(x.id)!==String(id));selectedIds.delete(String(id));done++;}
-    catch(e){failed++;}
+    try{
+      console.log('Deleting SP item:', id);
+      await sbDel('demands','id=eq.'+id);
+      demands=demands.filter(x=>String(x.id)!==String(id));
+      selectedIds.delete(String(id));
+      done++;
+    }catch(e){
+      failed++;
+      errors.push(`ID ${id}: ${e.message}`);
+      console.error('Delete failed for id', id, ':', e.message);
+    }
   }
-  clearSelection();setSyncStatus('ok','● Live');renderAll();
-  toast(failed?`Deleted ${done}, ${failed} failed`:`${done} demand${done!==1?'s':''} deleted ✓`,'green');
+  clearSelection();
+  setSyncStatus(failed>0?'err':'ok',failed>0?'⚠ Error':'● Live');
+  renderAll();
+  if(failed>0){
+    toast(`Deleted ${done}, ${failed} failed — check console`,'red');
+    console.error('Bulk delete errors:', errors);
+  } else {
+    toast(`${done} demand${done!==1?'s':''} deleted ✓`,'green');
+  }
 }
 function confDeleteAll(){
   // Close any other open overlays first to prevent conflicts
