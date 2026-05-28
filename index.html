@@ -1,7 +1,4 @@
-function closeImpOverlay(){
-  const ov=document.getElementById('imp-overlay');
-  if(ov) ov.style.display='none';
-}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -556,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.8 · Bulk Delete Fixed</div>
+    <div class="sb-version">v4.8 · Import Fixed</div>
   </div>
 </aside>
 
@@ -1706,7 +1703,14 @@ async function logNotif(type,d){
   }
   const cfg=NOTIF_CFG[type]||{label:type,to:[]};
   const slPOCs=SL_POC_MAP[d.service_line||'']||[];
-  const allRecipients=[...new Set([...cfg.to,...slPOCs])];
+  // Deduplicate emails case-insensitively and normalise to lowercase
+  const _seen=new Set();
+  const allRecipients=[...cfg.to,...slPOCs].filter(e=>{
+    const k=(e||'').toLowerCase().trim();
+    if(!k||!k.includes('@')) return false;
+    if(_seen.has(k)) return false;
+    _seen.add(k); return true;
+  });
   const titles={
     add:    `New demand #${d.demand_id} added — ${d.bsa}`,
     cancel: `Demand #${d.demand_id} cancelled — ${d.bsa}`,
@@ -1725,16 +1729,21 @@ async function logNotif(type,d){
   if(notifLog.length>50) notifLog.pop();
   // Only log to SP Notifications list if it exists — silently skip if not
   try{
-    await sbIns('notifications',{
-      type,demand_id:d.demand_id,
-      title:titles[type]||type,
-      subtitle:subs[type]||'',
-      triggered_by:USER_NAME,
-      recipients:allRecipients.join(';')
-    });
+    // Write ONE notification item per recipient
+    // Power Automate reads single email per item — avoids semicolon parsing issues
+    for(const recipient of allRecipients){
+      await sbIns('notifications',{
+        type,demand_id:d.demand_id,
+        title:titles[type]||type,
+        subtitle:subs[type]||'',
+        triggered_by:USER_NAME,
+        recipients:recipient.trim().toLowerCase()  // single email per item
+      });
+    }
+    if(allRecipients.length===0) console.warn('No recipients configured for notification type:',type);
+    else console.log('Notifications written for',allRecipients.length,'recipient(s):',allRecipients);
   }catch(e){
-    // Notifications list may not exist — non-critical, skip silently
-    if(!e.message.includes('404')) console.warn('Notification failed:',e.message);
+    if(!e.message.includes('404')) console.warn('Notification write failed:',e.message);
   }
 }
 function saveNotifSettings(){
@@ -1768,7 +1777,9 @@ function saveNotifSettings(){
   localStorage.setItem('nwmca_notif_settings', JSON.stringify(settings));
   
   // Update live NOTIF_CFG so next logNotif() uses these recipients
-  const allTo = tags;
+  // Deduplicate tag emails case-insensitively
+  const _s=new Set();
+  const allTo=tags.filter(e=>{const k=e.toLowerCase().trim();if(!k||!_s.has(k)){_s.add(k);return true;}return false;});
   if(allTo.length > 0){
     NOTIF_CFG.add.to    = settings.triggers.add    ? allTo : [];
     NOTIF_CFG.cancel.to = settings.triggers.cancel ? allTo : [];
@@ -2272,28 +2283,25 @@ function openImport(){
     toast('Import overlay missing — please refresh the page','red');
     return;
   }
-  // Force all styles inline — overrides any CSS class hiding it
-  // Simply toggle display — all other styles already set in HTML
-  ov.style.display = 'block';
-  console.log('openImport: overlay shown');
+  // Restore ALL styles every time — ensures works after any close
+  ov.style.display    = 'block';
+  ov.style.position   = 'fixed';
+  ov.style.top        = '0';
+  ov.style.left       = '0';
+  ov.style.width      = '100vw';
+  ov.style.height     = '100vh';
+  ov.style.background = 'rgba(0,0,0,0.65)';
+  ov.style.zIndex     = '9999999';
+  ov.style.overflowY  = 'auto';
+  ov.style.padding    = '20px';
+  ov.style.boxSizing  = 'border-box';
+  console.log('openImport: overlay shown, z-index:', ov.style.zIndex);
 }
 function closeImport(){ closeImpOverlay(); }
 function closeImpOverlay(){
+  // ONLY hide — never wipe other styles (openImport needs them)
   var ov = document.getElementById('imp-overlay');
-  if(ov){
-    ov.style.display     = 'none';
-    ov.style.position    = '';
-    ov.style.top         = '';
-    ov.style.left        = '';
-    ov.style.right       = '';
-    ov.style.bottom      = '';
-    ov.style.width       = '';
-    ov.style.height      = '';
-    ov.style.background  = '';
-    ov.style.zIndex      = '';
-    ov.style.overflowY   = '';
-    ov.style.padding     = '';
-  }
+  if(ov) ov.style.display = 'none';
   importRows=[];
 }
 function clearImp(){
