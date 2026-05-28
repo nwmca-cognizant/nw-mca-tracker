@@ -523,11 +523,11 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
   </div>
   <nav class="sb-nav">
-    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this)">
+    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
     </div>
-    <div class="ni" id="nav-all" onclick="showAll(this)">
+    <div class="ni" id="nav-all" onclick="document.getElementById('f-st').value='';showAll(this);">
       <span class="ni-ic">≡</span><span class="ni-lbl">All Demands</span>
     </div>
     <div class="ni" id="nav-dashboard" onclick="goPage('dashboard',this)">
@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.7 · Diagnostics</div>
+    <div class="sb-version">v4.7 · Full Fix</div>
   </div>
 </aside>
 
@@ -2257,26 +2257,24 @@ function closeAllModals(){closeModal();closeConf();closePanel()}
 // IMPORT CSV
 // ═══════════════════════════════════════
 function openImport(){
-  // Close any other open overlays/modals first
   try{ const obg=document.getElementById('del-all-bg'); if(obg) obg.classList.remove('on'); }catch(e){}
   try{ const mbg=document.getElementById('modal-bg'); if(mbg) mbg.classList.remove('on'); }catch(e){}
   try{ closeMobMenu(); }catch(e){}
   importRows=[];
   try{ clearImp(); }catch(e){}
-  var ov = document.getElementById('imp-overlay');
-  if(!ov){ console.error('imp-overlay element missing'); return; }
-  ov.style.display     = 'block';
-  ov.style.position    = 'fixed';
-  ov.style.top         = '0';
-  ov.style.left        = '0';
-  ov.style.right       = '0';
-  ov.style.bottom      = '0';
-  ov.style.width       = '100vw';
-  ov.style.height      = '100vh';
-  ov.style.background  = 'rgba(0,0,0,0.65)';
-  ov.style.zIndex      = '9999999';
-  ov.style.overflowY   = 'auto';
-  ov.style.padding     = '20px';
+  var ov=document.getElementById('imp-overlay');
+  if(!ov){
+    console.error('imp-overlay NOT FOUND in DOM');
+    toast('Import overlay missing — please refresh the page','red');
+    return;
+  }
+  // Force all styles inline — overrides any CSS class hiding it
+  ov.setAttribute('style',
+    'display:block!important;position:fixed!important;top:0!important;left:0!important;'+
+    'right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;'+
+    'background:rgba(0,0,0,0.65)!important;z-index:9999999!important;'+
+    'overflow-y:auto!important;padding:20px!important;');
+  console.log('openImport: overlay displayed, element:', ov);
 }
 function closeImport(){ closeImpOverlay(); }
 function closeImpOverlay(){
@@ -2573,10 +2571,13 @@ async function runDiagnostics(){
     'Ageing_Group','Profile_Name','Backfill_Resource','Status_Updates','Tier1_Program',
     'FG_Form_Number','Fieldglass_Status','Updated_By','BSA','Team_Name','SEPM_SEL','Skills'];
   if(items.length){
-    const fields=Object.keys(items[0].fields||{});
+    // Check columns across ALL items (some cols may be empty on item[0])
+    const allFields=new Set();
+    items.slice(0,10).forEach(i=>Object.keys(i.fields||{}).forEach(k=>allFields.add(k)));
+    const fields=[...allFields];
     const missing=SP_COLS.filter(c=>!fields.includes(c));
     log('All 23 SP columns present',missing.length===0,
-      missing.length?`Missing: ${missing.join(', ')}`:`All columns confirmed in SP`,'FIELDS',{fields,missing});
+      missing.length?`Missing from SP: ${missing.join(', ')} — these columns may not exist in list settings`:`All columns confirmed in SP`,'FIELDS',{fields,missing});
     // Sample data check
     const sample=items[0].fields;
     log('Title = Demand ID',!!sample?.Title,`Title="${sample?.Title}" — ${sample?.Title?'correct':'MISSING — demands will not show'}`, 'FIELDS');
@@ -2676,9 +2677,9 @@ async function runDiagnostics(){
 
   // ── SUITE 10: CONFIG CHECK ──
   setStatus('Checking configuration…',95);
-  log('CLIENT_ID set',typeof CLIENT_ID!=='undefined'&&CLIENT_ID.length>10,CLIENT_ID?.substring(0,8)+'…','CONFIG');
-  log('SP_HOSTNAME set',typeof SP_HOSTNAME!=='undefined',SP_HOSTNAME||'MISSING','CONFIG');
-  log('LIST_BASE resolves',typeof LIST_BASE==='function',LIST_BASE()?.substring(0,50)+'…','CONFIG');
+  log('CLIENT_ID set',typeof window.CLIENT_ID!=='undefined'&&(window.CLIENT_ID||'').length>10,(window.CLIENT_ID||'missing').substring(0,8)+'…','CONFIG');
+  log('SP_HOSTNAME set',typeof window.SP_HOSTNAME!=='undefined',window.SP_HOSTNAME||'MISSING','CONFIG');
+  log('LIST_BASE resolves',typeof LIST_BASE==='function',typeof LIST_BASE==='function'?LIST_BASE().substring(0,50)+'…':'NOT A FUNCTION','CONFIG');
   log('NOTIF_LIST_BASE resolves',typeof NOTIF_LIST_BASE==='function',NOTIF_LIST_BASE()?.substring(0,50)+'…','CONFIG');
   log('USER_NAME set',!!(typeof USER_NAME!=='undefined'&&USER_NAME),USER_NAME||'MISSING — check auth','CONFIG');
   log('NOTIF_CFG present',typeof NOTIF_CFG!=='undefined','NOTIF_CFG defined','CONFIG');
