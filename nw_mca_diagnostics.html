@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NW MCA Tracker — Full Diagnostics</title>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body{background:#0d1117;color:#e6edf3;min-height:100vh;display:flex;flex-direction:column}
+.topbar{background:#161b22;border-bottom:1px solid #30363d;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap}
+.topbar h1{font-size:14px;font-weight:600;color:#58a6ff}
+.topbar .sub{font-size:11px;color:#8b949e;flex:1}
+.pill{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+.pill.ok{background:#1a4731;color:#3fb950;border:1px solid #238636}
+.pill.err{background:#3d1f1f;color:#f85149;border:1px solid #da3633}
+.pill.warn{background:#3d2200;color:#d29922;border:1px solid #9e6a03}
+.pill.info{background:#1f3f6e;color:#58a6ff;border:1px solid #1f6feb}
+.btn{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#30363d}
+.btn.primary{background:#1f6feb;border-color:#388bfd;color:#fff}
+.btn.danger{background:#da3633;border-color:#f85149;color:#fff}
+.btn.success{background:#238636;border-color:#3fb950;color:#fff}
+.layout{flex:1;display:grid;grid-template-columns:260px 1fr;min-height:0;overflow:hidden}
+.sidebar{background:#161b22;border-right:1px solid #30363d;overflow-y:auto;padding:8px 0}
+.sb-sect{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#8b949e;padding:10px 12px 4px}
+.sb-item{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;cursor:pointer;font-size:12px;border-left:3px solid transparent}
+.sb-item:hover{background:#1c2128}
+.sb-item.active{background:#1c2128;border-left-color:#58a6ff;color:#58a6ff}
+.sb-item .si-ic{font-size:13px;margin-right:6px}
+.sb-item .si-cnt{font-size:10px;padding:1px 6px;border-radius:10px;min-width:20px;text-align:center}
+.si-cnt.ok{background:#1a4731;color:#3fb950}
+.si-cnt.err{background:#3d1f1f;color:#f85149}
+.si-cnt.warn{background:#3d2200;color:#d29922}
+.si-cnt.neu{background:#21262d;color:#8b949e}
+.main{overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.connect-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px}
+.connect-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px;max-width:460px;width:100%;text-align:center}
+.connect-card h2{font-size:18px;color:#58a6ff;margin-bottom:8px}
+.connect-card p{font-size:13px;color:#8b949e;line-height:1.6;margin-bottom:20px}
+.btn-connect{background:#1f6feb;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;width:100%}
+.btn-connect:hover{background:#388bfd}
+.spinner{width:20px;height:20px;border:3px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Test cards */
+.test-card{background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+.test-card.pass{border-color:#238636}
+.test-card.fail{border-color:#da3633}
+.test-card.warn{border-color:#9e6a03}
+.test-card.running{border-color:#388bfd}
+.tc-head{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #21262d}
+.tc-icon{font-size:16px;flex-shrink:0}
+.tc-title{font-size:13px;font-weight:500;flex:1}
+.tc-dur{font-size:10px;color:#8b949e}
+.tc-body{padding:10px 14px;font-size:12px;color:#8b949e;line-height:1.7}
+.tc-body code{font-family:monospace;font-size:11px;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:1px 6px;color:#c9d1d9}
+.tc-detail{background:#0d1117;border-top:1px solid #21262d;padding:10px 14px;font-family:monospace;font-size:11px;color:#8b949e;white-space:pre-wrap;max-height:200px;overflow-y:auto;line-height:1.6}
+/* Summary bar */
+.summary{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.sum-item{display:flex;align-items:center;gap:6px;font-size:12px}
+.sum-dot{width:8px;height:8px;border-radius:50%}
+/* Progress */
+.progress-bar{height:4px;background:#21262d;border-radius:2px;overflow:hidden;margin-bottom:8px}
+.progress-fill{height:100%;background:#1f6feb;border-radius:2px;transition:width .3s}
+/* Log table */
+.log-table{width:100%;border-collapse:collapse;font-size:11px;font-family:monospace}
+.log-table th{background:#21262d;padding:6px 10px;text-align:left;color:#8b949e;font-weight:500;border-bottom:1px solid #30363d}
+.log-table td{padding:5px 10px;border-bottom:1px solid #21262d;vertical-align:top}
+.log-table tr:last-child td{border-bottom:none}
+.log-table tr:hover td{background:#1c2128}
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#0d1117}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🔬 NW MCA Tracker — Full Diagnostics</h1>
+  <span class="sub">Tests every SP operation, filter, function and config setting</span>
+  <span class="pill info" id="auth-pill">Not connected</span>
+  <button class="btn primary" onclick="runAll()" id="run-btn" disabled>▶ Run All Tests</button>
+  <button class="btn" onclick="exportReport()" id="exp-btn" disabled>📄 Export Report</button>
+  <button class="btn" onclick="clearAll()">🗑 Clear</button>
+</div>
+
+<div id="connect-wrap" class="connect-wrap">
+  <div class="connect-card">
+    <h2>🔌 Connect to SharePoint</h2>
+    <p>Sign in with your Cognizant account to run the full diagnostic suite against the live SharePoint list.</p><p style="font-size:11px;color:#d29922;margin-top:-8px">⚠ A sign-in popup will open — allow popups if prompted by your browser.</p>
+    <div id="conn-status" style="font-size:12px;color:#8b949e;margin-bottom:12px;min-height:20px"></div>
+    <button class="btn-connect" onclick="connect()">Sign in with Cognizant Account</button>
+    <div id="conn-err" style="display:none;margin-top:10px;background:#3d1f1f;border:1px solid #da3633;border-radius:6px;padding:8px 12px;font-size:12px;color:#f85149;text-align:left"></div>
+  </div>
+</div>
+
+<div id="app" class="layout" style="display:none">
+  <div class="sidebar">
+    <div class="sb-sect">Test Suites</div>
+    <div class="sb-item active" onclick="showSuite('all')" id="nav-all"><span class="si-ic">🔬</span>All Tests<span class="si-cnt neu" id="cnt-all">—</span></div>
+    <div class="sb-item" onclick="showSuite('auth')" id="nav-auth"><span class="si-ic">🔐</span>Authentication<span class="si-cnt neu" id="cnt-auth">—</span></div>
+    <div class="sb-item" onclick="showSuite('read')" id="nav-read"><span class="si-ic">📥</span>Read / Load<span class="si-cnt neu" id="cnt-read">—</span></div>
+    <div class="sb-item" onclick="showSuite('write')" id="nav-write"><span class="si-ic">✏️</span>Write (PATCH)<span class="si-cnt neu" id="cnt-write">—</span></div>
+    <div class="sb-item" onclick="showSuite('create')" id="nav-create"><span class="si-ic">➕</span>Create (POST)<span class="si-cnt neu" id="cnt-create">—</span></div>
+    <div class="sb-item" onclick="showSuite('delete')" id="nav-delete"><span class="si-ic">🗑</span>Delete<span class="si-cnt neu" id="cnt-delete">—</span></div>
+    <div class="sb-item" onclick="showSuite('fields')" id="nav-fields"><span class="si-ic">📋</span>SP Field Mapping<span class="si-cnt neu" id="cnt-fields">—</span></div>
+    <div class="sb-item" onclick="showSuite('filter')" id="nav-filter"><span class="si-ic">🔍</span>Filters<span class="si-cnt neu" id="cnt-filter">—</span></div>
+    <div class="sb-item" onclick="showSuite('notif')" id="nav-notif"><span class="si-ic">🔔</span>Notifications<span class="si-cnt neu" id="cnt-notif">—</span></div>
+    <div class="sb-item" onclick="showSuite('config')" id="nav-config"><span class="si-ic">⚙️</span>Config<span class="si-cnt neu" id="cnt-config">—</span></div>
+    <div class="sb-sect" style="margin-top:12px">Quick Actions</div>
+    <div class="sb-item" onclick="runSuite('auth')"><span class="si-ic">▶</span>Run Auth Tests</div>
+    <div class="sb-item" onclick="runSuite('read')"><span class="si-ic">▶</span>Run Read Tests</div>
+    <div class="sb-item" onclick="runSuite('write')"><span class="si-ic">▶</span>Run Write Tests</div>
+    <div class="sb-item" onclick="runSuite('fields')"><span class="si-ic">▶</span>Test All SP Fields</div>
+  </div>
+  <div class="main" id="main-area">
+    <div class="summary" id="summary">
+      <div class="sum-item"><div class="sum-dot" style="background:#8b949e"></div><span id="sum-total">0 tests</span></div>
+      <div class="sum-item"><div class="sum-dot" style="background:#3fb950"></div><span id="sum-pass">0 passed</span></div>
+      <div class="sum-item"><div class="sum-dot" style="background:#f85149"></div><span id="sum-fail">0 failed</span></div>
+      <div class="sum-item"><div class="sum-dot" style="background:#d29922"></div><span id="sum-warn">0 warnings</span></div>
+      <div style="flex:1"></div>
+      <span id="sum-user" style="font-size:11px;color:#8b949e"></span>
+      <span id="sum-time" style="font-size:11px;color:#8b949e"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+    <div id="results"></div>
+  </div>
+</div>
+
+<script>
+// ═══ CONFIG ═══
+const CLIENT_ID = '6e9a85b8-194f-49ca-b524-ead2d8508f5a';
+const TENANT_ID = 'de08c407-19b9-427d-9fe8-edf254300ca7';
+const LIST_ID   = '13d692ad-1d24-4091-8c46-00811d17c6e2';
+const NOTIF_ID  = '1d5784dd-ae28-4232-8217-4689d7126f85';
+const SP_HOST   = 'cognizantonline.sharepoint.com';
+const SP_PATH   = '/sites/NWMCADemandTracker';
+// Redirect URI — must match what's registered in Azure AD
+// Works from GitHub Pages: https://nwmca-cognizant.github.io/nw-mca-diagnostics.html
+const REDIR = location.protocol==='file:'
+  ? 'https://nwmca-cognizant.github.io/nw-mca-tracker/'  // fallback for local testing
+  : location.href.split('?')[0].split('#')[0];
+const SCOPES    = ['https://graph.microsoft.com/.default'];
+const LIST_BASE = `https://graph.microsoft.com/v1.0/sites/${SP_HOST}:${SP_PATH}:/lists/${LIST_ID}`;
+const NOTIF_BASE= `https://graph.microsoft.com/v1.0/sites/${SP_HOST}:${SP_PATH}:/lists/${NOTIF_ID}`;
+const GH_URL    = 'https://nwmca-cognizant.github.io/nw-mca-tracker/';
+
+// ═══ STATE ═══
+let msalApp=null, token=null, user=null;
+let tests=[], results=[], activeSuite='all';
+
+// ═══ AUTH ═══
+async function connect(){
+  const st=document.getElementById('conn-status');
+  const err=document.getElementById('conn-err');
+  err.style.display='none';
+  try{
+    msalApp=new msal.PublicClientApplication({
+      auth:{
+        clientId:CLIENT_ID,
+        authority:`https://login.microsoftonline.com/${TENANT_ID}`,
+        redirectUri:'https://nwmca-cognizant.github.io/nw-mca-tracker/'
+      },
+      cache:{cacheLocation:'sessionStorage'}
+    });
+    await msalApp.initialize();
+    // Try silent first (already signed in)
+    const accounts=msalApp.getAllAccounts();
+    if(accounts.length){
+      st.innerHTML='<span class="spinner"></span>Acquiring token silently…';
+      try{
+        const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accounts[0]});
+        token=r.accessToken;user=accounts[0];onConnected();return;
+      }catch(e){}
+    }
+    // Use POPUP — works from local file, GitHub Pages, any URL
+    st.innerHTML='<span class="spinner"></span>Opening sign-in popup…<br><small>If popup is blocked, allow popups for this page</small>';
+    const r=await msalApp.loginPopup({scopes:SCOPES});
+    token=r.accessToken;user=r.account;onConnected();
+  }catch(e){
+    err.style.display='block';
+    err.textContent='Error: '+e.message+(e.message.toLowerCase().includes('popup')?'
+
+Tip: Allow popups for this page in your browser settings and try again.':'');
+    st.textContent='';
+  }
+}
+
+async function getToken(){
+  const accounts=msalApp.getAllAccounts();
+  if(!accounts.length) throw new Error('Not signed in');
+  try{
+    const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:accounts[0]});
+    token=r.accessToken;
+  }catch(e){
+    // Token expired — refresh via popup
+    const r=await msalApp.acquireTokenPopup({scopes:SCOPES,account:accounts[0]});
+    token=r.accessToken;
+  }
+  return token;
+}
+
+function onConnected(){
+  document.getElementById('connect-wrap').style.display='none';
+  document.getElementById('app').style.display='grid';
+  document.getElementById('run-btn').disabled=false;
+  document.getElementById('exp-btn').disabled=false;
+  document.getElementById('auth-pill').textContent='✓ '+( user?.name||user?.username);
+  document.getElementById('auth-pill').className='pill ok';
+  document.getElementById('sum-user').textContent=user?.name||user?.username;
+  setInterval(()=>document.getElementById('sum-time').textContent=new Date().toLocaleTimeString(),1000);
+  addResult({id:'connect',suite:'auth',title:'Authentication',status:'pass',detail:`Signed in as ${user?.name} (${user?.username})`,duration:0});
+}
+
+// ═══ API HELPER ═══
+async function api(url,method='GET',body=null){
+  await getToken();
+  const t0=Date.now();
+  const opts={method,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  const controller=new AbortController();
+  const tid=setTimeout(()=>controller.abort(),30000);
+  opts.signal=controller.signal;
+  try{
+    const r=await fetch(url,opts);
+    clearTimeout(tid);
+    const dur=Date.now()-t0;
+    if(!r.ok){
+      const txt=await r.text();
+      let msg=txt;
+      try{const j=JSON.parse(txt);msg=j.error?.message||j.error?.code||txt;}catch(x){}
+      throw Object.assign(new Error(msg),{status:r.status,dur});
+    }
+    const data=method==='DELETE'?null:await r.json();
+    return {data,dur};
+  }catch(e){
+    clearTimeout(tid);
+    throw e;
+  }
+}
+
+// ═══ RESULT MANAGEMENT ═══
+function addResult(r){
+  results.push({...r,time:new Date()});
+  renderResult(r);
+  updateSummary();
+  updateSuiteCounters();
+}
+
+function renderResult(r){
+  if(activeSuite!=='all'&&r.suite!==activeSuite) return;
+  const el=document.getElementById('results');
+  const icons={pass:'✅',fail:'❌',warn:'⚠️',running:'⏳',info:'ℹ️'};
+  const div=document.createElement('div');
+  div.className=`test-card ${r.status}`;
+  div.id='tc-'+r.id;
+  div.innerHTML=`
+    <div class="tc-head">
+      <span class="tc-icon">${icons[r.status]||'•'}</span>
+      <span class="tc-title">${r.title}</span>
+      <span class="pill ${r.status==='pass'?'ok':r.status==='fail'?'err':'warn'}">${r.status.toUpperCase()}</span>
+      ${r.duration?`<span class="tc-dur">${r.duration}ms</span>`:''}
+    </div>
+    <div class="tc-body">${r.detail||''}</div>
+    ${r.data?`<div class="tc-detail">${typeof r.data==='string'?r.data:JSON.stringify(r.data,null,2).substring(0,600)}</div>`:''}`;
+  el.appendChild(div);
+  div.scrollIntoView({block:'nearest'});
+}
+
+function updateResult(id,status,detail,data,dur){
+  const existing=results.find(r=>r.id===id);
+  if(existing){existing.status=status;existing.detail=detail;existing.data=data;existing.duration=dur;}
+  const el=document.getElementById('tc-'+id);
+  if(!el) return;
+  const icons={pass:'✅',fail:'❌',warn:'⚠️',running:'⏳',info:'ℹ️'};
+  el.className=`test-card ${status}`;
+  el.querySelector('.tc-icon').textContent=icons[status]||'•';
+  el.querySelector('.tc-title').textContent=el.querySelector('.tc-title').textContent;
+  el.querySelector('.pill').className=`pill ${status==='pass'?'ok':status==='fail'?'err':'warn'}`;
+  el.querySelector('.pill').textContent=status.toUpperCase();
+  el.querySelector('.tc-body').innerHTML=detail||'';
+  const dd=el.querySelector('.tc-detail');
+  if(data&&!dd){
+    const d=document.createElement('div');
+    d.className='tc-detail';
+    d.textContent=typeof data==='string'?data:JSON.stringify(data,null,2).substring(0,600);
+    el.appendChild(d);
+  }else if(dd&&data){
+    dd.textContent=typeof data==='string'?data:JSON.stringify(data,null,2).substring(0,600);
+  }
+  updateSummary();
+}
+
+function updateSummary(){
+  const total=results.length;
+  const pass=results.filter(r=>r.status==='pass').length;
+  const fail=results.filter(r=>r.status==='fail').length;
+  const warn=results.filter(r=>r.status==='warn').length;
+  document.getElementById('sum-total').textContent=total+' tests';
+  document.getElementById('sum-pass').textContent=pass+' passed';
+  document.getElementById('sum-fail').textContent=fail+' failed';
+  document.getElementById('sum-warn').textContent=warn+' warnings';
+}
+
+function updateSuiteCounters(){
+  ['auth','read','write','create','delete','fields','filter','notif','config'].forEach(suite=>{
+    const sr=results.filter(r=>r.suite===suite);
+    const fails=sr.filter(r=>r.status==='fail').length;
+    const warns=sr.filter(r=>r.status==='warn').length;
+    const el=document.getElementById('cnt-'+suite);
+    if(!el) return;
+    if(sr.length===0){el.textContent='—';el.className='si-cnt neu';}
+    else if(fails>0){el.textContent=fails+' ✗';el.className='si-cnt err';}
+    else if(warns>0){el.textContent=warns+' ⚠';el.className='si-cnt warn';}
+    else{el.textContent=sr.length+' ✓';el.className='si-cnt ok';}
+  });
+  const total=results.length;
+  const fails=results.filter(r=>r.status==='fail').length;
+  const el=document.getElementById('cnt-all');
+  el.textContent=fails>0?fails+' ✗':total+' ✓';
+  el.className=fails>0?'si-cnt err':'si-cnt ok';
+}
+
+function progress(pct){document.getElementById('prog').style.width=pct+'%';}
+
+function clearAll(){results=[];document.getElementById('results').innerHTML='';updateSummary();progress(0);}
+
+function showSuite(suite){
+  activeSuite=suite;
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('nav-'+suite)?.classList.add('active');
+  document.getElementById('results').innerHTML='';
+  results.filter(r=>suite==='all'||r.suite===suite).forEach(renderResult);
+}
+
+// ═══ TEST RUNNER ═══
+async function runTest(id,suite,title,fn){
+  const rid='t-'+id;
+  addResult({id:rid,suite,title,status:'running',detail:'Running…',duration:0});
+  const t0=Date.now();
+  try{
+    const result=await fn();
+    const dur=Date.now()-t0;
+    updateResult(rid,'pass',result.detail||'Passed',result.data,dur);
+    return 'pass';
+  }catch(e){
+    const dur=Date.now()-t0;
+    updateResult(rid,'fail',e.message||'Failed',e.data||null,dur);
+    return 'fail';
+  }
+}
+
+async function runWarn(id,suite,title,fn){
+  const rid='t-'+id;
+  addResult({id:rid,suite,title,status:'running',detail:'Checking…',duration:0});
+  const t0=Date.now();
+  try{
+    const result=await fn();
+    const dur=Date.now()-t0;
+    if(result.warn){updateResult(rid,'warn',result.detail,result.data,dur);return 'warn';}
+    updateResult(rid,'pass',result.detail||'OK',result.data,dur);
+    return 'pass';
+  }catch(e){
+    updateResult(rid,'warn',e.message,null,Date.now()-t0);
+    return 'warn';
+  }
+}
+
+// ═══ TEST SUITES ═══
+async function runAll(){
+  clearAll();
+  document.getElementById('run-btn').disabled=true;
+  document.getElementById('run-btn').textContent='⏳ Running…';
+  progress(5);
+  try{
+    await runSuiteAuth();    progress(15);
+    await runSuiteConfig();  progress(25);
+    await runSuiteRead();    progress(40);
+    await runSuiteWrite();   progress(55);
+    await runSuiteCreate();  progress(70);
+    await runSuiteDelete();  progress(80);
+    await runSuiteFields();  progress(88);
+    await runSuiteFilter();  progress(94);
+    await runSuiteNotif();   progress(100);
+  }catch(e){console.error(e);}
+  document.getElementById('run-btn').disabled=false;
+  document.getElementById('run-btn').textContent='▶ Run All Tests';
+  // Show summary alert
+  const fails=results.filter(r=>r.status==='fail').length;
+  addResult({id:'summary-final',suite:'all',title:`── FINAL SUMMARY: ${fails===0?'ALL TESTS PASSED ✅':''+fails+' TESTS FAILED ❌'} ──`,status:fails===0?'pass':'fail',detail:`${results.filter(r=>r.status==='pass').length} passed · ${fails} failed · ${results.filter(r=>r.status==='warn').length} warnings out of ${results.length} total tests`,duration:0});
+}
+
+async function runSuite(name){
+  clearAll();
+  if(name==='auth') await runSuiteAuth();
+  if(name==='read') await runSuiteRead();
+  if(name==='write') await runSuiteWrite();
+  if(name==='fields') await runSuiteFields();
+}
+
+// ── AUTH SUITE ──
+async function runSuiteAuth(){
+  await runTest('auth-me','auth','GET /me — Graph API access',async()=>{
+    const {data,dur}=await api('https://graph.microsoft.com/v1.0/me');
+    return {detail:`✓ Signed in as <code>${data.displayName}</code> (${data.mail||data.userPrincipalName})`,data:{name:data.displayName,email:data.mail,id:data.id}};
+  });
+  await runWarn('auth-token','auth','Token — scopes & expiry',async()=>{
+    const parts=token.split('.');
+    const claims=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    const exp=new Date(claims.exp*1000);
+    const mins=Math.round((exp-Date.now())/60000);
+    const scp=claims.scp||claims.roles||'none';
+    return {detail:`Expires in ${mins} min · Scopes: <code>${scp}</code>`,warn:mins<5,data:{exp:exp.toLocaleTimeString(),scopes:scp}};
+  });
+  await runTest('auth-redirect','auth','Redirect URI — GitHub Pages configured',async()=>{
+    const {data}=await api(`https://graph.microsoft.com/v1.0/applications?$filter=appId eq '${CLIENT_ID}'&$select=web,spa`).catch(()=>({data:null}));
+    const spas=data?.value?.[0]?.spa?.redirectUris||[];
+    if(spas.includes(GH_URL)) return {detail:`✓ GitHub Pages URL registered: <code>${GH_URL}</code>`,data:{uris:spas}};
+    return {detail:`⚠ GitHub URL <code>${GH_URL}</code> may not be in redirect URIs. Check Azure AD. Registered: ${spas.join(', ')||'(could not read)'}`,data:{uris:spas}};
+  });
+}
+
+// ── CONFIG SUITE ──
+async function runSuiteConfig(){
+  await runTest('cfg-list','config','Demands list — accessible via Graph API',async()=>{
+    const {data,dur}=await api(`https://graph.microsoft.com/v1.0/sites/${SP_HOST}:${SP_PATH}:/lists/${LIST_ID}?$select=id,name,webUrl`);
+    return {detail:`✓ List found: <code>${data.name}</code> at <code>${data.webUrl}</code>`,data,duration:dur};
+  });
+  await runTest('cfg-notif','config','Notifications list — accessible',async()=>{
+    const {data,dur}=await api(`https://graph.microsoft.com/v1.0/sites/${SP_HOST}:${SP_PATH}:/lists/${NOTIF_ID}?$select=id,name`);
+    return {detail:`✓ Notifications list found: <code>${data.name}</code>`,data};
+  });
+  await runWarn('cfg-notif-cols','config','Notifications list — EmailBody column exists',async()=>{
+    const {data}=await api(`https://graph.microsoft.com/v1.0/sites/${SP_HOST}:${SP_PATH}:/lists/${NOTIF_ID}/columns?$select=name`);
+    const cols=(data?.value||[]).map(c=>c.name);
+    const hasEmailBody=cols.includes('EmailBody');
+    return {detail:hasEmailBody?`✓ EmailBody column exists. All columns: <code>${cols.join(', ')}</code>`:`⚠ EmailBody column MISSING — add it to Notifications list. Found: <code>${cols.join(', ')}</code>`,warn:!hasEmailBody,data:{columns:cols}};
+  });
+}
+
+// ── READ SUITE ──
+async function runSuiteRead(){
+  let items=[];
+  await runTest('read-all','read','GET all demands — $expand=fields',async()=>{
+    const {data,dur}=await api(`${LIST_BASE}/items?$expand=fields&$top=200`);
+    items=data?.value||[];
+    return {detail:`✓ ${items.length} items returned in ${dur}ms`,data:{count:items.length,sample:items[0]?.fields}};
+  });
+  await runWarn('read-count','read','Demand count — sanity check',async()=>{
+    if(items.length===0) throw new Error('No items returned');
+    const hasTitle=items.every(i=>i.fields?.Title);
+    return {detail:`${items.length} demands · All have Title: ${hasTitle?'✓':'⚠ MISSING'}`,warn:!hasTitle||items.length<5,data:{count:items.length,missingTitle:items.filter(i=>!i.fields?.Title).length}};
+  });
+  await runTest('read-fields','read','SP field names — confirm structure',async()=>{
+    if(!items.length) throw new Error('No items to inspect');
+    const fields=Object.keys(items[0].fields||{});
+    const expected=['Title','Demand_Status','BSA','Service_Line','Skills','Location','Target_Date'];
+    const missing=expected.filter(f=>!fields.includes(f));
+    if(missing.length) throw Object.assign(new Error(`Missing fields: ${missing.join(', ')}`),{data:{fields,missing}});
+    return {detail:`✓ All expected fields present. Total SP fields: <code>${fields.length}</code>`,data:{fields}};
+  });
+  await runWarn('read-pagination','read','Pagination — @odata.nextLink handling',async()=>{
+    const {data}=await api(`${LIST_BASE}/items?$expand=fields&$top=5`);
+    const hasNext=!!data?.['@odata.nextLink'];
+    return {detail:hasNext?`✓ Pagination works — nextLink present for >5 items`:`No nextLink (${(data?.value||[]).length} items ≤ 5)`,warn:false};
+  });
+}
+
+// ── WRITE (PATCH) SUITE ──
+async function runSuiteWrite(){
+  let items=[];
+  try{const {data}=await api(`${LIST_BASE}/items?$expand=fields&$top=5`);items=data?.value||[];}catch(e){}
+  if(!items.length){addResult({id:'t-write-skip',suite:'write',title:'Write tests skipped — no items to test on',status:'warn',detail:'Run Read tests first'});return;}
+  const item=items[0];
+  // Test PATCH each key field type
+  const patches=[
+    {field:'Updated_By',value:'DiagTest_'+Date.now(),type:'text'},
+    {field:'Demand_Status',value:item.fields?.Demand_Status||'Open',type:'choice'},
+    {field:'Ageing_Days',value:item.fields?.Ageing_Days||0,type:'number'},
+  ];
+  for(const p of patches){
+    await runTest(`write-${p.field}`,'write',`PATCH ${p.field} (${p.type})`,async()=>{
+      const {dur}=await api(`${LIST_BASE}/items/${item.id}/fields`,'PATCH',{[p.field]:p.value});
+      return {detail:`✓ <code>${p.field}</code> = <code>${p.value}</code> accepted in ${dur}ms`};
+    });
+  }
+  // Test all SP columns one by one
+  await runTest('write-title','write','PATCH Title field (Demand ID)',async()=>{
+    const curTitle=item.fields?.Title||'test';
+    const {dur}=await api(`${LIST_BASE}/items/${item.id}/fields`,'PATCH',{Title:String(curTitle)});
+    return {detail:`✓ Title PATCH accepted: <code>${curTitle}</code> in ${dur}ms`};
+  });
+}
+
+// ── CREATE (POST) SUITE ──
+async function runSuiteCreate(){
+  let createdId=null;
+  await runTest('create-post','create','POST — Create new item (temp title)',async()=>{
+    const tempTitle='DIAG_'+Date.now();
+    const {data,dur}=await api(`${LIST_BASE}/items`,'POST',{fields:{Title:tempTitle}});
+    if(!data?.id) throw new Error('No item ID returned from POST');
+    createdId=data.id;
+    return {detail:`✓ Item created with ID <code>${createdId}</code> in ${dur}ms. Title: <code>${tempTitle}</code>`,data:{id:createdId}};
+  });
+  if(createdId){
+    await runTest('create-patch-all','create','PATCH all required fields onto new item',async()=>{
+      const fields={
+        Title:'DIAG_3999',Demand_Status:'Open',Profile_Status:'3. Internal Screening',
+        Demand_Type:'New',BSA:'Annuities',Location:'Offshore',Service_Line:'QEA',
+        Skills:'Diagnostic test',Demand_Added_On:'2026-05-19T00:00:00Z',
+        Target_Date:'2026-06-09T00:00:00Z',Ageing_Days:0,Ageing_Group:'I) Not due yet',
+        Updated_By:'Diagnostic Tool',Team_Name:'Test Team'
+      };
+      const rejected=[];
+      for(const [k,v] of Object.entries(fields)){
+        try{await api(`${LIST_BASE}/items/${createdId}/fields`,'PATCH',{[k]:v});}
+        catch(e){rejected.push({field:k,value:v,error:e.message});}
+      }
+      if(rejected.length) throw Object.assign(new Error(`${rejected.length} fields rejected by SP`),{data:{rejected}});
+      return {detail:`✓ All ${Object.keys(fields).length} fields accepted by SP`,data:{fields:Object.keys(fields)}};
+    });
+    await runTest('create-verify','create','GET — Verify created item reads back correctly',async()=>{
+      const {data,dur}=await api(`${LIST_BASE}/items/${createdId}?$expand=fields`);
+      const f=data?.fields||{};
+      return {detail:`✓ Item verified: Title=<code>${f.Title}</code> Status=<code>${f.Demand_Status}</code> BSA=<code>${f.BSA}</code> in ${dur}ms`,data:f};
+    });
+    await runTest('create-delete-diag','create','DELETE — Clean up diagnostic item',async()=>{
+      await api(`${LIST_BASE}/items/${createdId}`,'DELETE');
+      return {detail:`✓ Diagnostic item ${createdId} deleted successfully`};
+    });
+  }
+}
+
+// ── DELETE SUITE ──
+async function runSuiteDelete(){
+  let delId=null;
+  await runTest('del-create','delete','Create test item for delete test',async()=>{
+    const {data}=await api(`${LIST_BASE}/items`,'POST',{fields:{Title:'DEL_TEST_'+Date.now()}});
+    delId=data?.id;
+    if(!delId) throw new Error('Failed to create test item');
+    return {detail:`✓ Test item created: ID <code>${delId}</code>`};
+  });
+  if(delId){
+    await runTest('del-delete','delete','DELETE — Remove the test item',async()=>{
+      const {dur}=await api(`${LIST_BASE}/items/${delId}`,'DELETE');
+      return {detail:`✓ DELETE successful in ${dur}ms`};
+    });
+    await runTest('del-verify','delete','GET — Verify item is gone',async()=>{
+      try{await api(`${LIST_BASE}/items/${delId}?$expand=fields`);}
+      catch(e){
+        if(e.status===404) return {detail:`✓ Item confirmed deleted (404 as expected)`};
+        throw e;
+      }
+      throw new Error('Item still exists after DELETE — delete may have failed');
+    });
+  }
+}
+
+// ── SP FIELDS SUITE ──
+async function runSuiteFields(){
+  let items=[];
+  try{const {data}=await api(`${LIST_BASE}/items?$expand=fields&$top=3`);items=data?.value||[];}catch(e){}
+  if(!items.length){addResult({id:'t-fields-skip',suite:'fields',title:'Field tests skipped — could not load items',status:'warn'});return;}
+  const f=items[0]?.fields||{};
+  const SP_COLS=[
+    ['Title','Demand ID (single line)'],['SO_ID','SO ID'],['Demand_Status','Status (choice)'],
+    ['Profile_Status','Profile Status (choice)'],['Demand_Type','Demand Type (choice)'],
+    ['Location','Location (choice)'],['Service_Line','Service Line (choice)'],
+    ['Demand_Added_On','Date Added (datetime)'],['Target_Date','Target Date (datetime)'],
+    ['Demand_Closure_Date','Closure Date (datetime)'],['Ageing_Days','Ageing Days (number)'],
+    ['Ageing_Group','Ageing Group (text)'],['Profile_Name','Profile Name (multiline)'],
+    ['Backfill_Resource','Backfill Resource (text)'],['Status_Updates','Status Updates (multiline)'],
+    ['Tier1_Program','Tier1 Program (text)'],['FG_Form_Number','FG Form Number (text)'],
+    ['Fieldglass_Status','Fieldglass Status (text)'],['Updated_By','Updated By (text)'],
+    ['BSA','BSA (choice)'],['Team_Name','Team Name (text)'],
+    ['SEPM_SEL','SEPM/SEL (text)'],['Skills','Skills (multiline)'],
+  ];
+  for(const [col,label] of SP_COLS){
+    await runWarn(`field-${col}`,'fields',`Column: ${col} — ${label}`,async()=>{
+      const present=col in f;
+      const val=f[col];
+      const hasData=val!==null&&val!==undefined&&val!=='';
+      return {
+        detail:present?`✓ Present · Value: <code>${String(val).substring(0,60)||'(empty)'}</code>`:`⚠ Column <code>${col}</code> not in SP fields — may need to be added`,
+        warn:!present,
+        data:{column:col,value:val,present}
+      };
+    });
+  }
+}
+
+// ── FILTER SUITE ──
+async function runSuiteFilter(){
+  let items=[];
+  try{const {data}=await api(`${LIST_BASE}/items?$expand=fields&$top=200`);items=data?.value||[];}catch(e){}
+  await runTest('filter-status','filter','Status filter — Open demands',async()=>{
+    const open=items.filter(i=>(i.fields?.Demand_Status||'').toLowerCase()==='open');
+    if(!items.length) throw new Error('No items loaded');
+    return {detail:`✓ ${open.length} Open of ${items.length} total (${Math.round(open.length/items.length*100)}%)`,data:{open:open.length,total:items.length}};
+  });
+  await runTest('filter-bsa','filter','BSA values — distribution',async()=>{
+    const bsas={};
+    items.forEach(i=>{const b=i.fields?.BSA||'(empty)';bsas[b]=(bsas[b]||0)+1;});
+    const unique=Object.keys(bsas).length;
+    return {detail:`✓ ${unique} unique BSA values found`,data:bsas};
+  });
+  await runTest('filter-sl','filter','Service Line values — distribution',async()=>{
+    const sls={};
+    items.forEach(i=>{const s=i.fields?.Service_Line||'(empty)';sls[s]=(sls[s]||0)+1;});
+    return {detail:`✓ ${Object.keys(sls).length} unique Service Lines found`,data:sls};
+  });
+  await runWarn('filter-date','filter','Target dates — format check',async()=>{
+    const withDate=items.filter(i=>i.fields?.Target_Date);
+    const badFormat=withDate.filter(i=>!i.fields.Target_Date.includes('T'));
+    return {detail:`${withDate.length} items have Target_Date · ${badFormat.length} may have bad format`,warn:badFormat.length>0,data:{badFormat:badFormat.slice(0,3).map(i=>({id:i.id,date:i.fields.Target_Date}))}};
+  });
+}
+
+// ── NOTIFICATIONS SUITE ──
+async function runSuiteNotif(){
+  await runTest('notif-write','notif','Write to Notifications list',async()=>{
+    const {data,dur}=await api(`${NOTIF_BASE}/items`,'POST',{fields:{
+      Title:'DIAG_NOTIF_'+Date.now(),NotifType:'test',DemandId:'DIAG',
+      Title2:'Diagnostic test notification',Subtitle:'Testing notification write',
+      TriggeredBy:'Diagnostic Tool',Recipients:'test@cognizant.com',EmailBody:''
+    }});
+    if(!data?.id) throw new Error('No item ID returned');
+    // Clean up
+    try{await api(`${NOTIF_BASE}/items/${data.id}`,'DELETE');}catch(e){}
+    return {detail:`✓ Notification written and deleted in ${dur}ms · ID was: ${data.id}`};
+  });
+  await runWarn('notif-emailbody','notif','EmailBody column — large HTML write test',async()=>{
+    const longHtml='<html><body>'+' Test content '.repeat(200)+'</body></html>';
+    const {data}=await api(`${NOTIF_BASE}/items`,'POST',{fields:{
+      Title:'DIAG_EB_'+Date.now(),NotifType:'test',EmailBody:''
+    }});
+    if(!data?.id) throw new Error('POST failed');
+    let patched=false;
+    try{
+      await api(`${NOTIF_BASE}/items/${data.id}/fields`,'PATCH',{EmailBody:longHtml});
+      patched=true;
+    }catch(e){}
+    try{await api(`${NOTIF_BASE}/items/${data.id}`,'DELETE');}catch(e){}
+    return {detail:patched?`✓ EmailBody PATCH works — ${longHtml.length} chars written`:`⚠ EmailBody PATCH failed — check column type (must be Multiple lines of text)`,warn:!patched};
+  });
+}
+
+// ═══ EXPORT ═══
+function exportReport(){
+  const lines=[
+    'NW MCA TRACKER — DIAGNOSTIC REPORT',
+    '=====================================',
+    `Generated: ${new Date().toLocaleString()}`,
+    `User: ${user?.name||''} (${user?.username||''})`,
+    `SharePoint: ${SP_HOST}${SP_PATH}`,
+    `Demands List: ${LIST_ID}`,
+    `Notifications List: ${NOTIF_ID}`,
+    '',
+    `SUMMARY: ${results.filter(r=>r.status==='pass').length} passed · ${results.filter(r=>r.status==='fail').length} failed · ${results.filter(r=>r.status==='warn').length} warnings`,
+    '',
+    '─'.repeat(60),
+    '',
+    ...results.map(r=>[
+      `[${r.status.toUpperCase()}] ${r.title}`,
+      `  Time:    ${r.time?.toLocaleTimeString()||''}`,
+      `  Duration: ${r.duration||0}ms`,
+      `  Detail:  ${(r.detail||'').replace(/<[^>]+>/g,'')}`,
+      r.data?`  Data:    ${JSON.stringify(r.data).substring(0,200)}`:'',
+      ''
+    ].filter(Boolean).join('\n')),
+    '─'.repeat(60),
+    '',
+    'FAILED TESTS:',
+    ...results.filter(r=>r.status==='fail').map(r=>`  ✗ ${r.title}: ${(r.detail||'').replace(/<[^>]+>/g,'')}`),
+    '',
+    'WARNINGS:',
+    ...results.filter(r=>r.status==='warn').map(r=>`  ⚠ ${r.title}: ${(r.detail||'').replace(/<[^>]+>/g,'')}`),
+  ];
+  const blob=new Blob([lines.join('\n')],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`nw_mca_diagnostic_${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.txt`;
+  a.click();
+}
+
+// Auto sign-in
+window.addEventListener('load',async()=>{
+  try{
+    const m=new msal.PublicClientApplication({
+      auth:{clientId:CLIENT_ID,authority:`https://login.microsoftonline.com/${TENANT_ID}`,
+            redirectUri:'https://nwmca-cognizant.github.io/nw-mca-tracker/'},
+      cache:{cacheLocation:'sessionStorage'}
+    });
+    await m.initialize();
+    const accounts=m.getAllAccounts();
+    if(accounts.length){
+      try{
+        const r=await m.acquireTokenSilent({scopes:SCOPES,account:accounts[0]});
+        msalApp=m;token=r.accessToken;user=accounts[0];onConnected();
+      }catch(e){}
+    }
+  }catch(e){}
+});
+</script>
+</body>
+</html>
