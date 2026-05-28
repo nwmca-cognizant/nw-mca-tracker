@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.7 · All Fixes</div>
+    <div class="sb-version">v4.7 · Console Fixed</div>
   </div>
 </aside>
 
@@ -1342,7 +1342,9 @@ function showAll(el){
 }
 function quickFilter(type){
   goPage('tracker',document.getElementById('nav-tracker'));
-  ['f-st','f-ty','f-bsa','f-sl','f-loc'].forEach(id=>document.getElementById(id).value='');
+  ['f-st','f-ty','f-loc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  try{clearDD('f-bsa-list','f-bsa-btn','BSAs');}catch(e){}
+  try{clearDD('f-sl-list','f-sl-btn','SLs');}catch(e){}
   document.getElementById('q').value='';
   activeAg=''; activeSpecial='';
   if(type==='overdue'){document.getElementById('f-st').value='Open';activeSpecial='overdue';}
@@ -1453,14 +1455,7 @@ function renderAgeTabs(){
   });
 }
 function setAg(ag){activeAg=ag;activeSpecial='';renderTbl();renderCardList();renderAgeTabs();}
-function refreshDropdowns(){
-  const bsas=[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort();
-  const sls=[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort();
-  const bE=document.getElementById('f-bsa'),cb=bE.value;
-  bE.innerHTML='<option value="">All BSAs</option>'+bsas.map(b=>`<option${b===cb?' selected':''}>${b}</option>`).join('');
-  const sE=document.getElementById('f-sl'),cs=sE.value;
-  sE.innerHTML='<option value="">All SLs</option>'+sls.map(s=>`<option${s===cs?' selected':''}>${s}</option>`).join('');
-}
+function refreshDropdowns(){ try{ populateFilters(); }catch(e){} }
 function renderTbl(){
   const rows=getSorted(getFiltered());
   document.getElementById('rcount').textContent=`${rows.length} record${rows.length!==1?'s':''}`;
@@ -1485,9 +1480,9 @@ function renderTbl(){
       <td style="font-size:11px;color:var(--t2)">${pf}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
-        <button class="btn ghost sm" onclick="openEdit(${d.id})" title="Edit">✏</button>
-        ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel(${d.id})" title="Cancel">✕</button>`:''}
-        <button class="btn ghost sm" onclick="confDelete(${d.id})" title="Delete permanently" style="color:var(--t3)">🗑</button>
+        <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
+        ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel('${d.id}')" title="Cancel">✕</button>`:''}
+        <button class="btn ghost sm" onclick="confDelete('${d.id}')" title="Delete permanently" style="color:var(--t3)">🗑</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -1521,8 +1516,8 @@ function renderCardList(){
       <div class="dc-footer">
         <div class="dc-profile" style="color:var(--t2)">${pf?`👤 ${pf}`:'No profile yet'}</div>
         <div class="dc-actions" onclick="event.stopPropagation()">
-          <button class="btn ghost sm" onclick="openEdit(${d.id})">Edit</button>
-          ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm danger" onclick="confCancel(${d.id})">Cancel</button>`:''}
+          <button class="btn ghost sm" onclick="openEdit('${d.id}')">Edit</button>
+          ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm danger" onclick="confCancel('${d.id}')">Cancel</button>`:''}
         </div>
       </div>
     </div>`;
@@ -1661,7 +1656,7 @@ function renderNotifLog(){
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 const SL_POC_MAP={
-  'ADM':             ['adm-poc@cognizant.com'],
+  'ADM':             ['Vasudev.Majji@cognizant.com'],
   'QEA':             ['qea-poc@cognizant.com'],
   'IDE':             ['ide-poc@cognizant.com'],
   'AIA':             ['aia-poc@cognizant.com'],
@@ -2933,70 +2928,11 @@ function toast(msg,type=''){
 
 
   // Modal functions
-  const modalFns=['confCancel','confDelete','confDeleteAll','confBulkDelete'];
-  modalFns.forEach(name=>{
-    if(typeof window[name]==='function')
-      window[name]=_wrap(name,window[name],'modal','🪟');
-  });
+  // (modal wrapping removed)
 
-  // Action functions (async) — wrap differently
-  const asyncFns=['saveDemand','doCancel','doDelete','doBulkDelete','doDeleteAll','runImport','refreshData'];
-  asyncFns.forEach(name=>{
-    if(typeof window[name]==='function'){
-      const orig=window[name];
-      window[name]=async function(...args){
-        const eid=DBG.log('click','⚡',name+'('+args.map(a=>String(a).substring(0,20)).join(',')+')','Starting…');
-        const t0=Date.now();
-        try{
-          const result=await orig.apply(this,args);
-          DBG.log('ok','✅',name+' completed','Done in '+(Date.now()-t0)+'ms');
-          return result;
-        }catch(e){
-          DBG.log('error','❌',name+' FAILED',e.message,{error:e.message,stack:e.stack?.split('\n')[1]});
-          throw e;
-        }
-      };
-    }
-  });
+  // (async wrapping removed)
 
-  // Intercept gFetch to record all API calls (gFetch defined in main script)
-  if(typeof window.gFetch==='function'){
-    const origGFetch=window.gFetch;
-    window.gFetch=async function(url,method='GET',body=null){
-      const short=url.split('/').slice(-3).join('/');
-      const t0=Date.now();
-      DBG.log('api','☁',`${method} ${short}`,'Waiting…',{url,method,body:body?JSON.stringify(body).substring(0,100):null});
-      try{
-        const result=await origGFetch.call(this,url,method,body);
-        const dur=Date.now()-t0;
-        const items=result?.value?.length;
-        DBG.log('ok','✅',`${method} OK ${short}`,
-          `${dur}ms${items!==undefined?' · '+items+' items':''}`,
-          {url,method,duration:dur+'ms',items});
-        return result;
-      }catch(e){
-        const dur=Date.now()-t0;
-        DBG.log('error','❌',`${method} FAILED ${short}`,
-          e.message.substring(0,80)+' ('+dur+'ms)',
-          {url,method,duration:dur+'ms',error:e.message});
-        throw e;
-      }
-    };
-  }
-
-  // Intercept mapFields to record what is sent to SP
-  if(typeof window.mapFields==='function'){
-    const origMapFields=window.mapFields;
-    window.mapFields=function(d){
-      const result=origMapFields.call(this,d);
-      const fields=result?.fields||{};
-      const fieldNames=Object.keys(fields);
-      DBG.log('sp','📋','mapFields called',
-        fieldNames.length+' fields: '+fieldNames.join(', '),
-        {fields:JSON.stringify(fields,null,2).substring(0,400)});
-      return result;
-    };
-  }
+  // intercepts removed
 
 
 
