@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.8 · Final</div>
+    <div class="sb-version">v4.9 · Access Fix</div>
   </div>
 </aside>
 
@@ -677,6 +677,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           <div style="margin-top:12px;display:flex;gap:8px">
             <button class="btn primary" style="flex:1" onclick="saveNotifSettings()">Save Settings</button>
             <button class="btn ghost sm" style="color:var(--blue);border-color:var(--blue);padding:0 14px;white-space:nowrap" onclick="sendWeeklyReport(true)" title="Send weekly leadership report now">📊 Send Now</button>
+            <button class="btn ghost sm" style="color:var(--green,#1a6640);border-color:var(--green,#1a6640);padding:0 14px;white-space:nowrap" onclick="sendTestNotification()" title="Send test email to verify settings">🧪 Test Email</button>
           </div>
         </div>
         <div class="np" style="flex:1">
@@ -861,7 +862,7 @@ async function signIn(){
 }
 
 async function ensureToken(){
-  if(graphToken && Date.now() < tokenExpiry - 60000) return;
+  if(graphToken && Date.now() < tokenExpiry - 600000) return; // refresh 10 min before expiry
   if(!msalApp) return;
   const accounts = msalApp.getAllAccounts();
   if(!accounts.length){ await signIn(); return; }
@@ -870,7 +871,15 @@ async function ensureToken(){
     graphToken  = r.accessToken;
     tokenExpiry = Date.now() + 3500000;
   }catch(e){
-    await msalApp.acquireTokenRedirect({ scopes:SCOPES, account:accounts[0] });
+    // Use popup instead of redirect to avoid losing page state
+    try{
+      const r2=await msalApp.acquireTokenPopup({ scopes:SCOPES, account:accounts[0] });
+      graphToken=r2.accessToken; tokenExpiry=Date.now()+3500000;
+    }catch(popupErr){
+      // If popup blocked, show toast and let user click to refresh
+      toast('Session expired — please click here to sign in again','red');
+      console.error('Token refresh failed:', popupErr.message);
+    }
   }
 }
 
@@ -892,12 +901,45 @@ async function gFetch(url, method='GET', body=null){
   catch(e){ clearTimeout(timeoutId); if(e.name==='AbortError') throw new Error('Request timed out after 30s'); throw e; }
   clearTimeout(timeoutId);
   if(!r.ok){
+    // Auto-retry on 401 — token may have expired mid-session
+    if(r.status===401){
+      console.warn('401 detected — forcing token refresh and retrying…');
+      graphToken=null; tokenExpiry=0;
+      await ensureToken();
+      opts.headers['Authorization']='Bearer '+graphToken;
+      const r2=await fetch(url,opts);
+      if(r2.ok) return method==='DELETE'?null:r2.json();
+      const e2=await r2.text();
+      throw new Error(`HTTP ${r2.status}: ${e2.substring(0,120)}`);
+    }
+    if(r.status===403){
+      // Show friendly access denied message
+      const body403=document.getElementById('app')||document.body;
+      if(!document.getElementById('access-denied-msg')){
+        const div=document.createElement('div');
+        div.id='access-denied-msg';
+        div.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg,#f5f5f5);z-index:99999;flex-direction:column;gap:16px;font-family:Arial,sans-serif;padding:32px;text-align:center';
+        div.innerHTML=[
+          '<div style="font-size:48px">🔒</div>',
+          '<div style="font-size:22px;font-weight:600;color:#1a4b8c">Access Denied — SharePoint Permission Required</div>',
+          '<div style="font-size:14px;color:#555;max-width:520px;line-height:1.7">',
+          'Your account <strong>'+(USER_NAME||'(unknown)')+'</strong> does not have access to the NW MCA SharePoint site.<br><br>',
+          'Please contact <strong>Srikanth Bura</strong> (Srikanth.Bura@cognizant.com) to request access.<br><br>',
+          '<span style="font-size:12px;color:#888">Technical detail: HTTP 403 — Sites.Selected permission not granted for this account on cognizantonline.sharepoint.com/sites/NWMCADemandTracker</span>',
+          '</div>',
+          '<a href="mailto:Srikanth.Bura@cognizant.com?subject=NW MCA Tracker Access Request&body=Please grant access to: '+(USER_NAME||'my account')+'" ',
+          'style="background:#1a4b8c;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">',
+          '📧 Request Access from Srikanth Bura</a>'
+        ].join('');
+        document.body.appendChild(div);
+      }
+      throw new Error('HTTP 403: Access denied — SharePoint permission required');
+    }
     const e=await r.text();
     let msg=e;
     try{
       const j=JSON.parse(e);
       msg=j.error?.message||j.error?.code||e;
-      // Log full SP error for debugging
       console.error('SP API Error:', r.status, r.url, j.error||e);
     }catch(x){ console.error('SP API Error:', r.status, r.url, e.substring(0,200)); }
     throw new Error(`HTTP ${r.status}: ${msg}`);
@@ -1187,15 +1229,18 @@ async function refreshData(){
   }catch(e){setSyncStatus('err','⚠ Error');toast('Refresh failed','red')}
 }
 async function silentRefresh(){
+  // Proactively refresh token before it expires
+  try{ await ensureToken(); }catch(e){}
   const now=new Date();
   const isMonday=now.getDay()===1;
   const isWeekday=now.getDay()>=1&&now.getDay()<=5;
   try{
     const saved=JSON.parse(localStorage.getItem('nwmca_notif_settings')||'{}');
     const digestTime=saved.digestTime||'9:00 AM';
-    const [tp,ap]=(digestTime+' AM').split(' ');
-    const [hh]=tp.split(':');let th=parseInt(hh);
-    if(ap==='PM'&&th!==12)th+=12;if(ap==='AM'&&th===12)th=0;
+    const _dtParts=digestTime.trim().split(' ');
+    const _tp=_dtParts[0], _ap=(_dtParts[1]||'AM').toUpperCase();
+    const [_hh]=_tp.split(':'); let th=parseInt(_hh);
+    if(_ap==='PM'&&th!==12)th+=12; if(_ap==='AM'&&th===12)th=0;
     const isDigestHour=now.getHours()===th;
     const lastDig=localStorage.getItem('nwmca_daily_digest');
     const sentToday=lastDig&&new Date(lastDig).toDateString()===now.toDateString();
@@ -1209,11 +1254,11 @@ async function silentRefresh(){
     try{
       const saved=JSON.parse(localStorage.getItem('nwmca_notif_settings')||'{}');
       const digestTime=saved.digestTime||'9:00 AM';
-      const [timePart,ampm]=(digestTime+' AM').split(' ');
-      const [hh]=timePart.split(':');
-      let targetHour=parseInt(hh);
-      if(ampm==='PM'&&targetHour!==12) targetHour+=12;
-      if(ampm==='AM'&&targetHour===12) targetHour=0;
+      const _wp=digestTime.trim().split(' ');
+      const _wt=_wp[0],_wap=(_wp[1]||'AM').toUpperCase();
+      const [_whh]=_wt.split(':'); let targetHour=parseInt(_whh);
+      if(_wap==='PM'&&targetHour!==12) targetHour+=12;
+      if(_wap==='AM'&&targetHour===12) targetHour=0;
       const isDigestHour=now.getHours()===targetHour;
       const lastSent=localStorage.getItem('nwmca_weekly_sent');
       const sentToday=lastSent&&new Date(lastSent).toDateString()===now.toDateString();
@@ -1566,31 +1611,67 @@ function renderDash(){
 // ═══════════════════════════════════════
 // NOTIFICATIONS
 // ═══════════════════════════════════════
+async function sendTestNotification(){
+  const raw=localStorage.getItem('nwmca_notif_settings');
+  const s=raw?JSON.parse(raw):{};
+  const recipients=s.recipients||[];
+  if(!recipients.length){
+    toast('No recipients set — add emails in To field and Save Settings first','red');
+    return;
+  }
+  setSyncStatus('saving','↻ Sending test…');
+  try{
+    for(const r of recipients){
+      await sbIns('notifications',{
+        type:'add',demand_id:'TEST_'+Date.now(),
+        title:'🧪 Test — NW MCA Notification Settings Verified',
+        subtitle:`Digest time: ${s.digestTime||'9:00 AM'} · Sent ${new Date().toLocaleString()}`,
+        triggered_by:USER_NAME, recipients:r.trim().toLowerCase()
+      });
+    }
+    setSyncStatus('ok','● Live');
+    notifLog.unshift({type:'test',title:'Test notification sent',
+      subtitle:`Sent to: ${recipients.join(', ')} — check inbox in 1-2 min`,
+      triggered_by:USER_NAME,created_at:new Date().toISOString()});
+    try{renderNotifLog();}catch(e){}
+    toast(`✓ Test sent to ${recipients.length} recipient(s) — check your inbox in 1–2 minutes`,'green');
+  }catch(e){
+    setSyncStatus('ok','● Live');
+    toast('Test failed: '+e.message,'red');
+  }
+}
 async function loadNotifLog(){
   // Notifications list not in SP — use in-memory log only
   try{renderNotifLog();}catch(e){}
 }
 function renderNotifLog(){
   const el=document.getElementById('notif-log');
-  if(!notifLog.length){el.innerHTML='<div style="font-size:12px;color:var(--t3);padding:10px 0;text-align:center">No activity yet.</div>';return}
-  const icons={add:'➕',cancel:'✕',close:'✓',update:'✎'};
-  el.innerHTML=notifLog.map(n=>`
-    <div class="nl-item">
-      <div class="nl-ic ${n.type}">${icons[n.type]||'•'}</div>
-      <div class="nl-text"><div class="nm">${n.title||'—'}</div><div class="ns">${n.subtitle||''}</div></div>
-      <div class="nl-meta"><span class="nl-sent">✓ Logged</span><span class="nl-time">${new Date(n.created_at).toLocaleTimeString()}</span></div>
+  if(!el) return;
+  if(!notifLog.length){
+    el.innerHTML='<div style="padding:16px;text-align:center;color:var(--t3);font-size:12px">No activity yet.<br>Click <strong>🧪 Test Email</strong> to verify your settings.</div>';
+    return;
+  }
+  const icons={add:'➕',cancel:'❌',close:'✅',update:'✏️',weekly:'📊',test:'🧪',settings:'⚙️',overdue:'⚠️'};
+  el.innerHTML=notifLog.slice(0,15).map(n=>`
+    <div style="display:flex;gap:10px;padding:8px 14px;border-bottom:0.5px solid var(--border2)">
+      <span style="font-size:16px">${icons[n.type]||'🔔'}</span>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500;color:var(--t1)">${n.title}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px">${n.subtitle||''}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:1px">${new Date(n.created_at).toLocaleString()} · ${n.triggered_by||''}</div>
+      </div>
     </div>`).join('');
 }
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 const SL_POC_MAP={
-  'ADM':             ['srikanth.bura@cognizant'],
-  'QEA':             ['srikanth.bura@cognizant'],
-  'IDE':             ['srikanth.bura@cognizant'],
-  'AIA':             ['srikanth.bura@cognizant'],
-  'CIS':             ['srikanth.bura@cognizant'],
+  'ADM':             ['Vasudev.Majji@cognizant.com'],
+  'QEA':             ['Arnab.Sen4@cognizant.com'],
+  'IDE':             ['Palanivel.Marimuthu@cognizant.com'],
+  'AIA':             ['Suraj.Rajan2@cognizant.com'],
+  'CIS':             ['Srividhya.Balachandran@cognizant.com'],
   'IPA Consulting':  ['ipa-poc@cognizant.com'],
-  'ISG (GW)':        ['isg-poc@cognizant.com'],
+  'ISG (GW)':        ['Neelakantasastry.Peri@cognizant.com'],
   // Add more: 'Service Line Name': ['poc@cognizant.com'],
 };
 
@@ -1712,7 +1793,11 @@ function saveNotifSettings(){
   }
   
   console.log('Notification settings saved:', settings);
-  toast('Notification settings saved ✓ — recipients: '+allTo.join(', '),'green');
+  const savedMsg=`Recipients: ${allTo.length>0?allTo.join(', '):'none set'} · Digest: ${digestTime}`;
+  toast('✓ Settings saved — '+savedMsg,'green');
+  notifLog.unshift({type:'settings',title:'Notification settings saved',
+    subtitle:savedMsg,triggered_by:USER_NAME,created_at:new Date().toISOString()});
+  try{renderNotifLog();}catch(e){}
 }
 
 function loadNotifSettings(){
@@ -2736,7 +2821,8 @@ async function doBulkDelete(){
   setSyncStatus(failed>0?'err':'ok',failed>0?'⚠ Error':'● Live');
   renderAll();
   if(failed>0){
-    toast(`Deleted ${done}, ${failed} failed — check console`,'red');
+    const isAuthErr=errors.some(e=>e.includes('401'));
+    toast(`Deleted ${done}, ${failed} failed${isAuthErr?' — session expired, please refresh the page':''}. Check console.`,'red');
     console.error('Bulk delete errors:', errors);
   } else {
     toast(`${done} demand${done!==1?'s':''} deleted ✓`,'green');
@@ -3106,42 +3192,8 @@ function toast(msg,type=''){
   </div>
 
   <!-- Filter tabs -->
-  <div style="background:#161b22;border-bottom:1px solid #21262d;padding:4px 10px;display:flex;gap:4px;flex-shrink:0;overflow-x:auto" id="dbg-tabs">
-    <button onclick="dbgFilter(null)" class="dbg-tab dbg-tab-active" id="dbg-tab-all">All</button>
-    <button onclick="dbgFilter('click')" class="dbg-tab" id="dbg-tab-click">🖱 Clicks</button>
-    <button onclick="dbgFilter('api')" class="dbg-tab" id="dbg-tab-api">☁ API</button>
-    <button onclick="dbgFilter('error')" class="dbg-tab" id="dbg-tab-error">❌ Errors</button>
-    <button onclick="dbgFilter('modal')" class="dbg-tab" id="dbg-tab-modal">🪟 Modals</button>
-    <button onclick="dbgFilter('sp')" class="dbg-tab" id="dbg-tab-sp">📋 SP Fields</button>
-  </div>
-
-  <!-- Log -->
-  <div id="dbg-log" style="flex:1;overflow-y:auto;font-size:11px;line-height:1.6"></div>
-</div>
-
-<!-- Debug toggle button (always visible) -->
-<button id="debug-toggle-btn" onclick="toggleDebugPanel()" 
-  style="position:fixed;bottom:16px;right:16px;background:#161b22;border:1px solid #30363d;color:#58a6ff;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;z-index:99998;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"
-  title="Toggle Debug Console">🔬</button>
-
-<style>
-@keyframes dbg-blink{0%,100%{opacity:1}50%{opacity:.3}}
-.dbg-tab{background:none;border:none;color:#8b949e;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap}
-.dbg-tab:hover{background:#21262d;color:#e6edf3}
-.dbg-tab-active{background:#1f3f6e!important;color:#58a6ff!important}
-.dbg-entry{display:flex;gap:6px;padding:3px 10px;border-bottom:1px solid #21262d;cursor:pointer}
+  :1px solid #21262d;cursor:pointer}
 .dbg-entry:hover{background:#1c2128}
-.dbg-t{color:#8b949e;font-size:10px;white-space:nowrap;flex-shrink:0;width:64px}
-.dbg-ic{flex-shrink:0;width:18px;text-align:center}
-.dbg-lbl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dbg-dur{color:#8b949e;font-size:10px;flex-shrink:0}
-.dbg-ok{color:#3fb950}
-.dbg-err{color:#f85149}
-.dbg-warn{color:#d29922}
-.dbg-info{color:#8b949e}
-.dbg-click{color:#58a6ff}
-.dbg-modal{color:#a371f7}
-.dbg-sp{color:#79c0ff}
 </style>
 
 
