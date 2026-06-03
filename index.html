@@ -543,7 +543,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="refreshData()"><span class="ni-ic">↻</span><span class="ni-lbl">Refresh Data</span></div>
     <div class="ni" onclick="exportCSV()"><span class="ni-ic">↓</span><span class="ni-lbl">Export CSV</span></div>
     <div class="ni" onclick="goPage('tracker',document.getElementById('nav-tracker'));setTimeout(()=>{document.getElementById('f-st').value='';filterChanged();selectAllVisible();},100)" style="color:var(--red)"><span class="ni-ic">☑</span><span class="ni-lbl">Select All Demands</span></div>
-    <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>    <div class="ni" onclick="event.stopPropagation();confDeleteAll()" style="color:var(--red);font-weight:600"><span class="ni-ic">🗑</span><span class="ni-lbl">Delete All Demands</span></div>
+    <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>    
     <div class="nsect">Filters</div>
     <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Access Fix</div>
+    <div class="sb-version">v4.9 · Dashboard+</div>
   </div>
 </aside>
 
@@ -634,6 +634,43 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <!-- ══ DASHBOARD PAGE ══ -->
   <div class="page" id="page-dashboard">
     <div class="dash-inner">
+      <div id="dash-filters" style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--t3);font-weight:500">FROM</label>
+          <input type="date" id="df-from" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--t3);font-weight:500">TO</label>
+          <input type="date" id="df-to" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--t3);font-weight:500">STATUS</label>
+          <select id="df-status" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
+            <option value="">All</option><option value="Open">Open</option><option value="Closed">Closed</option><option value="Cancel">Cancel</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--t3);font-weight:500">BSA</label>
+          <select id="df-bsa" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
+            <option value="">All BSAs</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--t3);font-weight:500">SERVICE LINE</label>
+          <select id="df-sl" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
+            <option value="">All SLs</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:11px;color:var(--t3);font-weight:500">LOCATION</label>
+          <select id="df-loc" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
+            <option value="">All</option><option value="Offshore">Offshore</option><option value="Onsite">Onsite</option><option value="Canada">Canada</option>
+          </select>
+        </div>
+        <button onclick="clearDashFilters()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 12px;font-size:12px;color:var(--blue);cursor:pointer;align-self:flex-end">✕ Clear</button>
+        <span id="df-count" style="font-size:11px;color:var(--t3);align-self:flex-end"></span>
+      </div>
+      <div id="dash-mom" style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:14px 16px;margin-bottom:14px"></div>
       <div class="kpi-grid" id="kpis"></div>
       <div class="cg" id="charts-grid"></div>
     </div>
@@ -677,7 +714,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           <div style="margin-top:12px;display:flex;gap:8px">
             <button class="btn primary" style="flex:1" onclick="saveNotifSettings()">Save Settings</button>
             <button class="btn ghost sm" style="color:var(--blue);border-color:var(--blue);padding:0 14px;white-space:nowrap" onclick="sendWeeklyReport(true)" title="Send weekly leadership report now">📊 Send Now</button>
-            <button class="btn ghost sm" style="color:var(--green,#1a6640);border-color:var(--green,#1a6640);padding:0 14px;white-space:nowrap" onclick="sendTestNotification()" title="Send test email to verify settings">🧪 Test Email</button>
+            
           </div>
         </div>
         <div class="np" style="flex:1">
@@ -1527,9 +1564,60 @@ function renderFilterBadge(){
 function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 function renderDash(){
   destroyAll();
-  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
-  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
-  const cancelled=demands.filter(d=>['cancel','cancelled'].includes((d.demand_status||'').toLowerCase()));
+  // Populate BSA and SL dropdowns
+  const dfBE=document.getElementById('df-bsa'),dfSE=document.getElementById('df-sl');
+  if(dfBE&&dfBE.options.length<=1)[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort().forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;dfBE.appendChild(o);});
+  if(dfSE&&dfSE.options.length<=1)[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;dfSE.appendChild(o);});
+  // Read active filters
+  const dfFrom=document.getElementById('df-from')?.value||'';
+  const dfToRaw=document.getElementById('df-to')?.value||'';
+  const dfTo=dfToRaw?dfToRaw+'T23:59:59':'';
+  const dfSt=document.getElementById('df-status')?.value||'';
+  const dfBsaV=document.getElementById('df-bsa')?.value||'';
+  const dfSlV=document.getElementById('df-sl')?.value||'';
+  const dfLocV=document.getElementById('df-loc')?.value||'';
+  // Filter demands
+  let flt=demands;
+  if(dfFrom) flt=flt.filter(d=>d.demand_added_on&&d.demand_added_on>=dfFrom);
+  if(dfTo)   flt=flt.filter(d=>d.demand_added_on&&d.demand_added_on<=dfTo);
+  if(dfSt)   flt=flt.filter(d=>(d.demand_status||'').toLowerCase()===dfSt.toLowerCase());
+  if(dfBsaV) flt=flt.filter(d=>d.bsa===dfBsaV);
+  if(dfSlV)  flt=flt.filter(d=>d.service_line===dfSlV);
+  if(dfLocV) flt=flt.filter(d=>d.location===dfLocV);
+  const nf=[dfFrom,dfToRaw,dfSt,dfBsaV,dfSlV,dfLocV].filter(Boolean).length;
+  const dfCnt=document.getElementById('df-count');
+  if(dfCnt) dfCnt.textContent=nf?`${nf} filter${nf!==1?'s':''} active · ${flt.length} of ${demands.length} demands`:'';
+  // Month-on-Month chart
+  const momEl=document.getElementById('dash-mom');
+  if(momEl){
+    const now=new Date(),mos=[];
+    for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);mos.push({lb:d.toLocaleString('default',{month:'short',year:'2-digit'}),y:d.getFullYear(),m:d.getMonth()});}
+    const md=mos.map(mo=>({
+      lb:mo.lb,
+      added:flt.filter(d=>{if(!d.demand_added_on)return false;const dd=new Date(d.demand_added_on);return dd.getFullYear()===mo.y&&dd.getMonth()===mo.m;}).length,
+      cls:flt.filter(d=>{const ds=(d.demand_status||'').toLowerCase();if(ds!=='closed'&&ds!=='cancel')return false;if(!d.demand_closure_date)return false;const dd=new Date(d.demand_closure_date);return dd.getFullYear()===mo.y&&dd.getMonth()===mo.m;}).length
+    }));
+    const maxV=Math.max(...md.map(m=>Math.max(m.added,m.cls)),1);
+    const bW=32,sp=6,cH=100;let bars='';
+    md.forEach((m,i)=>{
+      const x=44+i*(bW*2+sp+10);
+      const hA=Math.round((m.added/maxV)*cH),hC=Math.round((m.cls/maxV)*cH);
+      bars+=`<rect x="${x}" y="${cH-hA}" width="${bW}" height="${Math.max(hA,2)}" fill="#1a4b8c" rx="2" opacity=".85"/>
+<rect x="${x+bW+sp}" y="${cH-hC}" width="${bW}" height="${Math.max(hC,2)}" fill="#1d9e75" rx="2" opacity=".85"/>
+<text x="${x+bW}" y="${cH+14}" text-anchor="middle" font-size="10" fill="var(--t3)">${m.lb}</text>
+${m.added?`<text x="${x+bW/2}" y="${cH-hA-5}" text-anchor="middle" font-size="9" font-weight="500" fill="#1a4b8c">${m.added}</text>`:''}
+${m.cls?`<text x="${x+bW+sp+bW/2}" y="${cH-hC-5}" text-anchor="middle" font-size="9" font-weight="500" fill="#1d9e75">${m.cls}</text>`:''}`;
+    });
+    const svgW=44+md.length*(bW*2+sp+10)+20;
+    momEl.innerHTML=`<div style="font-size:11px;font-weight:500;color:var(--t2);margin-bottom:10px;display:flex;gap:14px;align-items:center">
+Month-on-Month Demand Activity — last 6 months
+<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#1a4b8c;border-radius:2px;display:inline-block;opacity:.85"></span><span style="font-size:10px;color:var(--t3)">Added</span></span>
+<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#1d9e75;border-radius:2px;display:inline-block;opacity:.85"></span><span style="font-size:10px;color:var(--t3)">Closed / Cancelled</span></span>
+</div><svg width="100%" viewBox="0 0 ${svgW} ${cH+24}" style="overflow:visible">${bars}</svg>`;
+  }
+  const open=flt.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const closed=flt.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const cancelled=flt.filter(d=>['cancel','cancelled'].includes((d.demand_status||'').toLowerCase()));
   const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
   const noP=open.filter(d=>!d.profile_name).length;
   const atInt=open.filter(d=>['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status));
@@ -1648,7 +1736,7 @@ function renderNotifLog(){
   const el=document.getElementById('notif-log');
   if(!el) return;
   if(!notifLog.length){
-    el.innerHTML='<div style="padding:16px;text-align:center;color:var(--t3);font-size:12px">No activity yet.<br>Click <strong>🧪 Test Email</strong> to verify your settings.</div>';
+    el.innerHTML='<div style="padding:16px;text-align:center;color:var(--t3);font-size:12px">No activity yet. Save settings and trigger a notification to see activity here.</div>';
     return;
   }
   const icons={add:'➕',cancel:'❌',close:'✅',update:'✏️',weekly:'📊',test:'🧪',settings:'⚙️',overdue:'⚠️'};
@@ -3139,6 +3227,12 @@ function populateFilters(){
   const sv=[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort();
   buildMultiDD('f-bsa-list','f-bsa-btn',bv,'BSAs');
   buildMultiDD('f-sl-list','f-sl-btn',sv,'SLs');
+}
+function clearDashFilters(){
+  ['df-from','df-to','df-status','df-bsa','df-sl','df-loc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const b=document.getElementById('df-bsa');if(b)while(b.options.length>1)b.remove(1);
+  const s=document.getElementById('df-sl');if(s)while(s.options.length>1)s.remove(1);
+  renderDash();
 }
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
