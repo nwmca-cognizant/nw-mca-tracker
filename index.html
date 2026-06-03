@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Dashboard+</div>
+    <div class="sb-version">v4.9 · MoM Fixed</div>
   </div>
 </aside>
 
@@ -634,35 +634,35 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <!-- ══ DASHBOARD PAGE ══ -->
   <div class="page" id="page-dashboard">
     <div class="dash-inner">
-      <div id="dash-filters" style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+      <div id="dash-filters" style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:10px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--t3);font-weight:500">FROM</label>
+          <label style="font-size:10px;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.04em">From</label>
           <input type="date" id="df-from" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--t3);font-weight:500">TO</label>
+          <label style="font-size:10px;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.04em">To</label>
           <input type="date" id="df-to" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--t3);font-weight:500">STATUS</label>
+          <label style="font-size:10px;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.04em">Status</label>
           <select id="df-status" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
             <option value="">All</option><option value="Open">Open</option><option value="Closed">Closed</option><option value="Cancel">Cancel</option>
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--t3);font-weight:500">BSA</label>
+          <label style="font-size:10px;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.04em">Bsa</label>
           <select id="df-bsa" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
             <option value="">All BSAs</option>
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--t3);font-weight:500">SERVICE LINE</label>
+          <label style="font-size:10px;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.04em">Service Line</label>
           <select id="df-sl" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
             <option value="">All SLs</option>
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:11px;color:var(--t3);font-weight:500">LOCATION</label>
+          <label style="font-size:10px;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.04em">Location</label>
           <select id="df-loc" onchange="renderDash()" style="border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 8px;font-size:12px;background:var(--bg);color:var(--t1)">
             <option value="">All</option><option value="Offshore">Offshore</option><option value="Onsite">Onsite</option><option value="Canada">Canada</option>
           </select>
@@ -670,7 +670,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
         <button onclick="clearDashFilters()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:5px 12px;font-size:12px;color:var(--blue);cursor:pointer;align-self:flex-end">✕ Clear</button>
         <span id="df-count" style="font-size:11px;color:var(--t3);align-self:flex-end"></span>
       </div>
-      <div id="dash-mom" style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:14px 16px;margin-bottom:14px"></div>
+      <div id="dash-mom" style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px"></div>
       <div class="kpi-grid" id="kpis"></div>
       <div class="cg" id="charts-grid"></div>
     </div>
@@ -1564,66 +1564,107 @@ function renderFilterBadge(){
 function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
 function renderDash(){
   destroyAll();
-  // Populate BSA and SL dropdowns
+
+  // ── Populate filter dropdowns (once) ──
   const dfBE=document.getElementById('df-bsa'),dfSE=document.getElementById('df-sl');
-  if(dfBE&&dfBE.options.length<=1)[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort().forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;dfBE.appendChild(o);});
-  if(dfSE&&dfSE.options.length<=1)[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;dfSE.appendChild(o);});
-  // Read active filters
-  const dfFrom=document.getElementById('df-from')?.value||'';
-  const dfToRaw=document.getElementById('df-to')?.value||'';
-  const dfTo=dfToRaw?dfToRaw+'T23:59:59':'';
-  const dfSt=document.getElementById('df-status')?.value||'';
-  const dfBsaV=document.getElementById('df-bsa')?.value||'';
-  const dfSlV=document.getElementById('df-sl')?.value||'';
-  const dfLocV=document.getElementById('df-loc')?.value||'';
-  // Filter demands
-  let flt=demands;
-  if(dfFrom) flt=flt.filter(d=>d.demand_added_on&&d.demand_added_on>=dfFrom);
-  if(dfTo)   flt=flt.filter(d=>d.demand_added_on&&d.demand_added_on<=dfTo);
-  if(dfSt)   flt=flt.filter(d=>(d.demand_status||'').toLowerCase()===dfSt.toLowerCase());
-  if(dfBsaV) flt=flt.filter(d=>d.bsa===dfBsaV);
-  if(dfSlV)  flt=flt.filter(d=>d.service_line===dfSlV);
-  if(dfLocV) flt=flt.filter(d=>d.location===dfLocV);
-  const nf=[dfFrom,dfToRaw,dfSt,dfBsaV,dfSlV,dfLocV].filter(Boolean).length;
-  const dfCnt=document.getElementById('df-count');
-  if(dfCnt) dfCnt.textContent=nf?`${nf} filter${nf!==1?'s':''} active · ${flt.length} of ${demands.length} demands`:'';
-  // Month-on-Month chart
-  const momEl=document.getElementById('dash-mom');
+  if(dfBE&&dfBE.options.length<=1)
+    [...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort()
+      .forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;dfBE.appendChild(o);});
+  if(dfSE&&dfSE.options.length<=1)
+    [...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort()
+      .forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;dfSE.appendChild(o);});
+
+  // ── Read filters ──
+  const dfFrom  = document.getElementById('df-from')?.value||'';
+  const dfToRaw = document.getElementById('df-to')?.value||'';
+  const dfTo    = dfToRaw ? dfToRaw+'T23:59:59' : '';
+  const dfSt    = document.getElementById('df-status')?.value||'';
+  const dfBsaV  = document.getElementById('df-bsa')?.value||'';
+  const dfSlV   = document.getElementById('df-sl')?.value||'';
+  const dfLocV  = document.getElementById('df-loc')?.value||'';
+
+  // ── Apply filters to dashboard data (NOT to MoM chart) ──
+  let flt = demands;
+  if(dfFrom) flt = flt.filter(d=>d.demand_added_on && d.demand_added_on >= dfFrom);
+  if(dfTo)   flt = flt.filter(d=>d.demand_added_on && d.demand_added_on <= dfTo);
+  if(dfSt)   flt = flt.filter(d=>(d.demand_status||'').toLowerCase() === dfSt.toLowerCase());
+  if(dfBsaV) flt = flt.filter(d=>d.bsa === dfBsaV);
+  if(dfSlV)  flt = flt.filter(d=>d.service_line === dfSlV);
+  if(dfLocV) flt = flt.filter(d=>d.location === dfLocV);
+
+  const nf = [dfFrom,dfToRaw,dfSt,dfBsaV,dfSlV,dfLocV].filter(Boolean).length;
+  const dfCnt = document.getElementById('df-count');
+  if(dfCnt) dfCnt.textContent = nf
+    ? `${nf} filter${nf!==1?'s':''} active — showing ${flt.length} of ${demands.length} demands`
+    : '';
+
+  // ══ MONTH-ON-MONTH CHART (always uses ALL demands — filters NOT applied) ══
+  const momEl = document.getElementById('dash-mom');
   if(momEl){
-    const now=new Date(),mos=[];
-    for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);mos.push({lb:d.toLocaleString('default',{month:'short',year:'2-digit'}),y:d.getFullYear(),m:d.getMonth()});}
-    const md=mos.map(mo=>({
-      lb:mo.lb,
-      added:flt.filter(d=>{if(!d.demand_added_on)return false;const dd=new Date(d.demand_added_on);return dd.getFullYear()===mo.y&&dd.getMonth()===mo.m;}).length,
-      cls:flt.filter(d=>{const ds=(d.demand_status||'').toLowerCase();if(ds!=='closed'&&ds!=='cancel')return false;if(!d.demand_closure_date)return false;const dd=new Date(d.demand_closure_date);return dd.getFullYear()===mo.y&&dd.getMonth()===mo.m;}).length
+    const now = new Date();
+    const mos = [];
+    for(let i=5;i>=0;i--){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      mos.push({ lb: d.toLocaleString('default',{month:'short'}), y: d.getFullYear(), m: d.getMonth() });
+    }
+    // Always use full demands array — filters not applied here
+    const md = mos.map(mo=>({
+      lb: mo.lb,
+      open: demands.filter(d=>{
+        if((d.demand_status||'').toLowerCase()!=='open') return false;
+        if(!d.demand_added_on) return false;
+        const dd=new Date(d.demand_added_on);
+        return dd.getFullYear()===mo.y && dd.getMonth()===mo.m;
+      }).length,
+      closed: demands.filter(d=>{
+        if((d.demand_status||'').toLowerCase()!=='closed') return false;
+        if(!d.demand_closure_date) return false;
+        const dd=new Date(d.demand_closure_date);
+        return dd.getFullYear()===mo.y && dd.getMonth()===mo.m;
+      }).length
     }));
-    const maxV=Math.max(...md.map(m=>Math.max(m.added,m.cls)),1);
-    const bW=32,sp=6,cH=100;let bars='';
+
+    const maxV = Math.max(...md.map(m=>Math.max(m.open,m.closed)), 1);
+    const bW=22, sp=5, cH=80, grpGap=16;
+    let bars='', xAx='';
     md.forEach((m,i)=>{
-      const x=44+i*(bW*2+sp+10);
-      const hA=Math.round((m.added/maxV)*cH),hC=Math.round((m.cls/maxV)*cH);
-      bars+=`<rect x="${x}" y="${cH-hA}" width="${bW}" height="${Math.max(hA,2)}" fill="#1a4b8c" rx="2" opacity=".85"/>
-<rect x="${x+bW+sp}" y="${cH-hC}" width="${bW}" height="${Math.max(hC,2)}" fill="#1d9e75" rx="2" opacity=".85"/>
-<text x="${x+bW}" y="${cH+14}" text-anchor="middle" font-size="10" fill="var(--t3)">${m.lb}</text>
-${m.added?`<text x="${x+bW/2}" y="${cH-hA-5}" text-anchor="middle" font-size="9" font-weight="500" fill="#1a4b8c">${m.added}</text>`:''}
-${m.cls?`<text x="${x+bW+sp+bW/2}" y="${cH-hC-5}" text-anchor="middle" font-size="9" font-weight="500" fill="#1d9e75">${m.cls}</text>`:''}`;
+      const x = 8 + i*(bW*2+sp+grpGap);
+      const hO = Math.round((m.open/maxV)*cH);
+      const hC = Math.round((m.closed/maxV)*cH);
+      bars +=
+        `<rect x="${x}" y="${cH-hO}" width="${bW}" height="${Math.max(hO,2)}" fill="#1a4b8c" rx="3" opacity=".9"/>` +
+        `<rect x="${x+bW+sp}" y="${cH-hC}" width="${bW}" height="${Math.max(hC,2)}" fill="#1d9e75" rx="3" opacity=".9"/>` +
+        (m.open  ? `<text x="${x+bW/2}"     y="${cH-hO-5}" text-anchor="middle" font-size="9" font-weight="600" fill="#1a4b8c">${m.open}</text>` : '') +
+        (m.closed? `<text x="${x+bW+sp+bW/2}" y="${cH-hC-5}" text-anchor="middle" font-size="9" font-weight="600" fill="#1d9e75">${m.closed}</text>` : '');
+      xAx += `<text x="${x+bW}" y="${cH+13}" text-anchor="middle" font-size="10" fill="var(--t3)">${m.lb}</text>`;
     });
-    const svgW=44+md.length*(bW*2+sp+10)+20;
-    momEl.innerHTML=`<div style="font-size:11px;font-weight:500;color:var(--t2);margin-bottom:10px;display:flex;gap:14px;align-items:center">
-Month-on-Month Demand Activity — last 6 months
-<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#1a4b8c;border-radius:2px;display:inline-block;opacity:.85"></span><span style="font-size:10px;color:var(--t3)">Added</span></span>
-<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#1d9e75;border-radius:2px;display:inline-block;opacity:.85"></span><span style="font-size:10px;color:var(--t3)">Closed / Cancelled</span></span>
-</div><svg width="100%" viewBox="0 0 ${svgW} ${cH+24}" style="overflow:visible">${bars}</svg>`;
+    const svgW = 8 + md.length*(bW*2+sp+grpGap) + 4;
+
+    momEl.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:500;color:var(--t1)">Month-on-Month Activity</div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)">
+            <span style="width:10px;height:10px;background:#1a4b8c;border-radius:2px;display:inline-block;opacity:.9"></span>Open added
+          </span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)">
+            <span style="width:10px;height:10px;background:#1d9e75;border-radius:2px;display:inline-block;opacity:.9"></span>Closed
+          </span>
+          <span style="font-size:10px;color:var(--t3);border:0.5px solid var(--border2);border-radius:4px;padding:1px 7px">All demands · 6 months</span>
+        </div>
+      </div>
+      <svg width="100%" viewBox="0 0 ${svgW} ${cH+18}" style="overflow:visible;max-height:110px">${bars}${xAx}</svg>`;
   }
-  const open=flt.filter(d=>(d.demand_status||'').toLowerCase()==='open');
-  const closed=flt.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
-  const cancelled=flt.filter(d=>['cancel','cancelled'].includes((d.demand_status||'').toLowerCase()));
-  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
-  const noP=open.filter(d=>!d.profile_name).length;
-  const atInt=open.filter(d=>['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status));
-  const profSub=open.filter(d=>d.profile_status==='4.3 Profiles Submitted in Review with NW');
-  const bsas=new Set(open.map(d=>d.bsa)).size;
-  const fulfRate=closed.length+cancelled.length>0?Math.round(closed.length/(closed.length+cancelled.length)*100):0;
+
+  // ══ KPIs and charts use FILTERED data ══
+  const open      = flt.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const closed    = flt.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const cancelled = flt.filter(d=>['cancel','cancelled'].includes((d.demand_status||'').toLowerCase()));
+  const ov        = open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const noP       = open.filter(d=>!d.profile_name).length;
+  const atInt     = open.filter(d=>['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status));
+  const profSub   = open.filter(d=>d.profile_status==='4.3 Profiles Submitted in Review with NW');
+  const fulfRate  = closed.length+cancelled.length>0 ? Math.round(closed.length/(closed.length+cancelled.length)*100) : 0;
 
   document.getElementById('kpis').innerHTML=`
     <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open Demands</div></div></div>
@@ -1633,28 +1674,28 @@ Month-on-Month Demand Activity — last 6 months
     <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>
     <div class="kpi-card"><div class="kpi-ic teal">▦</div><div><div class="kpi-v" style="color:var(--teal)">${fulfRate}%</div><div class="kpi-l">Fulfilment Rate</div></div></div>`;
 
-  // Data calcs
-  const bsaC={};open.forEach(d=>{bsaC[d.bsa]=(bsaC[d.bsa]||0)+1});
+  // Data calcs (filtered)
+  const bsaC={};open.forEach(d=>{bsaC[d.bsa]=(bsaC[d.bsa]||0)+1;});
   const bsaE=Object.entries(bsaC).sort((a,b)=>b[1]-a[1]);
   const maxBsa=bsaE[0]?.[1]||1;
-  const slC={};open.forEach(d=>{if(d.service_line)slC[d.service_line]=(slC[d.service_line]||0)+1});
+  const slC={};open.forEach(d=>{if(d.service_line)slC[d.service_line]=(slC[d.service_line]||0)+1;});
   const slE=Object.entries(slC).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const agC={};open.forEach(d=>{const ag=d.ageing_group||'Unknown';agC[ag]=(agC[ag]||0)+1});
-  const agColors=Object.keys(agC).map(ag=>{if(ag.startsWith('A)')||ag.startsWith('B)'))return'#b01c1c';if(ag.startsWith('C)'))return'#c44a00';if(ag.startsWith('D)')||ag.startsWith('E)'))return'#b86e00';if(ag.startsWith('F)')||ag.startsWith('G)'))return'#8c7800';return'#1a6640'});
-  const locC={Offshore:0,Onsite:0,Canada:0,Mexico:0};open.forEach(d=>{const l=(d.location||'').trim();if(locC[l]!==undefined)locC[l]++});
+  const agC={};open.forEach(d=>{const ag=d.ageing_group||'Unknown';agC[ag]=(agC[ag]||0)+1;});
+  const agColors=Object.keys(agC).map(ag=>{if(ag.startsWith('A)')||ag.startsWith('B)'))return'#b01c1c';if(ag.startsWith('C)'))return'#c44a00';if(ag.startsWith('D)')||ag.startsWith('E)'))return'#b86e00';if(ag.startsWith('F)')||ag.startsWith('G)'))return'#8c7800';return'#1a6640';});
+  const locC={Offshore:0,Onsite:0,Canada:0,Mexico:0};open.forEach(d=>{const l=(d.location||'').trim();if(locC[l]!==undefined)locC[l]++;});
   const locColors=['#185FA5','#5c1a7a','#7a2e1a','#6b5a1a'];
-  const tyC={New:0,Backfill:0,'Sell Bill':0};open.forEach(d=>{if(tyC[d.demand_type]!==undefined)tyC[d.demand_type]++});
-  const psC={};open.forEach(d=>{if(d.profile_status)psC[d.profile_status]=(psC[d.profile_status]||0)+1});
+  const tyC={New:0,Backfill:0,'Sell Bill':0};open.forEach(d=>{if(tyC[d.demand_type]!==undefined)tyC[d.demand_type]++;});
+  const psC={};open.forEach(d=>{if(d.profile_status)psC[d.profile_status]=(psC[d.profile_status]||0)+1;});
   const psS={'3. Internal Screening':'Internal Screening','4. Customer interview':'Customer Interview','4.1 Interview Scheduled':'Interview Scheduled','4.2 Interview Completed - Decision Pending':'Decision Pending','4.3 Profiles Submitted in Review with NW':'Submitted to NW','4.4 External Profiles selected - Cognizant onboarding pending':'Ext. Selected','6. NW Onboarding':'NW Onboarding'};
   const ovdList=open.filter(d=>(d.ageing_days||0)>0).sort((a,b)=>(b.ageing_days||0)-(a.ageing_days||0)).slice(0,8);
-  const t1C={};open.filter(d=>d.tier1_program).forEach(d=>{t1C[d.tier1_program]=(t1C[d.tier1_program]||0)+1});
+  const t1C={};open.filter(d=>d.tier1_program).forEach(d=>{t1C[d.tier1_program]=(t1C[d.tier1_program]||0)+1;});
   const t1E=Object.entries(t1C).sort((a,b)=>b[1]-a[1]);
 
   document.getElementById('charts-grid').innerHTML=`
     <div class="cc"><div class="cc-hd"><div class="cc-title">Pipeline by Status</div><div class="cc-sub">Open / Closed / Cancelled breakdown</div></div><div class="ch-wrap h180"><canvas id="ch-status"></canvas></div><div class="leg" id="leg-status"></div></div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Ageing Distribution</div><div class="cc-sub">Open demands by urgency group</div></div><div class="ch-wrap h180"><canvas id="ch-age"></canvas></div><div class="leg" id="leg-age"></div></div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Demand Type Split</div><div class="cc-sub">New vs Backfill vs Sell Bill</div></div><div class="ch-wrap h180"><canvas id="ch-type"></canvas></div><div class="leg" id="leg-type"></div></div>
-    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Open Demands by BSA</div><div class="cc-sub">Active pipeline per Business Service Area — click a bar to filter tracker</div></div>
+    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Open Demands by BSA</div><div class="cc-sub">Active pipeline per Business Service Area</div></div>
       <div style="margin-top:4px">${bsaE.map(([b,c])=>`<div class="bsa-row"><div class="bsa-name" title="${b}">${b}</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:${Math.round(c/maxBsa*100)}%"></div></div><div class="bsa-num">${c}</div></div>`).join('')}</div>
     </div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Location Split</div><div class="cc-sub">Open demands by work location</div></div><div class="ch-wrap h200"><canvas id="ch-loc"></canvas></div><div class="leg" id="leg-loc"></div></div>
@@ -1666,7 +1707,7 @@ Month-on-Month Demand Activity — last 6 months
     <div class="cc"><div class="cc-hd"><div class="cc-title">Tier-1 Programs</div><div class="cc-sub">Strategic programs with open pipeline</div></div>
       <div class="t1-list">${t1E.length?t1E.map(([k,v])=>`<div class="t1-item"><div class="t1-name">${k}</div><div class="t1-cnt">${v}</div></div>`).join(''):'<p style="font-size:12px;color:var(--t3);padding:8px 0">None in open demands</p>'}</div>
     </div>
-    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Pipeline Health Summary</div><div class="cc-sub">Account-level metrics — all time</div></div>
+    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Pipeline Health Summary</div><div class="cc-sub">Account-level metrics</div></div>
       <table class="summ-tbl">
         <tr><td>Total demands in database</td><td>${demands.length}</td><td>All statuses</td></tr>
         <tr><td>Currently open</td><td style="color:var(--blue)">${open.length}</td><td>Active pipeline</td></tr>
@@ -1756,10 +1797,10 @@ const SL_POC_MAP={
   'ADM':             ['Vasudev.Majji@cognizant.com'],
   'QEA':             ['Arnab.Sen4@cognizant.com'],
   'IDE':             ['Palanivel.Marimuthu@cognizant.com'],
-  'AIA':             ['Suraj.Rajan2@cognizant.com'],
-  'CIS':             ['Srividhya.Balachandran@cognizant.com'],
+  'AIA':             ['Suraj.Rajan2@cognizant.comm'],
+  'CIS':             ['cis-poc@cognizant.com'],
   'IPA Consulting':  ['ipa-poc@cognizant.com'],
-  'ISG (GW)':        ['Neelakantasastry.Peri@cognizant.com'],
+  'ISG (GW)':        ['isg-poc@cognizant.com'],
   // Add more: 'Service Line Name': ['poc@cognizant.com'],
 };
 
