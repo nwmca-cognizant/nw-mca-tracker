@@ -266,7 +266,7 @@ tbody tr.ok td:first-child{border-left:3px solid var(--green)}
 /* ══════════════════════════════════════
    NOTIFICATIONS PAGE
 ══════════════════════════════════════ */
-.notif-layout{padding:16px 24px 80px;display:grid;grid-template-columns:300px 1fr;gap:16px;grid-auto-rows:auto}
+.notif-layout{padding:16px 24px 80px;display:flex;flex-direction:column;gap:16px}
 .np{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px;box-shadow:var(--sh)}
 .np h3{font-size:13px;font-weight:600;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
 .ff{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
@@ -402,7 +402,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   .cg{grid-template-columns:1fr 1fr}
   .cc.w2{grid-column:span 2}.cc.w3{grid-column:span 2}
   .summary-strip{grid-template-columns:repeat(3,1fr)}
-  .notif-layout{grid-template-columns:260px 1fr}
+  .notif-layout{display:flex;flex-direction:column}
   .legend{display:none}
   th{font-size:9px}.td{font-size:11px}
 }
@@ -449,7 +449,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   .cc.w2,.cc.w3{grid-column:span 1}
 
   /* Notifications */
-  .notif-layout{grid-template-columns:1fr;padding:12px 14px 80px}
+  .notif-layout{display:flex;flex-direction:column;padding:12px 14px 80px}
   .ep-wrap{display:none}
 
   /* Panel full screen on mobile */
@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · POC Full</div>
+    <div class="sb-version">v4.9 · Notif Fix</div>
   </div>
 </aside>
 
@@ -722,8 +722,9 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           <div class="notif-log" id="notif-log"><div style="font-size:12px;color:var(--t3);padding:10px 0;text-align:center">Loading…</div></div>
         </div>
       </div>
+      </div>
       <!-- POC Editor — placed after left column, before email preview -->
-      <div class="np" style="grid-column:1/-1;margin-top:0">
+      <div class="np">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <h3 style="margin:0">🔗 Service Line POC Emails</h3>
           <button onclick="loadSLPOCConfig()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer">↻ Refresh from SP</button>
@@ -731,6 +732,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
         <p style="font-size:11px;color:var(--t3);margin:0 0 12px">Loaded from <strong>SL_POC_Config</strong> SharePoint list — changes are live for all users immediately.</p>
         <div id="poc-editor"></div>
       </div>
+      <div class="np" style="padding:0">
       <div class="ep-wrap">
         <div class="ep-bar">
           <div class="ep-dots"><div class="ep-dot" style="background:#ff5f57"></div><div class="ep-dot" style="background:#febc2e"></div><div class="ep-dot" style="background:#28c840"></div></div>
@@ -1351,7 +1353,7 @@ function goPage(id,el){
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
   if(id==='dashboard')setTimeout(renderDash,60);
-  if(id==='notif'){loadNotifLog();renderPOCEditor();setTimeout(renderEmailPrev,60)}
+  if(id==='notif'){loadNotifLog();loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
   closeMobMenu();
 }
 function showAll(el){
@@ -1975,14 +1977,16 @@ function renderNotifLog(){
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
 let SL_POC_MAP={
-  'ADM':             ['adm-poc@cognizant.com'],
-  'QEA':             ['qea-poc@cognizant.com'],
-  'IDE':             ['ide-poc@cognizant.com'],
-  'AIA':             ['aia-poc@cognizant.com'],
-  'CIS':             ['cis-poc@cognizant.com'],
-  'IPA Consulting':  ['ipa-poc@cognizant.com'],
-  'ISG (GW)':        ['isg-poc@cognizant.com'],
-  // Add more: 'Service Line Name': ['poc@cognizant.com'],
+  // Loaded dynamically from SP SL_POC_Config list on page load
+  // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
+  // Fallback entries used only if SP list is unreachable
+  'ADM':             [],
+  'QEA':             [],
+  'IDE':             [],
+  'AIA':             [],
+  'CIS':             [],
+  'IPA Consulting':  [],
+  'ISG (GW)':        [],
 };
 
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
