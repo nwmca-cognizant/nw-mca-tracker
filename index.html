@@ -722,6 +722,15 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           <div class="notif-log" id="notif-log"><div style="font-size:12px;color:var(--t3);padding:10px 0;text-align:center">Loading…</div></div>
         </div>
       </div>
+      <!-- POC Editor — placed after left column, before email preview -->
+      <div class="np" style="grid-column:1/-1;margin-top:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="margin:0">🔗 Service Line POC Emails</h3>
+          <button onclick="loadSLPOCConfig()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer">↻ Refresh from SP</button>
+        </div>
+        <p style="font-size:11px;color:var(--t3);margin:0 0 12px">Loaded from <strong>SL_POC_Config</strong> SharePoint list — changes are live for all users immediately.</p>
+        <div id="poc-editor"></div>
+      </div>
       <div class="ep-wrap">
         <div class="ep-bar">
           <div class="ep-dots"><div class="ep-dot" style="background:#ff5f57"></div><div class="ep-dot" style="background:#febc2e"></div><div class="ep-dot" style="background:#28c840"></div></div>
@@ -729,7 +738,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           <select id="prev-type" onchange="renderEmailPrev()"><option value="digest">Daily Digest</option><option value="new">New Demand</option><option value="cancel">Cancellation</option><option value="closed">Demand Closed</option><option value="overdue">Overdue Alert</option></select>
         </div>
         <div class="ep-body" id="ep-body"></div>
-      </div>
+      
+  </div>
     </div>
   </div>
 
@@ -817,14 +827,6 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 
 
 <div class="toast" id="toast">
-      <div class="np" style="grid-column:1/-1">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <h3 style="margin:0">🔗 Service Line POC Emails</h3>
-          <button onclick="loadSLPOCConfig()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer">↻ Refresh from SP</button>
-        </div>
-        <p style="font-size:11px;color:var(--t3);margin:0 0 12px">Loaded from <strong>SL_POC_Config</strong> SharePoint list — changes are live for all users immediately.</p>
-        <div id="poc-editor"></div>
-      </div>
   </div>
 
 <script>
