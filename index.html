@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · MoM Fixed</div>
+    <div class="sb-version">v4.9 · MoM 3-Bar</div>
   </div>
 </aside>
 
@@ -1607,53 +1607,76 @@ function renderDash(){
       const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
       mos.push({ lb: d.toLocaleString('default',{month:'short'}), y: d.getFullYear(), m: d.getMonth() });
     }
-    // Always use full demands array — filters not applied here
+    // Always use full demands array — filters NOT applied to MoM
     const md = mos.map(mo=>({
       lb: mo.lb,
-      open: demands.filter(d=>{
-        if((d.demand_status||'').toLowerCase()!=='open') return false;
+      added: demands.filter(d=>{
+        // All demands added in this month (any status) — use demand_added_on
         if(!d.demand_added_on) return false;
         const dd=new Date(d.demand_added_on);
         return dd.getFullYear()===mo.y && dd.getMonth()===mo.m;
       }).length,
       closed: demands.filter(d=>{
+        // Demands closed in this month — use demand_closure_date
         if((d.demand_status||'').toLowerCase()!=='closed') return false;
-        if(!d.demand_closure_date) return false;
-        const dd=new Date(d.demand_closure_date);
+        const dateField = d.demand_closure_date || d.demand_added_on;
+        if(!dateField) return false;
+        const dd=new Date(dateField);
+        return dd.getFullYear()===mo.y && dd.getMonth()===mo.m;
+      }).length,
+      cancelled: demands.filter(d=>{
+        // Demands cancelled in this month — use demand_closure_date or demand_added_on
+        if(!['cancel','cancelled'].includes((d.demand_status||'').toLowerCase())) return false;
+        const dateField = d.demand_closure_date || d.demand_added_on;
+        if(!dateField) return false;
+        const dd=new Date(dateField);
         return dd.getFullYear()===mo.y && dd.getMonth()===mo.m;
       }).length
     }));
 
-    const maxV = Math.max(...md.map(m=>Math.max(m.open,m.closed)), 1);
-    const bW=22, sp=5, cH=80, grpGap=16;
+    const maxV = Math.max(...md.map(m=>Math.max(m.added, m.closed, m.cancelled)), 1);
+    // 3 bars per month group
+    const bW=18, sp=4, grpGap=14, cH=90;
     let bars='', xAx='';
     md.forEach((m,i)=>{
-      const x = 8 + i*(bW*2+sp+grpGap);
-      const hO = Math.round((m.open/maxV)*cH);
+      const grpW = bW*3 + sp*2;
+      const x = 12 + i*(grpW + grpGap);
+      const hA = Math.round((m.added/maxV)*cH);
       const hC = Math.round((m.closed/maxV)*cH);
-      bars +=
-        `<rect x="${x}" y="${cH-hO}" width="${bW}" height="${Math.max(hO,2)}" fill="#1a4b8c" rx="3" opacity=".9"/>` +
-        `<rect x="${x+bW+sp}" y="${cH-hC}" width="${bW}" height="${Math.max(hC,2)}" fill="#1d9e75" rx="3" opacity=".9"/>` +
-        (m.open  ? `<text x="${x+bW/2}"     y="${cH-hO-5}" text-anchor="middle" font-size="9" font-weight="600" fill="#1a4b8c">${m.open}</text>` : '') +
-        (m.closed? `<text x="${x+bW+sp+bW/2}" y="${cH-hC-5}" text-anchor="middle" font-size="9" font-weight="600" fill="#1d9e75">${m.closed}</text>` : '');
-      xAx += `<text x="${x+bW}" y="${cH+13}" text-anchor="middle" font-size="10" fill="var(--t3)">${m.lb}</text>`;
+      const hCa= Math.round((m.cancelled/maxV)*cH);
+      // Added bar (blue)
+      bars += `<rect x="${x}"           y="${cH-hA}"  width="${bW}" height="${Math.max(hA,2)}"  fill="#1a4b8c" rx="2" opacity=".9"/>`;
+      // Closed bar (green)
+      bars += `<rect x="${x+bW+sp}"     y="${cH-hC}"  width="${bW}" height="${Math.max(hC,2)}"  fill="#1d9e75" rx="2" opacity=".9"/>`;
+      // Cancelled bar (amber)
+      bars += `<rect x="${x+bW*2+sp*2}" y="${cH-hCa}" width="${bW}" height="${Math.max(hCa,2)}" fill="#d29922" rx="2" opacity=".9"/>`;
+      // Value labels — only show if >0
+      if(m.added)     bars += `<text x="${x+bW/2}"            y="${cH-hA-5}"  text-anchor="middle" font-size="9" font-weight="600" fill="#1a4b8c">${m.added}</text>`;
+      if(m.closed)    bars += `<text x="${x+bW+sp+bW/2}"      y="${cH-hC-5}"  text-anchor="middle" font-size="9" font-weight="600" fill="#1d9e75">${m.closed}</text>`;
+      if(m.cancelled) bars += `<text x="${x+bW*2+sp*2+bW/2}"  y="${cH-hCa-5}" text-anchor="middle" font-size="9" font-weight="600" fill="#d29922">${m.cancelled}</text>`;
+      // Month label centred under group
+      xAx += `<text x="${x+grpW/2}" y="${cH+14}" text-anchor="middle" font-size="10" fill="var(--t3)">${m.lb}</text>`;
     });
-    const svgW = 8 + md.length*(bW*2+sp+grpGap) + 4;
+    const grpW3 = bW*3+sp*2;
+    const svgW = 12 + md.length*(grpW3+grpGap) - grpGap + 12;
 
     momEl.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:12px;font-weight:500;color:var(--t1)">Month-on-Month Activity</div>
-        <div style="display:flex;gap:12px;align-items:center">
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
           <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)">
-            <span style="width:10px;height:10px;background:#1a4b8c;border-radius:2px;display:inline-block;opacity:.9"></span>Open added
+            <span style="width:10px;height:10px;background:#1a4b8c;border-radius:2px;display:inline-block;opacity:.9"></span>Added
           </span>
           <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)">
             <span style="width:10px;height:10px;background:#1d9e75;border-radius:2px;display:inline-block;opacity:.9"></span>Closed
           </span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)">
+            <span style="width:10px;height:10px;background:#d29922;border-radius:2px;display:inline-block;opacity:.9"></span>Cancelled
+          </span>
           <span style="font-size:10px;color:var(--t3);border:0.5px solid var(--border2);border-radius:4px;padding:1px 7px">All demands · 6 months</span>
         </div>
       </div>
-      <svg width="100%" viewBox="0 0 ${svgW} ${cH+18}" style="overflow:visible;max-height:110px">${bars}${xAx}</svg>`;
+      <svg width="100%" viewBox="0 0 ${svgW} ${cH+20}" style="overflow:visible;max-height:120px">${bars}${xAx}</svg>`;
   }
 
   // ══ KPIs and charts use FILTERED data ══
@@ -1797,10 +1820,10 @@ const SL_POC_MAP={
   'ADM':             ['Vasudev.Majji@cognizant.com'],
   'QEA':             ['Arnab.Sen4@cognizant.com'],
   'IDE':             ['Palanivel.Marimuthu@cognizant.com'],
-  'AIA':             ['Suraj.Rajan2@cognizant.comm'],
+  'AIA':             ['Suraj.Rajan2@cognizant.com'],
   'CIS':             ['cis-poc@cognizant.com'],
   'IPA Consulting':  ['ipa-poc@cognizant.com'],
-  'ISG (GW)':        ['isg-poc@cognizant.com'],
+  'ISG (GW)':        ['Neelakantasastry.Peri@cognizant.com'],
   // Add more: 'Service Line Name': ['poc@cognizant.com'],
 };
 
