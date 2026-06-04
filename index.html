@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · MoM 3-Bar</div>
+    <div class="sb-version">v4.9 · SP POC Config</div>
   </div>
 </aside>
 
@@ -718,7 +718,15 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           </div>
         </div>
         <div class="np" style="flex:1">
-          <h3>📋 Activity Log</h3>
+          <div style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:12px 14px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:500;color:var(--t1)">🔗 Service Line POC Emails</span>
+            <button onclick="loadSLPOCConfig()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:3px 10px;font-size:11px;color:var(--blue);cursor:pointer">↻ Refresh from SP</button>
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Changes save directly to SharePoint and are live for all users immediately.</div>
+          <div id="poc-editor"></div>
+        </div>
+        <h3>📋 Activity Log</h3>
           <div class="notif-log" id="notif-log"><div style="font-size:12px;color:var(--t3);padding:10px 0;text-align:center">Loading…</div></div>
         </div>
       </div>
@@ -987,6 +995,7 @@ async function gFetch(url, method='GET', body=null){
 // Base URL for the Demands list
 const LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${SP_LIST_ID}`;
 const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
+const POC_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/SL_POC_Config`;
 
 // ── Map SharePoint item to demand object ──
 function mapItem(item){
@@ -1260,6 +1269,7 @@ async function refreshData(){
   try{
     const data=await sbQ('demands','');
     demands=data;renderAll();setSyncStatus('ok','● Live');
+  loadSLPOCConfig();
     try{ loadNotifSettings(); }catch(e){}
     try{ populateFilters(); }catch(e){}
     toast('Data refreshed ✓','green');
@@ -1338,7 +1348,7 @@ function goPage(id,el){
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
   if(id==='dashboard')setTimeout(renderDash,60);
-  if(id==='notif'){loadNotifLog();setTimeout(renderEmailPrev,60)}
+  if(id==='notif'){loadNotifLog();renderPOCEditor();setTimeout(renderEmailPrev,60)}
   closeMobMenu();
 }
 function showAll(el){
@@ -1792,9 +1802,101 @@ async function sendTestNotification(){
     toast('Test failed: '+e.message,'red');
   }
 }
+async function loadSLPOCConfig(){
+  try{
+    const r=await gFetch(POC_LIST_BASE()+'/items?$expand=fields&$top=100');
+    const items=r?.value||[];
+    if(!items.length) return;
+    const m={};
+    items.forEach(i=>{
+      const f=i.fields||{};
+      const sl=(f.ServiceLine||f.Title||'').trim();
+      const raw=(f.POCEmails||'').trim();
+      if(!sl) return;
+      m[sl]=raw.split(/[,;\n]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
+    });
+    SL_POC_MAP=m;
+    try{renderPOCEditor();}catch(e){}
+  }catch(e){console.warn('loadSLPOCConfig:',e.message);}
+}
+async function saveSLPOCConfig(sl,emails){
+  try{
+    const r=await gFetch(POC_LIST_BASE()+'/items?$expand=fields&$top=100');
+    const ex=(r?.value||[]).find(i=>(i.fields?.ServiceLine||i.fields?.Title||'')=== sl);
+    const str=emails.filter(e=>e.includes('@')).join(',');
+    if(ex) await gFetch(POC_LIST_BASE()+'/items/'+ex.id+'/fields','PATCH',{POCEmails:str});
+    else await gFetch(POC_LIST_BASE()+'/items','POST',{fields:{Title:sl,ServiceLine:sl,POCEmails:str}});
+    await loadSLPOCConfig();
+    toast('Saved POC for '+sl,'green');
+  }catch(e){toast('Save failed: '+e.message,'red');}
+}
 async function loadNotifLog(){
   // Notifications list not in SP — use in-memory log only
   try{renderNotifLog();}catch(e){}
+}
+function renderPOCEditor(){
+  const el=document.getElementById('poc-editor');if(!el)return;
+  const sls=Object.keys(SL_POC_MAP);
+  if(!sls.length){el.innerHTML='<div style="font-size:12px;color:var(--t3);padding:6px 0">No service lines. Click Refresh from SP.</div>';return;}
+  // Build table via DOM to avoid quoting issues
+  const tbl=document.createElement('table');
+  tbl.style.cssText='width:100%;border-collapse:collapse';
+  const thead=tbl.createTHead();
+  const hr=thead.insertRow();
+  ['Service Line','POC Emails (comma-separated)',''].forEach((t,i)=>{
+    const th=document.createElement('th');
+    th.style.cssText='text-align:left;font-size:11px;font-weight:500;color:var(--t3);padding:3px 0 5px;'+(i===0?'width:130px':i===2?'width:54px':'');
+    th.textContent=t; hr.appendChild(th);
+  });
+  const tbody=tbl.createTBody();
+  sls.forEach(sl=>{
+    const row=tbody.insertRow();
+    row.style.borderBottom='0.5px solid var(--border2)';
+    // SL name cell
+    const td1=row.insertCell();
+    td1.style.cssText='padding:6px 0;font-size:12px;font-weight:500;color:var(--t1)';
+    td1.textContent=sl;
+    // Email input cell
+    const td2=row.insertCell();
+    td2.style.padding='4px 8px';
+    const inp=document.createElement('input');
+    inp.type='text';
+    inp.id='pi_'+sl.replace(/[^a-z0-9]/gi,'_');
+    inp.value=(SL_POC_MAP[sl]||[]).join(', ');
+    inp.placeholder='poc@cognizant.com, poc2@cognizant.com';
+    inp.style.cssText='width:100%;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 8px;font-size:12px;background:var(--bg);color:var(--t1)';
+    td2.appendChild(inp);
+    // Save button cell
+    const td3=row.insertCell();
+    td3.style.cssText='padding:4px 0;text-align:right';
+    const btn=document.createElement('button');
+    btn.textContent='Save';
+    btn.style.cssText='background:var(--blue);color:white;border:none;border-radius:var(--r);padding:4px 10px;font-size:11px;cursor:pointer';
+    btn.onclick=()=>pocSave(sl);
+    td3.appendChild(btn);
+  });
+  el.innerHTML='';
+  el.appendChild(tbl);
+  const addDiv=document.createElement('div');
+  addDiv.style.marginTop='8px';
+  const addBtn=document.createElement('button');
+  addBtn.textContent='+ Add service line';
+  addBtn.style.cssText='background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 12px;font-size:12px;color:var(--blue);cursor:pointer';
+  addBtn.onclick=pocAddRow;
+  addDiv.appendChild(addBtn);
+  el.appendChild(addDiv);
+}
+function pocSave(sl){
+  const k='pi_'+sl.replace(/[^a-z0-9]/gi,'_');
+  const v=document.getElementById(k)?.value||'';
+  const emails=v.split(/[,;\n]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
+  saveSLPOCConfig(sl,emails);
+}
+function pocAddRow(){
+  const sl=(prompt('New service line name:')||'').trim();
+  if(!sl||SL_POC_MAP[sl]!==undefined){if(sl)toast('Already exists','');return;}
+  SL_POC_MAP[sl]=[];renderPOCEditor();
+  setTimeout(()=>document.getElementById('pi_'+sl.replace(/[^a-z0-9]/gi,'_'))?.focus(),50);
 }
 function renderNotifLog(){
   const el=document.getElementById('notif-log');
@@ -1816,14 +1918,14 @@ function renderNotifLog(){
 }
 // ══ SERVICE LINE POC MAP ══
 // Add POC emails for each service line — these are CC'd on SL-specific notifications
-const SL_POC_MAP={
-  'ADM':             ['Vasudev.Majji@cognizant.com'],
-  'QEA':             ['Arnab.Sen4@cognizant.com'],
-  'IDE':             ['Palanivel.Marimuthu@cognizant.com'],
-  'AIA':             ['Suraj.Rajan2@cognizant.com'],
+let SL_POC_MAP={
+  'ADM':             ['adm-poc@cognizant.com'],
+  'QEA':             ['qea-poc@cognizant.com'],
+  'IDE':             ['ide-poc@cognizant.com'],
+  'AIA':             ['aia-poc@cognizant.com'],
   'CIS':             ['cis-poc@cognizant.com'],
   'IPA Consulting':  ['ipa-poc@cognizant.com'],
-  'ISG (GW)':        ['Neelakantasastry.Peri@cognizant.com'],
+  'ISG (GW)':        ['isg-poc@cognizant.com'],
   // Add more: 'Service Line Name': ['poc@cognizant.com'],
 };
 
