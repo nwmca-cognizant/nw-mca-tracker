@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Rich Email</div>
+    <div class="sb-version">v4.9 · Clear Fix</div>
   </div>
 </aside>
 
@@ -1057,7 +1057,10 @@ function mapFields(d){
     f.Title = String(d.demand_id);
 
   // Text / Choice fields — only send when non-empty (choice columns reject empty string)
-  const addText = (spCol, val) => { if(val!==undefined && val!==null && val!=='') f[spCol]=String(val); };
+  const addText = (spCol, val) => {
+    if(val===null) { f[spCol]=null; return; }  // explicit null = clear the field in SP
+    if(val!==undefined && val!=='') f[spCol]=String(val);
+  };
   const addChoice = (spCol, val) => { if(val!==undefined && val!==null && String(val).trim()!=='') f[spCol]=String(val).trim(); };
 
   addText  ('SO_ID',              d.so_id);
@@ -1105,9 +1108,9 @@ function mapFields(d){
   if(d.ageing_days!==undefined && d.ageing_days!==null)
     f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
 
-  // Remove any undefined/null/empty values as safety net
+  // Remove undefined and empty string — but KEEP null (intentional SP field clear)
   Object.keys(f).forEach(k => {
-    if(f[k]===null || f[k]===undefined || f[k]==='') delete f[k];
+    if(f[k]===undefined || f[k]==='') delete f[k];
   });
 
   if(!window._mfLogged){window._mfLogged=true;console.log('mapFields sample (logged once):', JSON.stringify(f));}
@@ -1209,7 +1212,7 @@ async function sbUpd(table, match, data){
     // Field-by-field fallback
     console.warn('Bulk PATCH failed on update, trying field by field:', e.message);
     for(const [k,v] of Object.entries(fields)){
-      try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v}); }
+      try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v===null?null:v}); }
       catch(e2){ console.warn('SP rejected field on update:', k,'=',JSON.stringify(v),'→',e2.message); }
     }
   }
@@ -2563,9 +2566,21 @@ async function saveDemand(){
     _p.status_updates=prevUpd?`${newLine}
 ${prevUpd}`:newLine;
   }
-  // Strip null/undefined/empty — SP rejects them on required choice columns
+  // For NEW demands: strip empty values (SP rejects empty choice columns)
+  // For EDITS: keep explicitly cleared text fields as null so SP clears them
   const payload = {};
-  Object.keys(_p).forEach(k => { if(_p[k]!==null && _p[k]!==undefined && _p[k]!=='') payload[k]=_p[k]; });
+  // Fields that are safe to clear in SP (text/multitext — not required choices)
+  const clearableFields = ['profile_name','backfill_resource','so_id','team_name',
+    'sepm_sel','tier1_program','fg_form_number','status_updates'];
+  Object.keys(_p).forEach(k => {
+    const v = _p[k];
+    if(v!==null && v!==undefined && v!==''){
+      payload[k] = v; // non-empty: always include
+    } else if(editId && clearableFields.includes(k)){
+      payload[k] = null; // explicitly cleared on edit: send null to clear in SP
+    }
+    // empty on new demand or non-clearable: skip
+  });
   setSyncStatus('saving','↻ Saving…');
   console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
   try{
