@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Notif Fix</div>
+    <div class="sb-version">v4.9 · Rich Email</div>
   </div>
 </aside>
 
@@ -2050,13 +2050,17 @@ async function logNotif(type,d){
   try{
     // Write ONE notification item per recipient
     // Power Automate reads single email per item — avoids semicolon parsing issues
+    // Build the rich HTML email body once
+    let emailBody='';
+    try{ emailBody=buildNotifEmailHTML(type,d); }catch(e){ emailBody=subs[type]||''; }
     for(const recipient of allRecipients){
       await sbIns('notifications',{
         type,demand_id:d.demand_id,
         title:titles[type]||type,
         subtitle:subs[type]||'',
         triggered_by:USER_NAME,
-        recipients:recipient.trim().toLowerCase()  // single email per item
+        recipients:recipient.trim().toLowerCase(),
+        email_body:emailBody   // rich HTML written to EmailBody column in SP
       });
     }
     if(allRecipients.length===0) console.warn('No recipients configured for notification type:',type);
@@ -2225,50 +2229,108 @@ function loadLeadershipRecipients(){
 function addTag(e){if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.trim().replace(/,$/,'');if(v&&v.includes('@')){const s=document.createElement('span');s.className='rtag';s.innerHTML=`${v}<span class="rx" onclick="removeTag(this)">×</span>`;e.target.before(s);e.target.value=''}}}
 function removeTag(el){el.parentElement.remove()}
 
+function buildNotifEmailHTML(type, d){
+  // Shared email HTML builder — used by both preview and actual notifications
+  const fmt=v=>{if(!v)return'—';try{return new Date(v).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(e){return v;}};
+  const hdr=(t,sub,col='#1a4b8c')=>`<div style="background:${col};padding:20px 24px;color:white"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-bottom:6px">Cognizant · Nationwide MCA</div><div style="font-size:20px;font-weight:700;margin-bottom:4px">${t}</div><div style="font-size:12px;opacity:.85">${sub}</div></div>`;
+  const row=(l,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #f0f0f0;font-size:13px"><span style="color:#666">${l}</span><strong style="text-align:right;max-width:60%">${v||'—'}</strong></div>`;
+  const section=(t)=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;padding:14px 0 6px">${t}</div>`;
+  const wrap=(body)=>`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">${body}<div style="background:#f5f5f5;padding:12px 24px;font-size:10px;color:#888;text-align:center">Automated · NW MCA Demand Tracker · Do not reply · ${new Date().toLocaleDateString()}</div></div>`;
+  const body_wrap=(c)=>`<div style="padding:20px 24px">${c}</div>`;
+  const alert=(msg,col,bg)=>`<div style="background:${bg};border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:${col}">${msg}</div>`;
+  const open=demands.filter(x=>(x.demand_status||'').toLowerCase()==='open');
+  const ov=open.filter(x=>['A)','B)','C)'].some(p=>(x.ageing_group||'').startsWith(p)));
+  const closed=demands.filter(x=>(x.demand_status||'').toLowerCase()==='closed');
+  let inner='';
+  if(type==='new'||type==='add'){
+    inner=hdr(`New Demand #${d.demand_id} Added — ${d.bsa}`,'Immediate resourcing attention required','#1a6640')+
+    body_wrap(
+      alert(`Demand <strong>#${d.demand_id}</strong> has been added to the NW MCA tracker and requires resourcing action.`,'#1a6640','#e6f4ec')+
+      section('DEMAND DETAILS')+
+      row('Demand ID','#'+d.demand_id)+
+      row('BSA',d.bsa)+
+      row('Team',d.team_name||'—')+
+      row('Skills Required',d.skills||'—')+
+      row('Location',d.location||'—')+
+      row('Service Line',d.service_line||'—')+
+      row('Demand Type',d.demand_type||'—')+
+      row('Target Start Date',fmt(d.target_date))+
+      row('SEPM/SEL',d.sepm_sel||'—')+
+      row('FG/JP ID',d.fg_form_number||'—')+
+      row('Added by',USER_NAME)+
+      `<div style="margin-top:20px;text-align:center"><a href="https://nwmca-cognizant.github.io/nw-mca-tracker/" style="background:#1a4b8c;color:white;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Tracker →</a></div>`
+    );
+  }else if(type==='cancel'){
+    inner=hdr(`Demand #${d.demand_id} Cancelled — ${d.bsa}`,'For your records','#8c1f1f')+
+    body_wrap(
+      alert(`Demand <strong>#${d.demand_id}</strong> has been <strong>cancelled</strong> and closed as of ${new Date().toLocaleDateString()}.`,'#8c1f1f','#faeaea')+
+      section('DEMAND DETAILS')+
+      row('Demand ID','#'+d.demand_id)+
+      row('BSA',d.bsa)+
+      row('Skills',d.skills||'—')+
+      row('Service Line',d.service_line||'—')+
+      row('Demand Type',d.demand_type||'—')+
+      row('Last Profile Status',d.profile_status||'—')+
+      row('Cancelled by',USER_NAME)+
+      row('Date',new Date().toLocaleDateString())
+    );
+  }else if(type==='close'){
+    inner=hdr(`Demand #${d.demand_id} Fulfilled! — ${d.bsa}`,'Great news from the NW MCA team','#1a6640')+
+    body_wrap(
+      alert(`🎉 Demand <strong>#${d.demand_id}</strong> has been <strong>successfully fulfilled</strong>. The resource is being onboarded.`,'#1a6640','#e6f4ec')+
+      section('FULFILMENT DETAILS')+
+      row('Demand ID','#'+d.demand_id)+
+      row('BSA',d.bsa)+
+      row('Skills',d.skills||'—')+
+      row('Profile Selected',d.profile_name||'—')+
+      row('Service Line',d.service_line||'—')+
+      row('FG/JP ID',d.fg_form_number||'—')+
+      row('Closed by',USER_NAME)+
+      row('Closure Date',new Date().toLocaleDateString())
+    );
+  }else if(type==='update'){
+    inner=hdr(`Demand #${d.demand_id} Updated — ${d.bsa}`,'Status update notification','#1a4b8c')+
+    body_wrap(
+      alert(`Demand <strong>#${d.demand_id}</strong> has been updated by <strong>${USER_NAME}</strong>.`,'#1a4b8c','#e6f1fb')+
+      section('CURRENT STATUS')+
+      row('Demand ID','#'+d.demand_id)+
+      row('BSA',d.bsa)+
+      row('Skills',d.skills||'—')+
+      row('Demand Status',d.demand_status||'—')+
+      row('Profile Status',d.profile_status||'—')+
+      row('Service Line',d.service_line||'—')+
+      row('Updated by',USER_NAME)+
+      row('Update Date',new Date().toLocaleDateString())
+    );
+  }else if(type==='digest'||type==='overdue'){
+    const bsaMap=open.reduce((a,x)=>{a[x.bsa]=(a[x.bsa]||0)+1;return a},{});
+    inner=hdr(`${ov.length} Overdue Demands Require Action`,'Daily overdue alert · '+new Date().toLocaleDateString(),'#7a4a00')+
+    body_wrap(
+      alert(`<strong>${ov.length} demands</strong> have passed their target start dates and need immediate attention.`,'#7a4a00','#fef3e2')+
+      section('⚠ CRITICAL OVERDUE DEMANDS (A–C)')+
+      ov.slice(0,10).map(x=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid #f0f0f0;font-size:12px"><div><strong>#${x.demand_id}</strong> · ${x.bsa} · ${(x.skills||'').substring(0,30)}<div style="font-size:10px;color:#888;margin-top:1px">${x.ageing_group} · ${x.service_line}</div></div><span style="color:#8c1f1f;font-size:11px;font-weight:600">${x.ageing_group}</span></div>`).join('')+
+      (ov.length>10?`<div style="font-size:11px;color:#888;padding:5px 0">+ ${ov.length-10} more</div>`:'')+
+      section('PIPELINE SNAPSHOT')+
+      row('Total Open',open.length)+
+      row('Overdue A–C',ov.length)+
+      row('Closed Today',closed.filter(x=>new Date(x.demand_closure_date||x.demand_added_on).toDateString()===new Date().toDateString()).length)+
+      section('OPEN BY BSA')+
+      Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([b,c])=>row(b,c)).join('')
+    );
+  }else{
+    inner=hdr('NW MCA Notification','Automated alert from the Demand Tracker')+
+    body_wrap(`<p style="font-size:13px;color:#555">${type} notification for demand #${d.demand_id||'—'}</p>`);
+  }
+  return wrap(inner);
+}
+
 function renderEmailPrev(){
   const type=document.getElementById('prev-type').value;
-  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
-  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
-  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
-  const s=demands[0]||{};
-  const hdr=(t,sub,col='#1a4b8c')=>`<div class="em-hd" style="background:${col}"><div class="eh-tag">Cognizant · Nationwide MCA</div><h2>${t}</h2><div class="eh-sub">${sub}</div></div>`;
-  const ft=`<div class="em-ft">Automated notification · NW MCA Demand Tracker · ${new Date().toLocaleDateString()}</div>`;
-  let html='';
-  if(type==='digest'){
-    const bsaMap=open.reduce((a,d)=>{a[d.bsa]=(a[d.bsa]||0)+1;return a},{});
-    html=`<div class="em">${hdr('Daily Demand Digest','Pipeline summary · '+new Date().toLocaleDateString())}
-    <div class="em-bd"><div class="em-kpis"><div class="em-kpi"><div class="ev">${open.length}</div><div class="el">Open</div></div><div class="em-kpi"><div class="ev" style="color:#8c1f1f">${ov.length}</div><div class="el">Overdue</div></div><div class="em-kpi"><div class="ev" style="color:#1a6640">${closed.length}</div><div class="el">Closed</div></div></div>
-    <div class="em-st">⚠ Critical Overdue Demands (A–C)</div>
-    ${ov.slice(0,5).map(d=>`<div class="em-row"><span><strong>#${d.demand_id}</strong> · ${d.bsa} · ${d.skills}</span><span style="color:#8c1f1f;font-size:11px">${d.ageing_group}</span></div>`).join('')}
-    ${ov.length>5?`<div style="font-size:11px;color:#888;padding:4px 0">+ ${ov.length-5} more overdue demands</div>`:''}
-    <br><div class="em-st">📊 Open Demands by BSA</div>
-    ${Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([b,c])=>`<div class="em-row"><span>${b}</span><strong>${c}</strong></div>`).join('')}
-    </div>${ft}</div>`;
-  }else if(type==='new'){
-    html=`<div class="em">${hdr('🆕 New Demand Added','Immediate attention required','#1a6640')}
-    <div class="em-bd"><div style="background:#e6f4ec;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px">Demand <strong>#${s.demand_id}</strong> has been added to the tracker and requires resourcing action.</div>
-    <div class="em-st">Demand Details</div>
-    ${[['Demand ID','#'+s.demand_id],['BSA',s.bsa],['Team',s.team_name||'—'],['Skills Required',s.skills],['Location',s.location],['Service Line',s.service_line],['Demand Type',s.demand_type],['Target Start Date',fmt(s.target_date)],['SEPM/SEL',s.sepm_sel||'—'],['FG/JP ID',s.fg_form_number||'—']].map(([l,v])=>`<div class="em-row"><span style="color:#666">${l}</span><strong>${v||'—'}</strong></div>`).join('')}
-    </div>${ft}</div>`;
-  }else if(type==='cancel'){
-    html=`<div class="em">${hdr('❌ Demand Cancelled','For your records','#8c1f1f')}
-    <div class="em-bd"><div style="background:#faeaea;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px;color:#8c1f1f">Demand <strong>#${s.demand_id}</strong> has been <strong>cancelled</strong> and closed as of today.</div>
-    ${[['Demand ID','#'+s.demand_id],['BSA',s.bsa],['Skills',s.skills],['Type',s.demand_type],['Cancelled On',new Date().toLocaleDateString()],['Last Profile Status',s.profile_status]].map(([l,v])=>`<div class="em-row"><span style="color:#666">${l}</span><strong>${v||'—'}</strong></div>`).join('')}
-    </div>${ft}</div>`;
-  }else if(type==='closed'){
-    html=`<div class="em">${hdr('✅ Demand Fulfilled!','Great news from the NW MCA team','#1a6640')}
-    <div class="em-bd"><div style="background:#e6f4ec;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px;color:#1a6640">🎉 Demand <strong>#${s.demand_id}</strong> has been <strong>successfully fulfilled</strong>. The resource is being onboarded.</div>
-    ${[['Demand ID','#'+s.demand_id],['BSA',s.bsa],['Skills',s.skills],['Profile Selected',s.profile_name||'—'],['Service Line',s.service_line],['Closure Date',new Date().toLocaleDateString()]].map(([l,v])=>`<div class="em-row"><span style="color:#666">${l}</span><strong>${v||'—'}</strong></div>`).join('')}
-    </div>${ft}</div>`;
-  }else if(type==='overdue'){
-    html=`<div class="em">${hdr(`⚠ ${ov.length} Overdue Demands Require Action`,'Daily overdue alert · '+new Date().toLocaleDateString(),'#7a4a00')}
-    <div class="em-bd"><div style="background:#fef3e2;border-radius:6px;padding:12px;margin-bottom:14px;font-size:12px"><strong>${ov.length} demands</strong> have passed their target start dates and need immediate attention.</div>
-    <div class="em-st">Overdue Demand Details</div>
-    ${ov.slice(0,10).map(d=>`<div class="em-ev"><div class="em-ev-dot" style="background:#8c1f1f"></div><div style="flex:1"><strong>#${d.demand_id}</strong> · ${d.bsa} · ${d.skills}<div style="font-size:10px;color:#888;margin-top:1px">${d.ageing_group} · Target: ${fmt(d.target_date)} · ${d.service_line}</div></div></div>`).join('')}
-    ${ov.length>10?`<div style="font-size:11px;color:#888;padding:5px 0">+ ${ov.length-10} more overdue demands</div>`:''}
-    </div>${ft}</div>`;
-  }
-  document.getElementById('ep-body').innerHTML=html;
+  const s=demands[0]||{demand_id:'SAMPLE',bsa:'Sample BSA',skills:'Sample Skills',service_line:'QEA',demand_type:'New',location:'Offshore',team_name:'Sample Team',profile_status:'3. Internal Screening',profile_name:'Sample Profile',fg_form_number:'NW00JP00034315',sepm_sel:'George',target_date:new Date().toISOString()};
+  const typeMap={digest:'digest',new:'add',cancel:'cancel',closed:'close',overdue:'overdue'};
+  const html=buildNotifEmailHTML(typeMap[type]||type, s);
+  const el=document.getElementById('ep-body');
+  if(el) el.innerHTML=html;
 }
 
 // ═══════════════════════════════════════
