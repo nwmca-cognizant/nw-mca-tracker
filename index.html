@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Clear Fix</div>
+    <div class="sb-version">v4.9 · Smart Notif</div>
   </div>
 </aside>
 
@@ -705,9 +705,9 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
         </div>
         <div class="np">
           <h3>🔔 Alert Triggers</h3>
-          <div class="tog-row"><div class="tog-info"><div class="tt">New demand added</div><div class="ts">Instant alert on creation</div></div><label class="tog"><input type="checkbox" id="t-new" checked><span class="tog-sl"></span></label></div>
-          <div class="tog-row"><div class="tog-info"><div class="tt">Demand cancelled</div><div class="ts">Alert on cancellation</div></div><label class="tog"><input type="checkbox" id="t-cancel" checked><span class="tog-sl"></span></label></div>
-          <div class="tog-row"><div class="tog-info"><div class="tt">Demand closed / fulfilled</div><div class="ts">Alert when resource joins</div></div><label class="tog"><input type="checkbox" id="t-close" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">New demand added</div><div class="ts">SL POC + recipients notified on demand creation</div></div><label class="tog"><input type="checkbox" id="t-new" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Demand cancelled</div><div class="ts">SL POC + recipients notified on cancellation</div></div><label class="tog"><input type="checkbox" id="t-cancel" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Demand closed / fulfilled</div><div class="ts">SL POC + recipients notified on fulfilment</div></div><label class="tog"><input type="checkbox" id="t-close" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Overdue daily digest</div><div class="ts">A/B ageing demands each morning</div></div><label class="tog"><input type="checkbox" id="t-ovd" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Pipeline summary</div><div class="ts">Morning snapshot email</div></div><label class="tog"><input type="checkbox" id="t-digest" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Weekly leadership report</div><div class="ts">BSA-level summary every Monday at digest time</div></div><label class="tog"><input type="checkbox" id="t-weekly" checked><span class="tog-sl"></span></label></div>
@@ -2024,7 +2024,10 @@ async function logNotif(type,d){
     }
   }
   const cfg=NOTIF_CFG[type]||{label:type,to:[]};
-  const slPOCs=SL_POC_MAP[d.service_line||'']||[];
+  // SL POCs only receive notifications for demand added, closed, cancelled
+  // General updates (profile changes etc.) do not go to SL POCs
+  const slPOCTypes = ['add','cancel','close'];
+  const slPOCs = slPOCTypes.includes(type) ? (SL_POC_MAP[d.service_line||'']||[]) : [];
   // Deduplicate emails case-insensitively and normalise to lowercase
   const _seen=new Set();
   const allRecipients=[...cfg.to,...slPOCs].filter(e=>{
@@ -2590,9 +2593,14 @@ ${prevUpd}`:newLine;
       await sbUpd('demands','id=eq.'+editId,payload);
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
       demands[idx]={...demands[idx],...payload};
+      // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
-      if(ns!==os){if(ns==='cancel')logNotif('cancel',demands[idx]);else if(ns==='closed')logNotif('close',demands[idx]);}
-      else{ logNotif('update',demands[idx]); } // notify on any edit
+      if(ns!==os){
+        if(ns==='cancel') logNotif('cancel',demands[idx]);
+        else if(ns==='closed') logNotif('close',demands[idx]);
+        // No notification for other status changes (e.g. Open → On Hold)
+      }
+      // No notification for general field edits (profile name, skills, etc.)
       toast(`Demand #${demands[idx].demand_id} updated ✓`,'green');
     }else{
       // Get next ID from local demands array (Title column = demand ID)
