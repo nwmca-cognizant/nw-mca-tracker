@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Smart Notif</div>
+    <div class="sb-version">v4.9 · HTML Email</div>
   </div>
 </aside>
 
@@ -2014,7 +2014,7 @@ let LEADERSHIP_RECIPIENTS = [
 ];
 async function logNotif(type,d){
   // Check if this notification type is enabled in settings
-  const toggleMap={add:'t-new',cancel:'t-cancel',close:'t-close',update:'t-new'};
+  const toggleMap={add:'t-new',cancel:'t-cancel',close:'t-close'};
   const toggleId = toggleMap[type];
   if(toggleId){
     const tog = document.getElementById(toggleId);
@@ -2039,14 +2039,16 @@ async function logNotif(type,d){
   const titles={
     add:    `New demand #${d.demand_id} added — ${d.bsa}`,
     cancel: `Demand #${d.demand_id} cancelled — ${d.bsa}`,
-    close:  `Demand #${d.demand_id} closed — ${d.bsa}`,
-    update: `Demand #${d.demand_id} updated — ${d.bsa}`
+    close:  `Demand #${d.demand_id} closed/fulfilled — ${d.bsa}`,
+    digest: `${d.count||''} overdue demands require action`,
+    weekly: `NW MCA Weekly Pipeline Report`
   };
   const subs={
     add:    `${d.skills||'—'} · ${d.demand_type||'—'} · ${d.service_line||'—'}`,
     cancel: `Cancelled ${new Date().toLocaleDateString()} by ${USER_NAME}`,
-    close:  `Closed ${new Date().toLocaleDateString()} by ${USER_NAME}`,
-    update: `Profile: ${d.profile_status||'—'} · Updated by ${USER_NAME}`
+    close:  `Fulfilled ${new Date().toLocaleDateString()} by ${USER_NAME}`,
+    digest: `Daily overdue digest · ${new Date().toLocaleDateString()}`,
+    weekly: `Weekly summary · ${new Date().toLocaleDateString()}`
   };
   notifLog.unshift({type,demand_id:d.demand_id,bsa:d.bsa,
     title:titles[type]||type,subtitle:subs[type]||'',
@@ -2327,7 +2329,8 @@ function buildNotifEmailHTML(type, d){
     inner=hdr('NW MCA Notification','Automated alert from the Demand Tracker')+
     body_wrap(`<p style="font-size:13px;color:#555">${type} notification for demand #${d.demand_id||'—'}</p>`);
   }
-  return wrap(inner);
+  // Return with proper HTML document wrapper for Outlook desktop compatibility
+  return '<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:0;background:#f0f4f8}table{border-collapse:collapse}</style></head><body style="margin:0;padding:16px;background:#f0f4f8">' + wrap(inner) + '</body></html>';
 }
 
 function renderEmailPrev(){
