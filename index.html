@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · HTML Email</div>
+    <div class="sb-version">v4.9 · BSA Fix</div>
   </div>
 </aside>
 
@@ -3524,11 +3524,7 @@ function buildMultiDD(listId,btnId,values,lbl){
     <div class="multi-dd-sep"></div>
     ${rows}
     <div class="multi-dd-sep"></div>
-    <div class="multi-dd-clear" onclick="clearDD('${listId}','${btnId}','${lbl}')">Clear all
-
-    <!-- POC Editor — full width below the two-column layout -->
-    
-    </div></div>`;
+    <div class="multi-dd-clear" onclick="clearDD('${listId}','${btnId}','${lbl}')">Clear all</div></div>`;
   updateDDLabel(listId,btnId,lbl);
 }
 function toggleDDAll(lid,bid,lbl){
@@ -3548,6 +3544,7 @@ function updateDDLabel(lid,bid,lbl){
   btn.textContent=ch.length===0?'All '+lbl+' ▾':ch.length===1?ch[0]+' ▾':ch.length+' selected ▾';
 }
 function populateFilters(){
+  // Always use full demands array — all BSAs must be available regardless of current filter
   const bv=[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort();
   const sv=[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort();
   buildMultiDD('f-bsa-list','f-bsa-btn',bv,'BSAs');
