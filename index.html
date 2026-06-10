@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · BSA Fix</div>
+    <div class="sb-version">v4.9 · Config Mgr</div>
   </div>
 </aside>
 
@@ -726,6 +726,14 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <!-- POC Editor — placed after left column, before email preview -->
       <div class="np">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <h3 style="margin:0">⚙️ Manage BSAs &amp; Service Lines</h3>
+          <button onclick="loadAppConfig().then(renderConfigEditor)" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer">↻ Refresh</button>
+        </div>
+        <p style="font-size:11px;color:var(--t3);margin:0 0 10px">Add or remove BSAs and Service Lines. Changes apply immediately to the Add Demand form and all filters.</p>
+        <div id="config-editor"></div>
+      </div>
+      <div class="np">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <h3 style="margin:0">🔗 Service Line POC Emails</h3>
           <button onclick="loadSLPOCConfig()" style="background:none;border:0.5px solid var(--border2);border-radius:var(--r);padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer">↻ Refresh from SP</button>
         </div>
@@ -837,8 +845,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 // ═══════════════════════════════════════
 const PS_LIST=['3. Internal Screening','4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending','4.3 Profiles Submitted in Review with NW','4.4 External Profiles selected - Cognizant onboarding pending','6. NW Onboarding'];
 const DT_LIST=['New','Backfill','Sell Bill'];
-const BSA_LIST=['Annuities','IDS','S&I','ESS','CSS','Pet Tech','PLS','ADS','EI&M','FIT','RST','Group Benefits','Life Tech','CLS','Customer Solutions','IIR','EDO','DAC','Agri Business','Tech ops','EIM'];
-const SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting','ISG (GW)','Moment (Content)','Moment (Salesforce)','Moment(Contact Center)','ISG-SAP','IoT CS','ISG (OIPA)','EPS (Oracle)','EPS (IPM)','EPS','Moment (DXP)','SNBG','Consulting','ISG (EIS)','ISG GW','EPS-CRM','ISG (BFS)','Moment (Digital Learning)','ISG','ISG-GW','ISG (Group Benefits)'];
+let BSA_LIST=['Annuities','IDS','S&I','ESS','CSS','Pet Tech','PLS','ADS','EI&M','FIT','RST','Group Benefits','Life Tech','CLS','Customer Solutions','IIR','EDO','DAC','Agri Business','Tech ops','EIM'];
+let SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting','ISG (GW)','Moment (Content)','Moment (Salesforce)','Moment(Contact Center)','ISG-SAP','IoT CS','ISG (OIPA)','EPS (Oracle)','EPS (IPM)','EPS','Moment (DXP)','SNBG','Consulting','ISG (EIS)','ISG GW','EPS-CRM','ISG (BFS)','Moment (Digital Learning)','ISG','ISG-GW','ISG (Group Benefits)'];
 const LOC_LIST=['Offshore','Onsite','Canada','Mexico'];
 const ST_LIST=['Open','Closed','Cancel','On Hold'];
 const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Coming up in 1 week','H) Coming up in 2 weeks','I) Not due yet'];
@@ -1001,6 +1009,7 @@ async function gFetch(url, method='GET', body=null){
 const LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${SP_LIST_ID}`;
 const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
 const POC_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/SL_POC_Config`;
+const APP_CONFIG_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/AppConfig`;
 
 // ── Map SharePoint item to demand object ──
 function mapItem(item){
@@ -1277,6 +1286,7 @@ async function refreshData(){
   try{
     const data=await sbQ('demands','');
     demands=data;renderAll();setSyncStatus('ok','● Live');
+  loadAppConfig();
   loadSLPOCConfig();
     try{ loadNotifSettings(); }catch(e){}
     try{ populateFilters(); }catch(e){}
@@ -1356,7 +1366,7 @@ function goPage(id,el){
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
   if(id==='dashboard')setTimeout(renderDash,60);
-  if(id==='notif'){loadNotifLog();loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
+  if(id==='notif'){loadNotifLog();loadAppConfig().then(renderConfigEditor).catch(()=>renderConfigEditor());loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
   closeMobMenu();
 }
 function showAll(el){
@@ -1810,6 +1820,31 @@ async function sendTestNotification(){
     toast('Test failed: '+e.message,'red');
   }
 }
+async function loadAppConfig(){
+  try{
+    const r=await gFetch(APP_CONFIG_BASE()+'/items?$expand=fields&$top=20');
+    const items=r?.value||[];
+    items.forEach(i=>{
+      const f=i.fields||{};
+      const key=(f.Title||'').trim();
+      const val=(f.Value||f.ConfigValue||'').trim();
+      if(!val) return;
+      if(key==='BSA_LIST'){const p=val.split(',').map(v=>v.trim()).filter(Boolean);if(p.length)BSA_LIST=p;}
+      if(key==='SL_LIST'){const p=val.split(',').map(v=>v.trim()).filter(Boolean);if(p.length)SL_LIST=p;}
+    });
+    try{populateFilters();}catch(e){}
+    console.log('AppConfig loaded: BSA',BSA_LIST.length,'SL',SL_LIST.length);
+  }catch(e){console.warn('loadAppConfig failed:',e.message);}
+}
+async function saveAppConfig(key,list){
+  try{
+    const r=await gFetch(APP_CONFIG_BASE()+'/items?$expand=fields&$top=20');
+    const ex=(r?.value||[]).find(i=>(i.fields?.Title||'')===key);
+    const val=list.join(',');
+    if(ex) await gFetch(APP_CONFIG_BASE()+'/items/'+ex.id+'/fields','PATCH',{Value:val});
+    else await gFetch(APP_CONFIG_BASE()+'/items','POST',{fields:{Title:key,Value:val}});
+  }catch(e){toast('Config save failed: '+e.message,'red');}
+}
 async function loadSLPOCConfig(){
   try{
     const r=await gFetch(POC_LIST_BASE()+'/items?$expand=fields&$top=100');
@@ -1841,6 +1876,44 @@ async function saveSLPOCConfig(sl,emails){
 async function loadNotifLog(){
   // Notifications list not in SP — use in-memory log only
   try{renderNotifLog();}catch(e){}
+}
+function renderConfigEditor(){
+  const el=document.getElementById('config-editor');if(!el)return;
+  el.innerHTML='';
+  const makeSection=(title,icon,listRef,key,col)=>{
+    const sec=document.createElement('div');sec.style.cssText='flex:1;min-width:260px';
+    const hdr=document.createElement('div');hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px';
+    hdr.innerHTML='<span style="font-size:13px;font-weight:500;color:var(--t1)">'+icon+' '+title+'</span><span style="font-size:11px;color:var(--t3)">'+listRef.length+' entries</span>';
+    sec.appendChild(hdr);
+    const listEl=document.createElement('div');listEl.style.cssText='border:0.5px solid var(--border2);border-radius:var(--r);overflow:hidden;max-height:260px;overflow-y:auto';
+    const rerender=()=>{
+      listEl.innerHTML='';
+      listRef.forEach((item,i)=>{
+        const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:0.5px solid var(--border2);background:'+(i%2?'var(--s2)':'var(--bg)');
+        const lbl=document.createElement('span');lbl.style.cssText='flex:1;font-size:12px;color:var(--t1)';lbl.textContent=item;
+        const del=document.createElement('button');del.textContent='✕';del.style.cssText='background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:0 4px';
+        del.onclick=()=>{if(!confirm('Remove "'+item+'" from '+title+'?'))return;listRef.splice(i,1);if(key==='BSA_LIST')BSA_LIST=[...listRef];else SL_LIST=[...listRef];saveAppConfig(key,[...listRef]);populateFilters();renderConfigEditor();toast(item+' removed','green');};
+        row.appendChild(lbl);row.appendChild(del);listEl.appendChild(row);
+      });
+    };
+    rerender();sec.appendChild(listEl);
+    const addRow=document.createElement('div');addRow.style.cssText='display:flex;gap:6px;margin-top:8px';
+    const inp=document.createElement('input');inp.type='text';inp.placeholder='Add new '+title.toLowerCase()+'...';
+    inp.style.cssText='flex:1;border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 10px;font-size:12px;background:var(--bg);color:var(--t1);outline:none';
+    inp.onfocus=()=>inp.style.borderColor='var(--blue)';inp.onblur=()=>inp.style.borderColor='var(--border2)';
+    const addBtn=document.createElement('button');addBtn.textContent='+ Add';
+    addBtn.style.cssText='background:'+col+';color:white;border:none;border-radius:var(--r);padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer';
+    const doAdd=()=>{const v=inp.value.trim();if(!v){toast('Enter a name','');return;}if(listRef.includes(v)){toast(v+' already exists','');return;}listRef.push(v);listRef.sort();if(key==='BSA_LIST')BSA_LIST=[...listRef];else SL_LIST=[...listRef];saveAppConfig(key,[...listRef]);populateFilters();inp.value='';renderConfigEditor();toast(v+' added to '+title,'green');};
+    addBtn.onclick=doAdd;inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();doAdd();}};
+    addRow.appendChild(inp);addRow.appendChild(addBtn);sec.appendChild(addRow);return sec;
+  };
+  const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:20px;flex-wrap:wrap';
+  wrap.appendChild(makeSection('Business Service Areas','🏢',[...BSA_LIST],'BSA_LIST','var(--blue)'));
+  wrap.appendChild(makeSection('Service Lines','🔗',[...SL_LIST],'SL_LIST','#1d9e75'));
+  el.appendChild(wrap);
+  const note=document.createElement('p');note.style.cssText='font-size:11px;color:var(--t3);margin-top:10px';
+  note.textContent='Changes save to SharePoint AppConfig — available to all users immediately. New entries appear in Add Demand form and all filters.';
+  el.appendChild(note);
 }
 function renderPOCEditor(){
   const el=document.getElementById('poc-editor');if(!el)return;
