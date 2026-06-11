@@ -553,7 +553,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Config Mgr</div>
+    <div class="sb-version">v4.9 · Notif Add Fix</div>
   </div>
 </aside>
 
@@ -2100,7 +2100,13 @@ async function logNotif(type,d){
   // SL POCs only receive notifications for demand added, closed, cancelled
   // General updates (profile changes etc.) do not go to SL POCs
   const slPOCTypes = ['add','cancel','close'];
+  // If SL_POC_MAP has no entries yet (not loaded from SP), try loading now
+  if(slPOCTypes.includes(type) && Object.keys(SL_POC_MAP).length===0){
+    console.log('SL_POC_MAP empty — loading from SP before sending notification...');
+    try{ await loadSLPOCConfig(); }catch(e){}
+  }
   const slPOCs = slPOCTypes.includes(type) ? (SL_POC_MAP[d.service_line||'']||[]) : [];
+  console.log('logNotif type:',type,'SL:',d.service_line,'SL_POC_MAP keys:',Object.keys(SL_POC_MAP),'slPOCs:',slPOCs);
   // Deduplicate emails case-insensitively and normalise to lowercase
   const _seen=new Set();
   const allRecipients=[...cfg.to,...slPOCs].filter(e=>{
@@ -2686,7 +2692,28 @@ ${prevUpd}`:newLine;
       const res=await sbIns('demands',payload);
       const nd=Array.isArray(res)?res[0]:res;
       if(nd)demands.push(nd);
-      if(document.getElementById('t-new')?.checked)logNotif('add',nd||payload);
+      // Build a clean demand object for the notification
+      // Use payload (user input) merged with nd (SP response) for completeness
+      if(document.getElementById('t-new')?.checked){
+        // payload has service_line, bsa, skills etc. from form
+        // demands[last] may not be populated yet if SP was slow
+        const notifDemand = {
+          ...payload,
+          demand_id: payload.demand_id || (nd?.fields?.Title||nd?.Title||''),
+          service_line: payload.service_line || gv('m-sl'),
+          bsa: payload.bsa || gv('m-bsa'),
+          skills: payload.skills || gv('m-sk'),
+          demand_type: payload.demand_type || gv('m-ty'),
+          location: payload.location || gv('m-loc'),
+          team_name: payload.team_name || gv('m-team'),
+          sepm_sel: payload.sepm_sel || gv('m-sepm'),
+          fg_form_number: payload.fg_form_number || gv('m-fg'),
+          target_date: payload.target_date || gv('m-tgt'),
+        };
+        console.log('logNotif add — ID:', notifDemand.demand_id,
+          'SL:', notifDemand.service_line, 'BSA:', notifDemand.bsa);
+        logNotif('add', notifDemand);
+      }
       toast('New demand added ✓','green');
     }
     setSyncStatus('ok','● Live');
