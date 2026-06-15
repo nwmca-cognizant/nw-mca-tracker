@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Notif Chain</div>
+    <div class="sb-version">v4.9 · POC Route Fix</div>
   </div>
 </aside>
 
@@ -2094,14 +2094,12 @@ async function logNotif(type,d){
   // Check if this notification type is enabled in settings
   const toggleMap={add:'t-new',cancel:'t-cancel',close:'t-close'};
   const toggleId = toggleMap[type];
-  if(toggleId){
-    const tog = document.getElementById(toggleId);
-    if(tog && !tog.checked){
-      console.log('Notification suppressed (toggle off):', type);
-      return;
-    }
-  }
+  // Toggle controls general recipients (cfg.to) — SL POCs always notified
+  const toggleOn = !toggleId || (document.getElementById(toggleId)?.checked !== false);
   const cfg=NOTIF_CFG[type]||{label:type,to:[]};
+  // If toggle off: suppress general recipients but still notify SL POCs
+  const effectiveTo = toggleOn ? cfg.to : [];
+  if(!toggleOn) console.log('General notification toggle OFF for',type,'— SL POCs still notified');
   // SL POCs only receive notifications for demand added, closed, cancelled
   // General updates (profile changes etc.) do not go to SL POCs
   const slPOCTypes = ['add','cancel','close'];
@@ -2110,11 +2108,29 @@ async function logNotif(type,d){
     console.log('SL_POC_MAP empty — loading from SP before sending notification...');
     try{ await loadSLPOCConfig(); }catch(e){}
   }
-  const slPOCs = slPOCTypes.includes(type) ? (SL_POC_MAP[d.service_line||'']||[]) : [];
-  console.log('logNotif →',type,'| SL:',d.service_line,'| POCs:',slPOCs,'| General to:',cfg.to);
+  // Case-insensitive SL lookup — handles 'QEA' vs 'qea' mismatches
+  let slPOCs = [];
+  if(slPOCTypes.includes(type)){
+    const sl = (d.service_line||'').trim();
+    // Exact match first
+    if(SL_POC_MAP[sl]){
+      slPOCs = SL_POC_MAP[sl];
+    } else {
+      // Case-insensitive fallback
+      const slLower = sl.toLowerCase();
+      const matchKey = Object.keys(SL_POC_MAP).find(k=>k.toLowerCase()===slLower);
+      if(matchKey) slPOCs = SL_POC_MAP[matchKey];
+    }
+  }
+  console.log('logNotif →',type,
+    '\n  SL from demand:',JSON.stringify(d.service_line),
+    '\n  SL_POC_MAP keys:',JSON.stringify(Object.keys(SL_POC_MAP)),
+    '\n  Matched POCs:',JSON.stringify(slPOCs),
+    '\n  General to (cfg.to):',JSON.stringify(cfg.to),
+    '\n  Toggle checked:',document.getElementById(toggleMap[type])?.checked);
   // Deduplicate emails case-insensitively and normalise to lowercase
   const _seen=new Set();
-  const allRecipients=[...cfg.to,...slPOCs].filter(e=>{
+  const allRecipients=[...effectiveTo,...slPOCs].filter(e=>{
     const k=(e||'').toLowerCase().trim();
     if(!k||!k.includes('@')) return false;
     if(_seen.has(k)) return false;
@@ -2147,8 +2163,11 @@ async function logNotif(type,d){
     try{ emailBody=buildNotifEmailHTML(type,d); }catch(e){ emailBody=subs[type]||''; }
     if(allRecipients.length===0){
       console.warn('⚠ logNotif: No recipients for type='+type+
-        ' SL='+d.service_line+' cfg.to='+JSON.stringify(cfg.to)+
-        ' slPOCs='+JSON.stringify(slPOCs)+' SL_POC_MAP keys='+JSON.stringify(Object.keys(SL_POC_MAP)));
+        ' | SL='+d.service_line+
+        ' | effectiveTo='+JSON.stringify(effectiveTo)+
+        ' | slPOCs='+JSON.stringify(slPOCs)+
+        ' | SL_POC_MAP='+JSON.stringify(SL_POC_MAP)+
+        ' | toggleOn='+toggleOn);
     } else {
       console.log('📧 logNotif: Writing',allRecipients.length,'notifications — type='+type+
         ' demand='+d.demand_id+' SL='+d.service_line+' recipients='+JSON.stringify(allRecipients));
