@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · POC Persist</div>
+    <div class="sb-version">v4.9 · Notif Chain</div>
   </div>
 </aside>
 
@@ -2145,18 +2145,25 @@ async function logNotif(type,d){
     // Build the rich HTML email body once
     let emailBody='';
     try{ emailBody=buildNotifEmailHTML(type,d); }catch(e){ emailBody=subs[type]||''; }
+    if(allRecipients.length===0){
+      console.warn('⚠ logNotif: No recipients for type='+type+
+        ' SL='+d.service_line+' cfg.to='+JSON.stringify(cfg.to)+
+        ' slPOCs='+JSON.stringify(slPOCs)+' SL_POC_MAP keys='+JSON.stringify(Object.keys(SL_POC_MAP)));
+    } else {
+      console.log('📧 logNotif: Writing',allRecipients.length,'notifications — type='+type+
+        ' demand='+d.demand_id+' SL='+d.service_line+' recipients='+JSON.stringify(allRecipients));
+    }
     for(const recipient of allRecipients){
-      await sbIns('notifications',{
-        type,demand_id:d.demand_id,
+      const result = await sbIns('notifications',{
+        type, demand_id:d.demand_id,
         title:titles[type]||type,
         subtitle:subs[type]||'',
         triggered_by:USER_NAME,
         recipients:recipient.trim().toLowerCase(),
-        email_body:emailBody   // rich HTML written to EmailBody column in SP
+        email_body:emailBody
       });
+      console.log('✓ SP Notification written — recipient:',recipient,'itemId:',result?.[0]?.id||'unknown');
     }
-    if(allRecipients.length===0) console.warn('No recipients configured for notification type:',type);
-    else console.log('Notifications written for',allRecipients.length,'recipient(s):',allRecipients);
   }catch(e){
     if(!e.message.includes('404')) console.warn('Notification write failed:',e.message);
   }
@@ -2203,7 +2210,14 @@ function saveNotifSettings(){
   }
   
   console.log('Notification settings saved:', settings);
+  // Update NOTIF_CFG immediately — don't wait for next page load
+  if(allTo.length>0){
+    NOTIF_CFG.add.to    = settings.triggers.add    !== false ? allTo : [];
+    NOTIF_CFG.cancel.to = settings.triggers.cancel !== false ? allTo : [];
+    NOTIF_CFG.close.to  = settings.triggers.close  !== false ? allTo : [];
+  }
   const savedMsg=`Recipients: ${allTo.length>0?allTo.join(', '):'none set'} · Digest: ${digestTime}`;
+  console.log('Settings saved. NOTIF_CFG.add.to:',NOTIF_CFG.add.to);
   toast('✓ Settings saved — '+savedMsg,'green');
   notifLog.unshift({type:'settings',title:'Notification settings saved',
     subtitle:savedMsg,triggered_by:USER_NAME,created_at:new Date().toISOString()});
@@ -2264,13 +2278,16 @@ function loadNotifSettings(){
       if(el && val !== undefined) el.checked = val;
     });
     
-    // Update live NOTIF_CFG
-    if(s.recipients && s.recipients.length){
-      NOTIF_CFG.add.to    = s.triggers?.add    ? s.recipients : [];
-      NOTIF_CFG.cancel.to = s.triggers?.cancel ? s.recipients : [];
-      NOTIF_CFG.close.to  = s.triggers?.close  ? s.recipients : [];
-      NOTIF_CFG.update.to = s.triggers?.add    ? s.recipients : [];
+    // Update live NOTIF_CFG — always update regardless of length
+    // If recipients empty, keep the hardcoded defaults in NOTIF_CFG
+    const savedRecipients = (s.recipients||[]).filter(e=>e&&e.includes('@'));
+    if(savedRecipients.length>0){
+      NOTIF_CFG.add.to    = s.triggers?.add    !== false ? savedRecipients : [];
+      NOTIF_CFG.cancel.to = s.triggers?.cancel !== false ? savedRecipients : [];
+      NOTIF_CFG.close.to  = s.triggers?.close  !== false ? savedRecipients : [];
     }
+    // If no saved recipients, hardcoded NOTIF_CFG defaults remain active
+    console.log('NOTIF_CFG updated — add.to:',NOTIF_CFG.add.to,'cancel.to:',NOTIF_CFG.cancel.to);
     
     console.log('Notification settings loaded:', s);
   }catch(e){ console.warn('Could not load notification settings:', e.message); }
@@ -2682,9 +2699,10 @@ ${prevUpd}`:newLine;
       demands[idx]={...demands[idx],...payload};
       // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
+      console.log('Status change check: prev=',os,'new=',ns);
       if(ns!==os){
-        if(ns==='cancel') logNotif('cancel',demands[idx]);
-        else if(ns==='closed') logNotif('close',demands[idx]);
+        if(ns==='cancel'||ns==='cancelled') logNotif('cancel',demands[idx]);
+        else if(ns==='closed'||ns==='close') logNotif('close',demands[idx]);
         // No notification for other status changes (e.g. Open → On Hold)
       }
       // No notification for general field edits (profile name, skills, etc.)
