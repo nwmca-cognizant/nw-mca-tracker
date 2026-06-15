@@ -543,7 +543,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="refreshData()"><span class="ni-ic">↻</span><span class="ni-lbl">Refresh Data</span></div>
     <div class="ni" onclick="exportCSV()"><span class="ni-ic">↓</span><span class="ni-lbl">Export CSV</span></div>
     <div class="ni" onclick="goPage('tracker',document.getElementById('nav-tracker'));setTimeout(()=>{document.getElementById('f-st').value='';filterChanged();selectAllVisible();},100)" style="color:var(--red)"><span class="ni-ic">☑</span><span class="ni-lbl">Select All Demands</span></div>
-    <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>    
+    <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>
+    <div class="ni" onclick="runEmailTests()" style="color:var(--teal,#1d9e75);font-size:12px"><span class="ni-ic">📧</span><span class="ni-lbl">Email Tests</span></div>    
     <div class="nsect">Filters</div>
     <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
@@ -553,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Notif Add Fix</div>
+    <div class="sb-version">v4.9 · POC Persist</div>
   </div>
 </aside>
 
@@ -1286,6 +1287,7 @@ async function refreshData(){
   try{
     const data=await sbQ('demands','');
     demands=data;renderAll();setSyncStatus('ok','● Live');
+  try{const _c=localStorage.getItem('nwmca_slpoc_map');if(_c){const _p=JSON.parse(_c);if(Object.keys(_p).length>0){SL_POC_MAP=_p;console.log('SL_POC_MAP restored:',Object.keys(_p).length,'SLs');}}}catch(_e){}
   loadAppConfig();
   loadSLPOCConfig();
     try{ loadNotifSettings(); }catch(e){}
@@ -1859,6 +1861,7 @@ async function loadSLPOCConfig(){
       m[sl]=raw.split(/[,;\n]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
     });
     SL_POC_MAP=m;
+    try{localStorage.setItem('nwmca_slpoc_map',JSON.stringify(m));}catch(_e){}
     try{renderPOCEditor();}catch(e){}
   }catch(e){console.warn('loadSLPOCConfig:',e.message);}
 }
@@ -2024,6 +2027,8 @@ function pocSave(sl){
   const k='pi_'+sl.replace(/[^a-z0-9]/gi,'_');
   const v=document.getElementById(k)?.value||'';
   const emails=v.split(/[,;\n]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
+  SL_POC_MAP[sl]=emails;
+  try{localStorage.setItem('nwmca_slpoc_map',JSON.stringify(SL_POC_MAP));}catch(e){}
   saveSLPOCConfig(sl,emails);
 }
 function pocAddRow(){
@@ -2106,7 +2111,7 @@ async function logNotif(type,d){
     try{ await loadSLPOCConfig(); }catch(e){}
   }
   const slPOCs = slPOCTypes.includes(type) ? (SL_POC_MAP[d.service_line||'']||[]) : [];
-  console.log('logNotif type:',type,'SL:',d.service_line,'SL_POC_MAP keys:',Object.keys(SL_POC_MAP),'slPOCs:',slPOCs);
+  console.log('logNotif →',type,'| SL:',d.service_line,'| POCs:',slPOCs,'| General to:',cfg.to);
   // Deduplicate emails case-insensitively and normalise to lowercase
   const _seen=new Set();
   const allRecipients=[...cfg.to,...slPOCs].filter(e=>{
@@ -3008,6 +3013,113 @@ async function runImport(){
 // ═══════════════════════════════════════
 // CONNECTIVITY DIAGNOSTICS
 // ═══════════════════════════════════════
+async function runEmailTests(){
+  const existing=document.getElementById('diag-modal');if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='diag-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML='<div id="et-box" style="background:#fff;border-radius:12px;max-width:700px;width:100%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4)">'+
+    '<div style="background:#1a4b8c;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'+
+    '<div style="color:white;font-size:15px;font-weight:600">📧 Email Notification Test Suite</div>'+
+    '<button onclick="document.getElementById(\'diag-modal\').remove()" style="background:none;border:none;color:rgba(255,255,255,.8);font-size:20px;cursor:pointer">✕</button></div>'+
+    '<div id="et-status" style="padding:8px 18px;font-size:12px;color:#666;border-bottom:1px solid #eee;background:#f8f8f8">Running tests…</div>'+
+    '<div id="et-results" style="flex:1;overflow-y:auto;padding:0"></div>'+
+    '<div style="padding:12px 18px;border-top:1px solid #eee;background:#f8f8f8;display:flex;gap:8px">'+
+    '<button onclick="document.getElementById(\'diag-modal\').remove()" style="background:#f0f0f0;border:1px solid #ddd;padding:7px 16px;border-radius:6px;font-size:12px;cursor:pointer">Close</button>'+
+    '<span id="et-summary" style="margin-left:auto;font-size:12px;font-weight:500"></span></div></div>';
+  document.body.appendChild(modal);
+  const R=[];
+  const log=(title,ok,detail,data)=>{
+    R.push({title,ok,detail});
+    const el=document.getElementById('et-results');if(!el)return;
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;gap:10px;padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:12px';
+    div.innerHTML='<span style="font-size:16px;flex-shrink:0">'+(ok===true?'✅':ok===false?'❌':'⚠️')+'</span>'+
+      '<div style="flex:1"><div style="font-weight:600;color:'+(ok===true?'#1a6640':ok===false?'#8c1f1f':'#7a4a00')+'">'+title+'</div>'+
+      '<div style="color:#555;margin-top:2px;font-size:11px">'+(detail||'')+'</div>'+
+      (data?'<details style="margin-top:3px"><summary style="font-size:10px;color:#888;cursor:pointer">Details</summary><pre style="font-size:10px;background:#f5f5f5;padding:5px;border-radius:4px;margin-top:4px;overflow-x:auto">'+JSON.stringify(data,null,2).substring(0,400)+'</pre></details>':'')+'</div>';
+    el.appendChild(div);el.scrollTop=el.scrollHeight;
+  };
+  const setStatus=(m)=>{const s=document.getElementById('et-status');if(s)s.textContent=m;};
+  // TEST 1: SL_POC_MAP loaded
+  setStatus('Checking SL POC configuration…');
+  let slKeys=Object.keys(SL_POC_MAP);
+  if(slKeys.length===0){
+    setStatus('Loading SL POC config from SP…');
+    try{await loadSLPOCConfig();}catch(e){}
+    slKeys=Object.keys(SL_POC_MAP);
+  }
+  log('SL_POC_MAP loaded',slKeys.length>0,
+    slKeys.length>0?slKeys.length+' service lines: '+slKeys.join(', '):'Empty — open Notifications page and click Refresh from SP',
+    slKeys.length>0?{serviceLines:slKeys}:null);
+  // TEST 2: NOTIF_CFG recipients
+  setStatus('Checking notification recipients…');
+  ['add','cancel','close'].forEach(type=>{
+    const cfg=NOTIF_CFG[type]||{to:[]};
+    log('NOTIF_CFG.'+type+' recipients',cfg.to.length>0,
+      cfg.to.length>0?cfg.to.length+' recipient(s): '+cfg.to.join(', '):'None — set in Notifications page → To field',
+      {type,recipients:cfg.to});
+  });
+  // TEST 3: Per-SL audit
+  setStatus('Auditing SL POC emails…');
+  const openSLs=[...new Set(demands.filter(d=>(d.demand_status||'').toLowerCase()==='open').map(d=>d.service_line).filter(Boolean))];
+  log('Open demand service lines',true,openSLs.length+' unique SLs in open demands: '+openSLs.join(', '));
+  const missingPOC=openSLs.filter(sl=>!(SL_POC_MAP[sl]||[]).length);
+  if(missingPOC.length) log('SLs missing POC',null,missingPOC.length+' SLs have no POC email: '+missingPOC.join(', ')+' — add in Notifications page');
+  else if(openSLs.length) log('All open demand SLs have POC',true,'Every open demand SL has at least one POC configured');
+  // TEST 4: Routing simulation per SL
+  setStatus('Simulating notification routing…');
+  const testSLs=slKeys.slice(0,6);
+  testSLs.forEach(sl=>{
+    ['add','cancel','close'].forEach(type=>{
+      const cfg=NOTIF_CFG[type]||{to:[]};
+      const pocs=(SL_POC_MAP[sl]||[]);
+      const _s=new Set();
+      const all=[...cfg.to,...pocs].filter(e=>{const k=(e||'').toLowerCase().trim();if(!k||!k.includes('@')||_s.has(k))return false;_s.add(k);return true;});
+      log('['+type.toUpperCase()+'] → '+sl,all.length>0,
+        all.length>0?all.length+' email(s): '+all.join(', '):'⚠ 0 recipients — notification would be skipped',
+        {type,sl,generalTo:cfg.to,slPOCs:pocs,total:all});
+    });
+  });
+  // TEST 5: Live SP write (ADD)
+  setStatus('Testing live SP notification write…');
+  const testSL=slKeys[0]||'QEA';
+  const pocs=SL_POC_MAP[testSL]||[];
+  const recipient=pocs[0]||NOTIF_CFG.add.to[0]||USER_NAME;
+  const testD={demand_id:'TEST_'+Date.now(),bsa:'Test BSA',service_line:testSL,skills:'Test',demand_type:'New',location:'Offshore',team_name:'Test Team',sepm_sel:'Test',fg_form_number:'NWTEST',target_date:new Date().toISOString()};
+  try{
+    let emailBody='Test email body';
+    try{emailBody=buildNotifEmailHTML('add',testD);}catch(e){}
+    const spItem=await gFetch(NOTIF_LIST_BASE()+'/items','POST',{fields:{
+      Title:'EMAIL_TEST_'+Date.now(),NotifType:'add',DemandId:testD.demand_id,
+      Title2:'TEST: New demand '+testD.demand_id+' — '+testD.bsa,
+      Subtitle:'Email notification test',TriggeredBy:USER_NAME,
+      Recipients:recipient,EmailBody:String(emailBody).substring(0,2000)
+    }});
+    if(spItem?.id){
+      log('SP write test (ADD)',true,'Notification item created — ID: '+spItem.id+' · Recipient: '+recipient+' · Power Automate will send this',{id:spItem.id,recipient});
+      try{await gFetch(NOTIF_LIST_BASE()+'/items/'+spItem.id,'DELETE');}catch(e){}
+      log('SP cleanup',true,'Test item deleted from SP Notifications list');
+    }else log('SP write test (ADD)',false,'SP write returned no ID');
+  }catch(e){log('SP write test (ADD)',false,'SP write failed: '+e.message);}
+  // TEST 6: HTML builder
+  setStatus('Checking email HTML…');
+  try{
+    const html=buildNotifEmailHTML('add',testD);
+    log('Email HTML — DOCTYPE',html.startsWith('<!DOCTYPE'),html.startsWith('<!DOCTYPE')?'✓ Present':'Missing — Outlook desktop may show plain text');
+    log('Email HTML — Content-Type',html.includes('Content-Type'),html.includes('Content-Type')?'✓ Present':'Missing meta tag');
+    log('Email HTML — Demand data',html.includes(testD.bsa),'BSA '+testD.bsa+(html.includes(testD.bsa)?' found in body':' NOT found'));
+    log('Email HTML — Open Tracker CTA',html.includes('Open Tracker'),html.includes('Open Tracker')?'✓ Button present':'Button missing');
+  }catch(e){log('Email HTML builder',false,'Error: '+e.message);}
+  // SUMMARY
+  const pass=R.filter(r=>r.ok===true).length,fail=R.filter(r=>r.ok===false).length,warn=R.filter(r=>r.ok===null).length;
+  const sum=document.getElementById('et-summary');if(sum)sum.innerHTML='<span style="color:#1a6640">✅ '+pass+'</span> · <span style="color:#8c1f1f">❌ '+fail+'</span> · <span style="color:#7a4a00">⚠ '+warn+'</span>';
+  setStatus('Complete — '+pass+' passed · '+fail+' failed · '+warn+' warnings');
+  const sep=document.createElement('div');sep.style.cssText='padding:8px 16px;background:#f0f4ff;border-top:2px solid #1a4b8c;font-size:12px;font-weight:600;color:#1a4b8c';
+  sep.textContent='── '+(fail===0?'ALL TESTS PASSED ✅':''+fail+' ISSUES FOUND ❌')+' ──';
+  document.getElementById('et-results')?.appendChild(sep);
+}
+
 async function runDiagnostics(){
   // ══ COMPREHENSIVE EMBEDDED DIAGNOSTIC ══
   // Uses existing tracker auth — no separate sign-in needed
