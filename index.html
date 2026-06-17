@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · POC Route Fix</div>
+    <div class="sb-version">v4.9 · POC Debug</div>
   </div>
 </aside>
 
@@ -1851,19 +1851,45 @@ async function loadSLPOCConfig(){
   try{
     const r=await gFetch(POC_LIST_BASE()+'/items?$expand=fields&$top=100');
     const items=r?.value||[];
-    if(!items.length) return;
+    console.log('loadSLPOCConfig: SP returned',items.length,'items');
+    if(items.length>0){
+      // Log first item fields to diagnose column name issues
+      const sampleFields=items[0]?.fields||{};
+      console.log('SL_POC_Config first item fields:', JSON.stringify(Object.keys(sampleFields)));
+      console.log('SL_POC_Config first item values:', JSON.stringify(sampleFields));
+    }
+    if(!items.length){
+      console.warn('loadSLPOCConfig: SP list returned 0 items — check SL_POC_Config list has data');
+      return;
+    }
     const m={};
     items.forEach(i=>{
       const f=i.fields||{};
-      const sl=(f.ServiceLine||f.Title||'').trim();
-      const raw=(f.POCEmails||'').trim();
-      if(!sl) return;
-      m[sl]=raw.split(/[,;\n]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
+      // Try all possible internal column name variants for ServiceLine
+      const sl=(
+        f.ServiceLine||f.Service_Line||f.ServiceLine0||
+        f.service_line||f.Title||''
+      ).trim();
+      // Try all possible internal column name variants for POCEmails
+      const raw=(
+        f.POCEmails||f.POC_Emails||f.POCEmails0||
+        f.Poc_Emails||f.poc_emails||f.POCEmail||''
+      ).trim();
+      if(!sl){
+        console.warn('loadSLPOCConfig: item has no ServiceLine value',JSON.stringify(f));
+        return;
+      }
+      const emails=raw.split(/[,;\n]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
+      m[sl]=emails;
+      console.log('SL POC loaded:',sl,'→',emails.length,'email(s):',emails);
     });
     SL_POC_MAP=m;
     try{localStorage.setItem('nwmca_slpoc_map',JSON.stringify(m));}catch(_e){}
     try{renderPOCEditor();}catch(e){}
-  }catch(e){console.warn('loadSLPOCConfig:',e.message);}
+    console.log('SL_POC_MAP updated:',Object.keys(m).length,'service lines loaded');
+  }catch(e){
+    console.error('loadSLPOCConfig FAILED:',e.message,e);
+  }
 }
 async function saveSLPOCConfig(sl,emails){
   try{
@@ -3155,6 +3181,44 @@ async function runEmailTests(){
   const sep=document.createElement('div');sep.style.cssText='padding:8px 16px;background:#f0f4ff;border-top:2px solid #1a4b8c;font-size:12px;font-weight:600;color:#1a4b8c';
   sep.textContent='── '+(fail===0?'ALL TESTS PASSED ✅':''+fail+' ISSUES FOUND ❌')+' ──';
   document.getElementById('et-results')?.appendChild(sep);
+}
+
+async function diagSLPOCConfig(){
+  // Standalone diagnostic for SL_POC_Config SP list
+  // Call from browser console: diagSLPOCConfig()
+  console.group('=== SL_POC_Config Diagnostic ===');
+  try{
+    const r=await gFetch(POC_LIST_BASE()+'/items?$expand=fields&$top=100');
+    const items=r?.value||[];
+    console.log('Total items in SP list:',items.length);
+    if(!items.length){
+      console.error('SP list is EMPTY — add items to SL_POC_Config list in SharePoint');
+      console.groupEnd(); return;
+    }
+    // Show ALL fields for first item
+    const f0=items[0]?.fields||{};
+    console.log('First item ALL field names:',Object.keys(f0));
+    console.log('First item ALL field values:',f0);
+    // Show all items
+    items.forEach((item,i)=>{
+      const f=item.fields||{};
+      console.log('Item',i+1,':',JSON.stringify(f));
+    });
+    // Try to map them
+    const POCEmailVariants=['POCEmails','POC_Emails','POCEmails0','Poc_Emails','POCEmail','poc_emails'];
+    const SLVariants=['ServiceLine','Service_Line','ServiceLine0','service_line'];
+    const pocCol=POCEmailVariants.find(k=>f0.hasOwnProperty(k));
+    const slCol=SLVariants.find(k=>f0.hasOwnProperty(k));
+    console.log('Detected ServiceLine column:',slCol||'NOT FOUND — using Title');
+    console.log('Detected POCEmails column:',pocCol||'NOT FOUND — emails will be empty');
+    if(!pocCol) console.error('POCEmails column not found! SP column internal name must match one of:',POCEmailVariants);
+    if(!slCol)  console.warn('ServiceLine column not found — falling back to Title column');
+  }catch(e){
+    console.error('SP fetch failed:',e.message);
+    console.error('Check: 1) Azure token valid  2) POC_LIST_BASE correct  3) SP list permissions');
+  }
+  console.log('Current SL_POC_MAP:',JSON.stringify(SL_POC_MAP));
+  console.groupEnd();
 }
 
 async function runDiagnostics(){
