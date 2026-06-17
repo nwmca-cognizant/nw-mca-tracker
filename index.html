@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Dup Fixed · Duplicate</div>
+    <div class="sb-version">v4.9 · Common Mailbox · Duplicate</div>
   </div>
 </aside>
 
@@ -2087,13 +2087,13 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
-  'ADM':             [],
-  'QEA':             [],
-  'IDE':             [],
-  'AIA':             [],
-  'CIS':             [],
+  'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+  'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
+  'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
+  'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
+  'CIS':             ['srividhya.balachandran@cognizant.com'],
   'IPA Consulting':  [],
-  'ISG (GW)':        [],
+  'ISG (GW)':        ['neelakantasastry.peri@cognizant.com'],
 };
 
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
@@ -2278,7 +2278,7 @@ function loadNotifSettings(){
     // One-time cleanup: remove placeholder email if still saved
     if(s.recipients){
       s.recipients=s.recipients.filter(e=>
-        e!=='manager@cognizant.com' && e!=='manager@cog.com'
+        e!=='manager@cognizant.com' && e!=='manager@cog.com' && e!=='manager@'
       );
       localStorage.setItem('nwmca_notif_settings',JSON.stringify(s));
     }
@@ -2389,7 +2389,7 @@ function buildNotifEmailHTML(type, d){
   const hdr=(t,sub,col='#1a4b8c')=>`<div style="background:${col};padding:20px 24px;color:white"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-bottom:6px">Cognizant · Nationwide MCA</div><div style="font-size:20px;font-weight:700;margin-bottom:4px">${t}</div><div style="font-size:12px;opacity:.85">${sub}</div></div>`;
   const row=(l,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #f0f0f0;font-size:13px"><span style="color:#666">${l}</span><strong style="text-align:right;max-width:60%">${v||'—'}</strong></div>`;
   const section=(t)=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;padding:14px 0 6px">${t}</div>`;
-  const wrap=(body)=>`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">${body}<div style="background:#f5f5f5;padding:12px 24px;font-size:10px;color:#888;text-align:center">Automated · NW MCA Demand Tracker · Do not reply · ${new Date().toLocaleDateString()}</div></div>`;
+  const wrap=(body)=>`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">${body}<div style="background:#f5f5f5;padding:12px 24px;font-size:10px;color:#888;text-align:center">Automated · NW MCA Demand Tracker · Do not reply to this email · Nationwidedemands@cognizant.com</div></div>`;
   const body_wrap=(c)=>`<div style="padding:20px 24px">${c}</div>`;
   const alert=(msg,col,bg)=>`<div style="background:${bg};border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:${col}">${msg}</div>`;
   const open=demands.filter(x=>(x.demand_status||'').toLowerCase()==='open');
