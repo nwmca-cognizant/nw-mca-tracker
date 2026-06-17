@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Duplicate · Duplicate</div>
+    <div class="sb-version">v4.9 · Dup Fixed · Duplicate</div>
   </div>
 </aside>
 
@@ -1518,7 +1518,6 @@ function renderTbl(){
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
         <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
-        <button class="btn ghost sm" onclick="confDuplicate('${d.id}')" title="Duplicate demand" style="color:var(--purple,#5c1a7a);border-color:var(--purple,#5c1a7a);padding:4px 7px">⧉</button>
         ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel('${d.id}')" title="Cancel">✕</button>`:''}
         <button class="btn ghost sm" onclick="confDelete('${d.id}')" title="Delete permanently" style="color:var(--t3)">🗑</button>
       </div></td>
@@ -2828,20 +2827,21 @@ async function doCancel(id){
 }
 async function confDuplicate(id){
   const d=demands.find(x=>String(x.id)===String(id));if(!d)return;
-  showConf(
-    '⧉ Duplicate Demand',
-    `<div style="font-size:13px;color:var(--t2);line-height:1.8">
-      <div style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px">
-        <div style="font-weight:500;color:var(--t1);margin-bottom:6px">#${d.demand_id} — ${d.bsa}</div>
-        <div style="font-size:12px;color:var(--t3)">${d.skills||'—'} · ${d.service_line||'—'} · ${d.location||'—'}</div>
-      </div>
-      A new demand will be created with all the same details.<br>
-      Only the <strong>Demand ID</strong> and <strong>Date Added</strong> will be different.
-    </div>`,
-    ()=>duplicateDemand(id),
-    'Create Duplicate',
-    'var(--purple,#5c1a7a)'
-  );
+  document.getElementById('conf-title').textContent='⧉ Duplicate Demand';
+  document.getElementById('conf-body').innerHTML=`
+    <div style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px">
+      <div style="font-weight:500;color:var(--t1);margin-bottom:4px">#${d.demand_id} — ${d.bsa}</div>
+      <div style="font-size:12px;color:var(--t3)">${d.skills||'—'} · ${d.service_line||'—'} · ${d.location||'—'}</div>
+    </div>
+    <p>A new demand will be created with all the same details.</p>
+    <p>Only the <strong>Demand ID</strong> and <strong>Date Added</strong> will be different.</p>`;
+  const okBtn=document.getElementById('conf-ok');
+  okBtn.textContent='Create Duplicate';
+  okBtn.style.background='var(--purple,#5c1a7a)';
+  okBtn.style.borderColor='var(--purple,#5c1a7a)';
+  okBtn.onclick=()=>{duplicateDemand(id);closeConf();};
+  const cbg=document.getElementById('conf-bg');
+  cbg.classList.add('on');
 }
 
 function confDelete(id){
@@ -2871,7 +2871,14 @@ async function doDelete(id){
   }
 }
 function closeModal(){const _mbgr=document.getElementById('modal-bg'); if(_mbgr) _mbgr.classList.remove('on');editId=null}
-function closeConf(){const el=document.getElementById('conf-bg');el.classList.remove('on');document.getElementById('conf-ok').textContent='Confirm'}
+function closeConf(){
+  // Reset conf-ok button to default danger style after any custom use
+  const okBtn=document.getElementById('conf-ok');
+  if(okBtn){
+    okBtn.textContent='Confirm';
+    okBtn.style.background='';
+    okBtn.style.borderColor='';
+  }const el=document.getElementById('conf-bg');el.classList.remove('on');document.getElementById('conf-ok').textContent='Confirm'}
 function closeAllModals(){closeModal();closeConf();closePanel()}
 
 // ═══════════════════════════════════════
