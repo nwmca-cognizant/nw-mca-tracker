@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · POC Debug</div>
+    <div class="sb-version">v4.9 · Duplicate · Duplicate</div>
   </div>
 </aside>
 
@@ -1518,6 +1518,7 @@ function renderTbl(){
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
         <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
+        <button class="btn ghost sm" onclick="confDuplicate('${d.id}')" title="Duplicate demand" style="color:var(--purple,#5c1a7a);border-color:var(--purple,#5c1a7a);padding:4px 7px">⧉</button>
         ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel('${d.id}')" title="Cancel">✕</button>`:''}
         <button class="btn ghost sm" onclick="confDelete('${d.id}')" title="Delete permanently" style="color:var(--t3)">🗑</button>
       </div></td>
@@ -2099,12 +2100,12 @@ let SL_POC_MAP={
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -2536,6 +2537,7 @@ function openDetail(id){
   document.getElementById('panel-foot').innerHTML=`
     <button class="btn" onclick="closePanel()">Close</button>
     <button class="btn primary" onclick="closePanel();openEdit(${id})">✏ Edit</button>
+    <button class="btn ghost sm" onclick="closePanel();confDuplicate(${id})" style="color:var(--purple,#5c1a7a);border-color:var(--purple,#5c1a7a)" title="Create a copy of this demand with a new ID and today's date">⧉ Duplicate</button>
     ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn danger" onclick="closePanel();confCancel(${id})">✕ Cancel</button>`:''}
     <button class="btn ghost sm" onclick="confDelete(${id})" style="color:var(--t3);margin-left:auto" title="Delete permanently">🗑 Delete</button>`;
   document.getElementById('panel').classList.add('on');
@@ -2824,7 +2826,25 @@ async function doCancel(id){
     toast('Cancel failed: '+(e.message||'').substring(0,80),'red');
   }
 }
-async function confDelete(id){
+async function confDuplicate(id){
+  const d=demands.find(x=>String(x.id)===String(id));if(!d)return;
+  showConf(
+    '⧉ Duplicate Demand',
+    `<div style="font-size:13px;color:var(--t2);line-height:1.8">
+      <div style="background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px">
+        <div style="font-weight:500;color:var(--t1);margin-bottom:6px">#${d.demand_id} — ${d.bsa}</div>
+        <div style="font-size:12px;color:var(--t3)">${d.skills||'—'} · ${d.service_line||'—'} · ${d.location||'—'}</div>
+      </div>
+      A new demand will be created with all the same details.<br>
+      Only the <strong>Demand ID</strong> and <strong>Date Added</strong> will be different.
+    </div>`,
+    ()=>duplicateDemand(id),
+    'Create Duplicate',
+    'var(--purple,#5c1a7a)'
+  );
+}
+
+function confDelete(id){
   id=String(id);
   const d=demands.find(x=>String(x.id)===id);
   if(!d){toast('Demand not found','red');return;}
@@ -3869,6 +3889,75 @@ function clearDashFilters(){
   const s=document.getElementById('df-sl');if(s)while(s.options.length>1)s.remove(1);
   renderDash();
 }
+async function duplicateDemand(id){
+  const src=demands.find(x=>String(x.id)===String(id));
+  if(!src){ toast('Demand not found','red'); return; }
+
+  setSyncStatus('saving','↻ Duplicating…');
+
+  // Generate new demand ID (max existing + 1)
+  const maxId=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,3000);
+  const newId=maxId+1;
+  const today=new Date().toISOString().split('T')[0];
+
+  // Build new payload — copy all fields, override ID and date
+  const payload={
+    demand_id:         newId,
+    demand_added_on:   today,                          // Today's date
+    demand_status:     'Open',                          // Always open when duplicated
+    bsa:               src.bsa,
+    service_line:      src.service_line,
+    location:          src.location,
+    demand_type:       src.demand_type,
+    skills:            src.skills,
+    team_name:         src.team_name,
+    tier1_program:     src.tier1_program,
+    sepm_sel:          src.sepm_sel,
+    target_date:       src.target_date,
+    so_id:             src.so_id,
+    fg_form_number:    '',                              // Clear FG ID — new demand
+    profile_name:      '',                              // Clear profile — fresh start
+    profile_status:    '',                              // Clear profile status
+    backfill_resource: src.backfill_resource,
+    overall_positions: src.overall_positions||1,
+    ageing_days:       0,
+    ageing_group:      '',
+    demand_closure_date:'',
+    status_updates:    `Duplicated from demand #${src.demand_id} on ${today} by ${USER_NAME}`,
+  };
+
+  try{
+    const res=await sbIns('demands',payload);
+    const nd=Array.isArray(res)?res[0]:res;
+    if(nd) demands.push(nd);
+
+    // Log to notification if add toggle is on
+    if(document.getElementById('t-new')?.checked){
+      const notifDemand={...payload,
+        demand_id:newId,
+        service_line:payload.service_line||'',
+        bsa:payload.bsa||'',
+      };
+      logNotif('add',notifDemand);
+    }
+
+    renderAll();
+    setSyncStatus('ok','● Live');
+    toast(`✓ Demand #${newId} created — duplicate of #${src.demand_id}`,'green');
+
+    // Open the new demand detail immediately
+    setTimeout(()=>{
+      const newDemand=demands.find(x=>String(x.demand_id)===String(newId));
+      if(newDemand) openDetail(newDemand.id||newDemand.demand_id);
+    },600);
+
+  }catch(e){
+    setSyncStatus('err','✗ Error');
+    toast('Duplicate failed: '+e.message,'red');
+    console.error('duplicateDemand error:',e);
+  }
+}
+
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
   const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
