@@ -554,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Common Mailbox · Duplicate</div>
+    <div class="sb-version">v4.9 · Smart Form v3 · Duplicate</div>
   </div>
 </aside>
 
@@ -2087,7 +2087,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
-  'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+ 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -2553,6 +2553,34 @@ function autoCalcTarget(){
   const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
   if(a&&t&&a.value){const dt=new Date(a.value);dt.setDate(dt.getDate()+21);t.value=dt.toISOString().split('T')[0]}
 }
+function onProfileNameInput(inp){
+  const psEl=document.getElementById('m-ps');
+  if(!psEl) return;
+  const hasName  = inp.value.trim().length>0;
+  const wasBlank = !inp.dataset.hadValue;
+  const hint     = document.getElementById('m-st-hint');
+  const showHint = (msg,col)=>{
+    if(!hint) return;
+    hint.innerHTML='<span style="font-size:11px;color:'+col+'">'+msg+'</span>';
+    setTimeout(()=>hint.innerHTML='',3000);
+  };
+  if(hasName && wasBlank && psEl.value==='3. Internal Screening'){
+    // Name entered from blank + still at screening → advance to 4.3
+    psEl.value='4.3 Profiles Submitted in Review with NW';
+    psEl.style.borderColor='var(--blue)';
+    setTimeout(()=>psEl.style.borderColor='',2000);
+    showHint('✓ Profile Status updated to 4.3','var(--blue)');
+  } else if(!hasName && ['4.3 Profiles Submitted in Review with NW','4.1 Interview Scheduled'].includes(psEl.value)){
+    // Name cleared → revert to 3. Internal Screening
+    psEl.value='3. Internal Screening';
+    psEl.style.borderColor='var(--amber,#b86e00)';
+    setTimeout(()=>psEl.style.borderColor='',2000);
+    showHint('↩ Profile Status reverted to Internal Screening','var(--amber,#b86e00)');
+  }
+  // Track whether field has a value
+  if(hasName) inp.dataset.hadValue='1';
+  else delete inp.dataset.hadValue;
+}
 function onStatusChange(){
   const stEl=document.getElementById('m-st');
   const psEl=document.getElementById('m-ps');
@@ -2573,6 +2601,17 @@ function onStatusChange(){
     if(psEl)psEl.style.borderColor='';
     if(clEl)clEl.style.borderColor='';
     if(hint)hint.innerHTML='';
+  }
+}
+function onBackfillInput(inp){
+  const tyEl=document.getElementById('m-ty');
+  if(!tyEl) return;
+  if(inp.value.trim().length>0 && tyEl.value!=='Backfill'){
+    tyEl.value='Backfill';
+    onTypeChange();
+  } else if(inp.value.trim().length===0 && tyEl.value==='Backfill'){
+    tyEl.value='New';
+    onTypeChange();
   }
 }
 function onTypeChange(){
@@ -2611,8 +2650,8 @@ function makeForm(d,isNew){
     <div class="ff2"><label>Closure Date</label><input type="date" id="m-closed" value="${d.demand_closure_date||''}"></div>
     <div class="ff2"><label>Ageing Group</label>${sel('ag',[''].concat(AGS),d.ageing_group)}</div>
     <div class="fg-sect">Profile Information</div>
-    <div class="ff2 fg-full"><label>Profile Name(s)</label><input id="m-prof" value="${(d.profile_name||'').split('\n')[0].replace(/"/g,'&quot;')}"></div>
-    <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2 fg-full"><label>Profile Name(s)</label><input id="m-prof" value="${(d.profile_name||'').split('\n')[0].replace(/"/g,'&quot;')}" oninput="onProfileNameInput(this)"></div>
+    <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
@@ -2630,6 +2669,7 @@ function openAdd(){
   saveEl.textContent  = 'Add Demand';
   bodyEl.innerHTML    = makeForm({}, true);
   bgEl.classList.add('on');
+  requestAnimationFrame(()=>{ bodyEl.scrollTop=0; });
 }
 function openEdit(id){
   editId=id;
@@ -2643,6 +2683,7 @@ function openEdit(id){
   saveEl.textContent  = 'Save Changes';
   bodyEl.innerHTML    = makeForm(d, false);
   bgEl.classList.add('on');
+  requestAnimationFrame(()=>{ bodyEl.scrollTop=0; });
   setTimeout(()=>{ try{onTypeChange();}catch(e){} }, 80);
 }
 async function saveDemand(){
