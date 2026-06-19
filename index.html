@@ -51,18 +51,6 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 .sb{width:var(--sb-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:transform .25s ease,width .25s ease}
 .sb-top{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
 .sb-brand .tag{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--t3);text-transform:uppercase;margin-bottom:3px}
-/* BOTT mode sidebar theming */
-.bott-mode .sb-top{border-bottom:3px solid #1d9e75}
-.bott-mode .sb-brand .tag{color:#1d9e75}
-.bott-mode .sb-brand .name{color:#1d9e75}
-.bott-mode .sb-live{color:#1d9e75}
-.bott-mode .ni.on{border-left:3px solid #1d9e75;background:rgba(29,158,117,.08)}
-.bott-mode #tracker-switcher{border-color:#1d9e75}
-/* BOTT topbar accent */
-.bott-mode .topbar{border-bottom:2px solid #1d9e75}
-#mode-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.04em;margin-left:10px;vertical-align:middle}
-#mode-badge.mca{background:#e6f1fb;color:#185FA5;border:1px solid #b5d4f4}
-#mode-badge.bott{background:#e1f5ee;color:#0f6e56;border:1px solid #5dcaa5}
 .sb-brand .name{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .sb-live{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10px;color:var(--green);font-weight:600}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
@@ -528,7 +516,6 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 <!-- SIDEBAR -->
 <aside class="sb" id="sb">
   <div class="sb-top">
-    <div id="tracker-accent" style="height:3px;background:var(--blue);border-radius:2px;margin:0 0 8px;transition:background .3s"></div>
     <div class="sb-brand">
       <div class="tag">Nationwide MCA</div>
       <div class="name">Demand Tracker</div>
@@ -536,10 +523,6 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
   </div>
   <nav class="sb-nav">
-    <div id="tracker-switcher" style="display:flex;margin:6px 8px 10px;background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:3px;gap:2px">
-      <button id="sw-mca" onclick="switchTracker('MCA')" style="flex:1;padding:5px 0;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:var(--blue);color:white">MCA</button>
-      <button id="sw-bott" onclick="switchTracker('BOTT')" style="flex:1;padding:5px 0;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:none;color:var(--t2)">BOTT</button>
-    </div>
     <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
@@ -571,7 +554,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · BOTT UI · Duplicate</div>
+    <div class="sb-version">v4.9 · Smart Form v3 · Duplicate</div>
   </div>
 </aside>
 
@@ -581,8 +564,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <!-- Desktop Topbar -->
   <div class="topbar" id="topbar">
     <div class="topbar-left">
-      <h1 id="tb-title">Open Demands<span id="mode-badge" class="mca">MCA</span></h1>
-      <p id="tb-subtitle">Nationwide Mutual — GSP-MCA · Real-time shared database</p>
+      <h1 id="tb-title">Open Demands</h1>
+      <p>Nationwide Mutual — GSP-MCA · Real-time shared database</p>
     </div>
     <div class="topbar-right">
       <div class="legend" id="tb-legend">
@@ -1024,17 +1007,10 @@ async function gFetch(url, method='GET', body=null){
 }
 
 // Base URL for the Demands list
-const LIST_BASE=()=>isBOTT()?BOTT_DEMANDS_BASE():MCA_DEMANDS_BASE();
+const LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${SP_LIST_ID}`;
 const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
 const POC_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/SL_POC_Config`;
 const APP_CONFIG_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/AppConfig`;
-const BOTT_DEMANDS_ID  ='3c6db472-6995-4d27-a3ac-7d2b09798a1d';
-const BOTT_NOTIF_ID    ='fb2fc615-24f2-46c3-8c7e-46b1a5e4a965';
-const MCA_DEMANDS_BASE =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/13d692ad-1d24-4091-8c46-00811d17c6e2`;
-const BOTT_DEMANDS_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_DEMANDS_ID}`;
-const BOTT_NOTIF_BASE  =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_NOTIF_ID}`;
-let TRACKER_MODE=localStorage.getItem('nwmca_tracker_mode')||'MCA';
-const isBOTT=()=>TRACKER_MODE==='BOTT';
 
 // ── Map SharePoint item to demand object ──
 function mapItem(item){
@@ -1068,12 +1044,6 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
-    band:                       f.Band||'',
-    start_date:                 f.Start_Date||'',
-    profile_name_1:             f.Profile_Name_1||'',
-    profile_1_submitted_date:   f.Profile_1_Submitted_Date||'',
-    profile_name_2:             f.Profile_Name_2||'',
-    profile_2_submitted_date:   f.Profile_2_Submitted_Date||'',
   };
 }
 
@@ -1149,15 +1119,9 @@ function mapFields(d){
     f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
 
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
-  if(isBOTT()){
-    if(d.band!==undefined) addText('Band',d.band);
-    if(d.start_date!==undefined)               f.Start_Date=d.start_date||null;
-    if(d.profile_name_1!==undefined)           addText('Profile_Name_1',d.profile_name_1);
-    if(d.profile_1_submitted_date!==undefined) f.Profile_1_Submitted_Date=d.profile_1_submitted_date||null;
-    if(d.profile_name_2!==undefined)           addText('Profile_Name_2',d.profile_name_2);
-    if(d.profile_2_submitted_date!==undefined) f.Profile_2_Submitted_Date=d.profile_2_submitted_date||null;
-  }
-  Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
+  Object.keys(f).forEach(k => {
+    if(f[k]===undefined || f[k]==='') delete f[k];
+  });
 
   if(!window._mfLogged){window._mfLogged=true;console.log('mapFields sample (logged once):', JSON.stringify(f));}
   return {fields: f};
@@ -1167,7 +1131,7 @@ function mapFields(d){
 // ── sbQ: Read all items from a list ──
 async function sbQ(table, query=''){
   // Only 'demands' and 'notifications' tables used
-  const base = table==='demands' ? LIST_BASE() : table==='bott_notifications' ? BOTT_NOTIF_BASE() : NOTIF_LIST_BASE();
+  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
   // Fetch all pages (Graph paginates at 200 items)
   let items=[], url=base+'/items?$expand=fields&$top=200';
   while(url){
@@ -1324,7 +1288,6 @@ async function refreshData(){
     const data=await sbQ('demands','');
     demands=data;renderAll();setSyncStatus('ok','● Live');
   try{const _c=localStorage.getItem('nwmca_slpoc_map');if(_c){const _p=JSON.parse(_c);if(Object.keys(_p).length>0){SL_POC_MAP=_p;console.log('SL_POC_MAP restored:',Object.keys(_p).length,'SLs');}}}catch(_e){}
-  applySwitcherState();
   loadAppConfig();
   loadSLPOCConfig();
     try{ loadNotifSettings(); }catch(e){}
@@ -1404,7 +1367,7 @@ function goPage(id,el){
   if(document.getElementById('tb-legend'))document.getElementById('tb-legend').style.display=isTracker?'flex':'none';
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
-  if(id==='dashboard')setTimeout(isBOTT()?renderBOTTDashboard:renderDash,60);
+  if(id==='dashboard')setTimeout(renderDash,60);
   if(id==='notif'){loadNotifLog();loadAppConfig().then(renderConfigEditor).catch(()=>renderConfigEditor());loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
   closeMobMenu();
 }
@@ -1629,61 +1592,6 @@ function renderFilterBadge(){
 // DASHBOARD
 // ═══════════════════════════════════════
 function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
-function renderBOTTDashboard(){
-  destroyAll();
-  const el=document.getElementById('charts-grid'),kpiEl=document.getElementById('kpis');
-  if(!el||!kpiEl) return;
-  const now=new Date(),thisM=now.getMonth(),thisY=now.getFullYear();
-  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
-  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
-  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
-  const sla3Floor=35;
-  const subThisM=demands.filter(d=>{const sd=d.profile_1_submitted_date||d.profile_2_submitted_date;if(!sd)return false;const dd=new Date(sd);return dd.getMonth()===thisM&&dd.getFullYear()===thisY;});
-  const shortlistedM=subThisM.filter(d=>(d.profile_status||'').toLowerCase().includes('interview')||(d.demand_status||'').toLowerCase()==='closed');
-  const sla2=subThisM.length>0?Math.round(shortlistedM.length/subThisM.length*100):null;
-  const interviewed=demands.filter(d=>(d.profile_status||'').toLowerCase().includes('interview'));
-  const sla3=interviewed.length>0?Math.round(closed.length/interviewed.length*100):null;
-  const closedWT=closed.filter(d=>d.target_date&&d.demand_closure_date);
-  const onTime=closedWT.filter(d=>new Date(d.demand_closure_date)<=new Date(d.target_date));
-  const sla4=closedWT.length>0?Math.round(onTime.length/closedWT.length*100):null;
-  const bc={D:0,E:0,F:0,G:0,H:0};open.forEach(d=>{if(bc[d.band]!==undefined)bc[d.band]++;});
-  kpiEl.innerHTML=`
-    <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic" style="color:#1d9e75">📊</div><div><div class="kpi-v" style="color:${sla2===null?'var(--t3)':sla2>=50?'#1d9e75':'var(--amber)'}">${sla2===null?'—':sla2+'%'}</div><div class="kpi-l">SLA2 Profile Quality</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic" style="color:#5c1a7a">🎯</div><div><div class="kpi-v" style="color:${sla3===null?'var(--t3)':sla3>=sla3Floor?'#1d9e75':'var(--red)'}">${sla3===null?'—':sla3+'%'}</div><div class="kpi-l">SLA3 Interview→Hire</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic" style="color:#1a4b8c">⏱</div><div><div class="kpi-v" style="color:${sla4===null?'var(--t3)':sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'}">${sla4===null?'—':sla4+'%'}</div><div class="kpi-l">SLA4 On-Time Offer</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>`;
-  const months=[];for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({lb:d.toLocaleString('default',{month:'short'}),y:d.getFullYear(),m:d.getMonth()});}
-  const bW=40,gap=18,cH=100;let bars='',xax='';
-  months.forEach((mo,i)=>{
-    const inv=demands.filter(d=>{const ps=(d.profile_status||'').toLowerCase();if(!ps.includes('interview'))return false;const dd=new Date(d.profile_1_submitted_date||d.demand_added_on||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
-    const sel=demands.filter(d=>{if((d.demand_status||'').toLowerCase()!=='closed')return false;const dd=new Date(d.demand_closure_date||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
-    const pct=inv>0?Math.round(sel/inv*100):null;
-    const x=12+i*(bW+gap),h2=pct!==null?Math.round((pct/100)*cH):2;
-    const col=pct===null?'var(--border2)':pct>=sla3Floor?'#1d9e75':'#e24b4a';
-    bars+=`<rect x="${x}" y="${cH-h2}" width="${bW}" height="${h2}" fill="${col}" rx="3"/>`;
-    if(pct!==null) bars+=`<text x="${x+bW/2}" y="${cH-h2-5}" text-anchor="middle" font-size="9" font-weight="500" fill="${col}">${pct}%</text>`;
-    xax+=`<text x="${x+bW/2}" y="${cH+14}" text-anchor="middle" font-size="10" fill="var(--t3)">${mo.lb}</text>`;
-  });
-  const svgW=12+months.length*(bW+gap)+12;
-  bars+=`<line x1="0" y1="${cH-sla3Floor}" x2="${svgW}" y2="${cH-sla3Floor}" stroke="#e24b4a" stroke-width="1" stroke-dasharray="4 3" opacity=".6"/>`;
-  bars+=`<text x="${svgW-2}" y="${cH-sla3Floor-4}" text-anchor="end" font-size="9" fill="#e24b4a">${sla3Floor}% floor</text>`;
-  const bsaC={};open.forEach(d=>{bsaC[d.bsa]=(bsaC[d.bsa]||0)+1;});
-  const bsaE=Object.entries(bsaC).sort((a,b)=>b[1]-a[1]);const mx=bsaE[0]?.[1]||1;
-  el.innerHTML=`
-    <div class="cc w3"><div class="cc-hd"><div class="cc-title">SLA3 — Interview to hire (monthly)</div><div class="cc-sub">Green = above ${sla3Floor}% floor · Red = breach</div></div>
-      <svg width="100%" viewBox="0 0 ${svgW} ${cH+24}" style="overflow:visible;max-height:130px;display:block;padding:8px 0">${bars}${xax}</svg></div>
-    <div class="cc"><div class="cc-hd"><div class="cc-title">SLA4 — Time to offer</div><div class="cc-sub">${onTime.length} of ${closedWT.length} met target</div></div>
-      <div style="padding:10px 0"><div style="font-size:28px;font-weight:500;color:${sla4===null?'var(--t3)':sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'}">${sla4===null?'No data':sla4+'%'}</div>
-      <div style="margin-top:8px;background:var(--border2);border-radius:4px;height:6px;overflow:hidden"><div style="height:100%;background:${sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'};width:${sla4||0}%"></div></div></div></div>
-    <div class="cc"><div class="cc-hd"><div class="cc-title">SLA2 — Profile quality</div><div class="cc-sub">${shortlistedM.length} shortlisted / ${subThisM.length} submitted this month</div></div>
-      <div style="padding:10px 0"><div style="font-size:28px;font-weight:500;color:${sla2===null?'var(--t3)':sla2>=50?'#1d9e75':'var(--amber)'}">${sla2===null?'No data':sla2+'%'}</div></div></div>
-    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Open demands by BSA</div></div>
-      <div>${bsaE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/mx*100)+'%;background:#1d9e75"></div></div><div class="bsa-num">'+c+'</div></div>').join('')}</div></div>
-    <div class="cc"><div class="cc-hd"><div class="cc-title">Band distribution</div><div class="cc-sub">Open demands by band</div></div>
-      <div style="margin-top:8px">${Object.entries(bc).map(([b,c])=>'<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--border2);font-size:12px"><span style="font-weight:500">Band '+b+'</span><span style="color:#1d9e75;font-weight:500">'+c+'</span></div>').join('')}</div></div>`;
-}
 function renderDash(){
   destroyAll();
 
@@ -2255,7 +2163,7 @@ async function logNotif(type,d){
     _seen.add(k); return true;
   });
   const titles={
-    add:    `${isBOTT()?'[BOTT] ':''}New demand #${d.demand_id} added — ${d.bsa}`,
+    add:    `New demand #${d.demand_id} added — ${d.bsa}`,
     cancel: `Demand #${d.demand_id} cancelled — ${d.bsa}`,
     close:  `Demand #${d.demand_id} closed/fulfilled — ${d.bsa}`,
     digest: `${d.count||''} overdue demands require action`,
@@ -2291,7 +2199,7 @@ async function logNotif(type,d){
         ' demand='+d.demand_id+' SL='+d.service_line+' recipients='+JSON.stringify(allRecipients));
     }
     for(const recipient of allRecipients){
-      const result = await sbIns(isBOTT()?'bott_notifications':'notifications',{
+      const result = await sbIns('notifications',{
         type, demand_id:d.demand_id,
         title:titles[type]||type,
         subtitle:subs[type]||'',
@@ -2624,19 +2532,7 @@ function openDetail(id){
         ${d.backfill_resource?`<div class="di full"><div class="dl">Current Resource (Backfill)</div><div class="dv">${d.backfill_resource}</div></div>`:''}
       </div>
     </div>
-    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>
-  ${isBOTT()?`
-  <div class='ps' style='border-top:2px solid #1d9e75;margin-top:8px'>
-    <div class='ps-title' style='color:#1d9e75'>BOTT Details</div>
-    <div style='display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-top:6px'>
-      <div><span style='color:var(--t3)'>Band</span><div style='font-weight:500'>${d.band||'\u2014'}</div></div>
-      <div><span style='color:var(--t3)'>Start Date</span><div style='font-weight:500'>${d.start_date?new Date(d.start_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
-      <div><span style='color:var(--t3)'>Profile Name 1</span><div style='font-weight:500'>${d.profile_name_1||'\u2014'}</div></div>
-      <div><span style='color:var(--t3)'>Profile 1 Submitted</span><div style='font-weight:500'>${d.profile_1_submitted_date?new Date(d.profile_1_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
-      <div><span style='color:var(--t3)'>Profile Name 2</span><div style='font-weight:500'>${d.profile_name_2||'\u2014'}</div></div>
-      <div><span style='color:var(--t3)'>Profile 2 Submitted</span><div style='font-weight:500'>${d.profile_2_submitted_date?new Date(d.profile_2_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
-    </div>
-  </div>`:''}`:''}`;
+    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>`:''}`;
   document.getElementById('panel-foot').innerHTML=`
     <button class="btn" onclick="closePanel()">Close</button>
     <button class="btn primary" onclick="closePanel();openEdit(${id})">✏ Edit</button>
@@ -2759,15 +2655,6 @@ function makeForm(d,isNew){
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
-  ${isBOTT()?`
-  <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">BOTT Details</div>
-  <div class="ff2"><label>Band</label>${sel('band',['_','D','E','F','G','H'],d.band||'_')}</div>
-  <div class="ff2"><label>Start Date</label><input id="m-startdate" type="date" value="${d.start_date||''}" style="width:100%"></div>
-  <div class="ff2"><label>Profile Name 1</label><input id="m-pn1" type="text" value="${(d.profile_name_1||'').replace(/"/g,'&quot;')}" placeholder="Candidate 1"></div>
-  <div class="ff2"><label>Profile 1 Submitted</label><input id="m-p1sd" type="date" value="${d.profile_1_submitted_date||''}" style="width:100%"></div>
-  <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2"></div>
-  <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
-  `:''}
   </div>`;
 }
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():''}
@@ -2888,7 +2775,6 @@ ${prevUpd}`:newLine;
     }
     // empty on new demand or non-clearable: skip
   });
-  if(isBOTT()){_p.band=gv('m-band')==='_'?'':gv('m-band');_p.start_date=gv('m-startdate')||null;_p.profile_name_1=gv('m-pn1');_p.profile_1_submitted_date=gv('m-p1sd')||null;_p.profile_name_2=gv('m-pn2');_p.profile_2_submitted_date=gv('m-p2sd')||null;}
   setSyncStatus('saving','↻ Saving…');
   console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
   try{
@@ -4120,62 +4006,6 @@ async function duplicateDemand(id){
   }
 }
 
-function switchTracker(mode){
-  if(TRACKER_MODE===mode) return;
-  TRACKER_MODE=mode;
-  localStorage.setItem('nwmca_tracker_mode',mode);
-  applyTrackerTheme(mode);
-  demands=[];renderAll();setSyncStatus('saving','↻ Loading '+mode+'…');
-  refreshData().then(()=>setSyncStatus('ok','● Live'));
-  toast('Switched to '+mode+' tracker','green');
-}
-function applyTrackerTheme(mode){
-  const isBOTTMode = mode==='BOTT';
-  // Switcher buttons
-  const swM=document.getElementById('sw-mca'),swB=document.getElementById('sw-bott');
-  if(swM&&swB){
-    swM.style.background = isBOTTMode?'none':'var(--blue)';
-    swM.style.color      = isBOTTMode?'var(--t2)':'white';
-    swB.style.background = isBOTTMode?'#1d9e75':'none';
-    swB.style.color      = isBOTTMode?'white':'var(--t2)';
-  }
-  // Sidebar accent bar colour
-  const accent=document.getElementById('tracker-accent');
-  if(accent) accent.style.background=isBOTTMode?'#1d9e75':'var(--blue)';
-  // Sidebar body class for CSS theming
-  const sidebar=document.querySelector('.sidebar');
-  if(sidebar){ sidebar.classList.toggle('bott-mode',isBOTTMode); }
-  // Mode badge in topbar
-  const badge=document.getElementById('mode-badge');
-  if(badge){
-    badge.textContent=isBOTTMode?'BOTT':'MCA';
-    badge.className=isBOTTMode?'bott':'mca';
-  }
-  // Topbar subtitle
-  const sub=document.getElementById('tb-subtitle');
-  if(sub) sub.textContent=isBOTTMode
-    ?'Nationwide Mutual — BOTT · Real-time shared database'
-    :'Nationwide Mutual — GSP-MCA · Real-time shared database';
-  // Sidebar brand tag + name
-  const tag=document.querySelector('.sb-brand .tag');
-  if(tag) tag.textContent=isBOTTMode?'BOTT Tracker':'Nationwide MCA';
-  const name=document.querySelector('.sb-brand .name');
-  if(name) name.textContent=isBOTTMode?'Demand Tracker':'Demand Tracker';
-  // Page title (dashboard)
-  const pt=document.getElementById('page-title');
-  if(pt) pt.textContent=isBOTTMode?'BOTT Dashboard':'Management Dashboard';
-  // Topbar title (demands page)
-  const tb=document.getElementById('tb-title');
-  if(tb){
-    // Keep the mode badge — update the text before it
-    const badgeEl=document.getElementById('mode-badge');
-    if(badgeEl) tb.firstChild.textContent='';
-    // The h1 text is managed by renderAll via goPage
-  }
-}
-function applySwitcherState(){
-  applyTrackerTheme(TRACKER_MODE);
-}
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
   const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
