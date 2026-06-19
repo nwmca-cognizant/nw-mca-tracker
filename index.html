@@ -51,6 +51,18 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 .sb{width:var(--sb-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:transform .25s ease,width .25s ease}
 .sb-top{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
 .sb-brand .tag{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--t3);text-transform:uppercase;margin-bottom:3px}
+/* BOTT mode sidebar theming */
+.bott-mode .sb-top{border-bottom:3px solid #1d9e75}
+.bott-mode .sb-brand .tag{color:#1d9e75}
+.bott-mode .sb-brand .name{color:#1d9e75}
+.bott-mode .sb-live{color:#1d9e75}
+.bott-mode .ni.on{border-left:3px solid #1d9e75;background:rgba(29,158,117,.08)}
+.bott-mode #tracker-switcher{border-color:#1d9e75}
+/* BOTT topbar accent */
+.bott-mode .topbar{border-bottom:2px solid #1d9e75}
+#mode-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.04em;margin-left:10px;vertical-align:middle}
+#mode-badge.mca{background:#e6f1fb;color:#185FA5;border:1px solid #b5d4f4}
+#mode-badge.bott{background:#e1f5ee;color:#0f6e56;border:1px solid #5dcaa5}
 .sb-brand .name{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .sb-live{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10px;color:var(--green);font-weight:600}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
@@ -516,6 +528,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 <!-- SIDEBAR -->
 <aside class="sb" id="sb">
   <div class="sb-top">
+    <div id="tracker-accent" style="height:3px;background:var(--blue);border-radius:2px;margin:0 0 8px;transition:background .3s"></div>
     <div class="sb-brand">
       <div class="tag">Nationwide MCA</div>
       <div class="name">Demand Tracker</div>
@@ -558,7 +571,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · BOTT · Duplicate</div>
+    <div class="sb-version">v4.9 · BOTT UI · Duplicate</div>
   </div>
 </aside>
 
@@ -568,8 +581,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <!-- Desktop Topbar -->
   <div class="topbar" id="topbar">
     <div class="topbar-left">
-      <h1 id="tb-title">Open Demands</h1>
-      <p>Nationwide Mutual — GSP-MCA · Real-time shared database</p>
+      <h1 id="tb-title">Open Demands<span id="mode-badge" class="mca">MCA</span></h1>
+      <p id="tb-subtitle">Nationwide Mutual — GSP-MCA · Real-time shared database</p>
     </div>
     <div class="topbar-right">
       <div class="legend" id="tb-legend">
@@ -1011,7 +1024,7 @@ async function gFetch(url, method='GET', body=null){
 }
 
 // Base URL for the Demands list
-const LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${SP_LIST_ID}`;
+const LIST_BASE=()=>isBOTT()?BOTT_DEMANDS_BASE():MCA_DEMANDS_BASE();
 const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
 const POC_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/SL_POC_Config`;
 const APP_CONFIG_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/AppConfig`;
@@ -1055,6 +1068,12 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
+    band:                       f.Band||'',
+    start_date:                 f.Start_Date||'',
+    profile_name_1:             f.Profile_Name_1||'',
+    profile_1_submitted_date:   f.Profile_1_Submitted_Date||'',
+    profile_name_2:             f.Profile_Name_2||'',
+    profile_2_submitted_date:   f.Profile_2_Submitted_Date||'',
   };
 }
 
@@ -2605,7 +2624,19 @@ function openDetail(id){
         ${d.backfill_resource?`<div class="di full"><div class="dl">Current Resource (Backfill)</div><div class="dv">${d.backfill_resource}</div></div>`:''}
       </div>
     </div>
-    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>`:''}`;
+    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>
+  ${isBOTT()?`
+  <div class='ps' style='border-top:2px solid #1d9e75;margin-top:8px'>
+    <div class='ps-title' style='color:#1d9e75'>BOTT Details</div>
+    <div style='display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-top:6px'>
+      <div><span style='color:var(--t3)'>Band</span><div style='font-weight:500'>${d.band||'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Start Date</span><div style='font-weight:500'>${d.start_date?new Date(d.start_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile Name 1</span><div style='font-weight:500'>${d.profile_name_1||'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile 1 Submitted</span><div style='font-weight:500'>${d.profile_1_submitted_date?new Date(d.profile_1_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile Name 2</span><div style='font-weight:500'>${d.profile_name_2||'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile 2 Submitted</span><div style='font-weight:500'>${d.profile_2_submitted_date?new Date(d.profile_2_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+    </div>
+  </div>`:''}`:''}`;
   document.getElementById('panel-foot').innerHTML=`
     <button class="btn" onclick="closePanel()">Close</button>
     <button class="btn primary" onclick="closePanel();openEdit(${id})">✏ Edit</button>
@@ -4093,19 +4124,57 @@ function switchTracker(mode){
   if(TRACKER_MODE===mode) return;
   TRACKER_MODE=mode;
   localStorage.setItem('nwmca_tracker_mode',mode);
-  const m=document.getElementById('sw-mca'),b=document.getElementById('sw-bott');
-  if(m&&b){m.style.background=mode==='MCA'?'var(--blue)':'none';m.style.color=mode==='MCA'?'white':'var(--t2)';b.style.background=mode==='BOTT'?'#1d9e75':'none';b.style.color=mode==='BOTT'?'white':'var(--t2)';}
-  const pt=document.getElementById('page-title');if(pt)pt.textContent=mode==='BOTT'?'BOTT Demand Tracker':'Management Dashboard';
-  const bn=document.querySelector('.name');if(bn)bn.textContent=mode==='BOTT'?'BOTT Tracker':'NW MCA Tracker';
+  applyTrackerTheme(mode);
   demands=[];renderAll();setSyncStatus('saving','↻ Loading '+mode+'…');
   refreshData().then(()=>setSyncStatus('ok','● Live'));
   toast('Switched to '+mode+' tracker','green');
 }
+function applyTrackerTheme(mode){
+  const isBOTTMode = mode==='BOTT';
+  // Switcher buttons
+  const swM=document.getElementById('sw-mca'),swB=document.getElementById('sw-bott');
+  if(swM&&swB){
+    swM.style.background = isBOTTMode?'none':'var(--blue)';
+    swM.style.color      = isBOTTMode?'var(--t2)':'white';
+    swB.style.background = isBOTTMode?'#1d9e75':'none';
+    swB.style.color      = isBOTTMode?'white':'var(--t2)';
+  }
+  // Sidebar accent bar colour
+  const accent=document.getElementById('tracker-accent');
+  if(accent) accent.style.background=isBOTTMode?'#1d9e75':'var(--blue)';
+  // Sidebar body class for CSS theming
+  const sidebar=document.querySelector('.sidebar');
+  if(sidebar){ sidebar.classList.toggle('bott-mode',isBOTTMode); }
+  // Mode badge in topbar
+  const badge=document.getElementById('mode-badge');
+  if(badge){
+    badge.textContent=isBOTTMode?'BOTT':'MCA';
+    badge.className=isBOTTMode?'bott':'mca';
+  }
+  // Topbar subtitle
+  const sub=document.getElementById('tb-subtitle');
+  if(sub) sub.textContent=isBOTTMode
+    ?'Nationwide Mutual — BOTT · Real-time shared database'
+    :'Nationwide Mutual — GSP-MCA · Real-time shared database';
+  // Sidebar brand tag + name
+  const tag=document.querySelector('.sb-brand .tag');
+  if(tag) tag.textContent=isBOTTMode?'BOTT Tracker':'Nationwide MCA';
+  const name=document.querySelector('.sb-brand .name');
+  if(name) name.textContent=isBOTTMode?'Demand Tracker':'Demand Tracker';
+  // Page title (dashboard)
+  const pt=document.getElementById('page-title');
+  if(pt) pt.textContent=isBOTTMode?'BOTT Dashboard':'Management Dashboard';
+  // Topbar title (demands page)
+  const tb=document.getElementById('tb-title');
+  if(tb){
+    // Keep the mode badge — update the text before it
+    const badgeEl=document.getElementById('mode-badge');
+    if(badgeEl) tb.firstChild.textContent='';
+    // The h1 text is managed by renderAll via goPage
+  }
+}
 function applySwitcherState(){
-  const mode=TRACKER_MODE;
-  const m=document.getElementById('sw-mca'),b=document.getElementById('sw-bott');
-  if(m&&b){m.style.background=mode==='MCA'?'var(--blue)':'none';m.style.color=mode==='MCA'?'white':'var(--t2)';b.style.background=mode==='BOTT'?'#1d9e75':'none';b.style.color=mode==='BOTT'?'white':'var(--t2)';}
-  if(mode==='BOTT'){const pt=document.getElementById('page-title');if(pt)pt.textContent='BOTT Demand Tracker';const bn=document.querySelector('.name');if(bn)bn.textContent='BOTT Tracker';}
+  applyTrackerTheme(TRACKER_MODE);
 }
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
