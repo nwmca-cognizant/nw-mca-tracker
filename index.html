@@ -484,6 +484,13 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-item input{accent-color:var(--blue);width:13px;height:13px;cursor:pointer}
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
+.star-btn{background:none;border:none;cursor:pointer;font-size:16px;
+  padding:0 3px;line-height:1;vertical-align:middle;color:#ccc;
+  transition:color .15s;flex-shrink:0}
+.star-btn:hover{color:#999}
+.star-s1{color:#d32f2f!important}
+.star-s2{color:#f59e0b!important}
+.star-s3{color:#16a34a!important}
 </style>
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 </head>
@@ -524,7 +531,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
   </div>
   <nav class="sb-nav">
-    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';activePriorityFilter='';document.querySelectorAll('[id^=f-prio-]').forEach(el=>el.classList.remove('on'));renderAll();">
+    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
     </div>
@@ -547,9 +554,6 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>
     <div class="ni" onclick="runEmailTests()" style="color:var(--teal,#1d9e75);font-size:12px"><span class="ni-ic">📧</span><span class="ni-lbl">Email Tests</span></div>    
     <div class="nsect">Filters</div>
-    <div class="ni" id="f-prio-high" onclick="filterByPriority('High')"><span class="ni-ic" style="color:#d32f2f">&#9733;</span><span class="ni-lbl">High Priority</span></div>
-    <div class="ni" id="f-prio-risk" onclick="filterByPriority('At Risk')"><span class="ni-ic" style="color:#f59e0b">&#9733;</span><span class="ni-lbl">At Risk</span></div>
-    <div class="ni" id="f-prio-low"  onclick="filterByPriority('Low')"><span class="ni-ic" style="color:#16a34a">&#9733;</span><span class="ni-lbl">Low Priority</span></div>
     <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
     <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
@@ -558,7 +562,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · ID Fix2</div>
+    <div class="sb-version">v4.9 · Star</div>
   </div>
 </aside>
 
@@ -1048,7 +1052,7 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
-    priority:                   f.Priority||f.Priority0||f.OData__Priority||'',
+    priority:           f.Priority||f.Priority0||'',
   };
 }
 
@@ -1124,12 +1128,7 @@ function mapFields(d){
     f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
 
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
-  // Priority: write when non-empty, clear only when explicitly null (cleared by user)
-  if(d.priority!==undefined){
-    if(d.priority===null) f.Priority=null;           // explicit clear
-    else if(d.priority!=='') f.Priority=d.priority;  // set to value
-    // if d.priority==='' — don't touch SP field (not changed by user)
-  }
+
   Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
 
   return {fields: f};
@@ -1229,7 +1228,7 @@ async function sbUpd(table, match, data){
     // id is null/undefined — demand was loaded with a bad id
     // Try to recover: look up the SP item by Title (demand_id) from the data
     // Try to get demand_id from payload or from local demands array
-    const titleFromPayload = data?._demand_id_recovery ? String(data._demand_id_recovery) : (data?.demand_id ? String(data.demand_id) : null);
+    const titleFromPayload = null;
     const titleFromLocal   = demands.find(x=>String(x.id)===String(match.split('id=eq.')[1]||''))?.demand_id;
     const titleVal = titleFromPayload || String(titleFromLocal||'') || null;
     if(titleVal && titleVal!=='undefined' && titleVal!=='null'){
@@ -1419,8 +1418,6 @@ function goPage(id,el){
   if(document.getElementById('tb-legend'))document.getElementById('tb-legend').style.display=isTracker?'flex':'none';
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
-  if(id==='tracker'&&!window._priorityNavActive){activePriorityFilter='';document.querySelectorAll('[id^=f-prio-]').forEach(el=>el.classList.remove('on'));}
-  window._priorityNavActive=false;
   if(id==='dashboard')setTimeout(renderDash,60);
   if(id==='notif'){loadNotifLog();loadAppConfig().then(renderConfigEditor).catch(()=>renderConfigEditor());loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
   closeMobMenu();
@@ -1466,12 +1463,7 @@ function closeMobMenu(){
 function stB(s){const m={open:'b-open',closed:'b-closed',cancel:'b-cancel','on hold':'b-hold'};return`<span class="badge ${m[(s||'').toLowerCase()]||'b-na'}">${s||'—'}</span>`}
 function tyB(t){const m={New:'b-new',Backfill:'b-backfill','Sell Bill':'b-sellbill'};return`<span class="badge ${m[t]||'b-na'}">${t||'—'}</span>`}
 function locB(l){const m={Offshore:'b-offshore',Onsite:'b-onsite',Canada:'b-canada',Mexico:'b-mexico'};return`<span class="badge ${m[(l||'').trim()]||'b-na'}">${l||'—'}</span>`}
-function prioStar(p){
-  if(p==='High')    return '<span title="High" style="color:#d32f2f;font-size:15px;margin-right:2px">&#9733;</span>';
-  if(p==='At Risk') return '<span title="At Risk" style="color:#f59e0b;font-size:15px;margin-right:2px">&#9733;</span>';
-  if(p==='Low')     return '<span title="Low" style="color:#16a34a;font-size:15px;margin-right:2px">&#9733;</span>';
-  return '';
-}
+
 function ageB(days,ag){
   let cls='ao';
   if(ag){if(ag.startsWith('A)')||ag.startsWith('B)'))cls='ac';else if(ag.startsWith('C)'))cls='ah';else if(ag.startsWith('D)')||ag.startsWith('E)'))cls='am';else if(ag.startsWith('F)')||ag.startsWith('G)'))cls='al';}
@@ -1503,8 +1495,7 @@ function getFiltered(){
     if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
     if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
     if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)))return false;
-    if(activePriorityFilter && d.priority!==activePriorityFilter) return false;
-    return true;
+      return true;
   });
 }
 function getSorted(a){
@@ -1564,7 +1555,7 @@ function renderTbl(){
     const isChk=selectedIds.has(String(d.id));
     return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
       <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${prioStar(d.priority)}${d.demand_id}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
       <td>${tyB(d.demand_type)}</td>
@@ -1817,7 +1808,7 @@ function renderDash(){
     <div class="cc w3"><div class="cc-hd"><div class="cc-title">Recruitment Pipeline — Profile Status Funnel</div><div class="cc-sub">Where open demands sit in the hiring funnel</div></div><div class="ch-wrap h160"><canvas id="ch-pipe"></canvas></div></div>
     <div class="cc w2"><div class="cc-hd"><div class="cc-title">Service Line Demand Count</div><div class="cc-sub">Open demand volume by practice area</div></div><div class="ch-wrap h200"><canvas id="ch-sl"></canvas></div></div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Top Overdue Demands</div><div class="cc-sub">Highest ageing — immediate action needed</div></div>
-      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)">${prioStar(d.priority)}#${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
+      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
     </div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Tier-1 Programs</div><div class="cc-sub">Strategic programs with open pipeline</div></div>
       <div class="t1-list">${t1E.length?t1E.map(([k,v])=>`<div class="t1-item"><div class="t1-name">${k}</div><div class="t1-cnt">${v}</div></div>`).join(''):'<p style="font-size:12px;color:var(--t3);padding:8px 0">None in open demands</p>'}</div>
@@ -2149,7 +2140,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
-  'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -2704,7 +2695,7 @@ function makeForm(d,isNew){
     <div class="fg-sect">Demand Details</div>
     <div class="ff2"><label>${rlbl('BSA')}</label>${sel('bsa',[''].concat(BSA_LIST),d.bsa)}</div>
     <div class="ff2"><label>${rlbl('Service Line')}</label>${sel('sl',[''].concat(SL_LIST),d.service_line)}</div>
-    <div class="ff2"><label>Priority</label><select id="m-priority" style="width:100%"><option value=""${(d.priority||'')==''?' selected':''}>— None —</option><option value="High"${d.priority==='High'?' selected':''}>&#9733; High</option><option value="At Risk"${d.priority==='At Risk'?' selected':''}>&#9733; At Risk</option><option value="Low"${d.priority==='Low'?' selected':''}>&#9733; Low</option></select></div>
+    
     <div class="ff2"><label>Team Name</label><input id="m-team" value="${(d.team_name||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>SEPM / SEL</label><input id="m-sepm" value="${(d.sepm_sel||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>${rlbl('Skills Required')}</label><textarea id="m-sk">${d.skills||''}</textarea></div>
@@ -2831,13 +2822,9 @@ ${prevUpd}`:newLine;
   const payload = {};
   // Fields that are safe to clear in SP (text/multitext — not required choices)
   const clearableFields = new Set(['profile_name','backfill_resource','so_id','team_name',
-    'sepm_sel','tier1_program','fg_form_number','status_updates','priority']);
+    'sepm_sel','tier1_program','fg_form_number','status_updates']);
   // Priority: only include in payload when user changed it
-  // Compare form value vs current stored value to avoid overwriting unchanged demands
-  const formPriority = gv('m-priority')||'';
-  const currentPriority = editId ? (demands.find(x=>String(x.id)===String(editId))?.priority||'') : '';
-  // Always include priority in payload (new or changed)
-  _p.priority = formPriority;
+
   Object.keys(_p).forEach(k => {
     const v = _p[k];
     if(v!==null && v!==undefined && v!==''){
@@ -2855,14 +2842,9 @@ ${prevUpd}`:newLine;
       const prev=d?d.demand_status:'';
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
       demands[idx]={...demands[idx],...payload};
-      demands[idx].priority = formPriority; // use pre-captured value
       closeModal(); renderAll(); setSyncStatus('saving','↻ Saving…');
       try{
-        // Include demand_id in payload for sbUpd null-id recovery
-        const demandIdForRecovery = demands.find(x=>String(x.id)===String(editId))?.demand_id;
-        if(demandIdForRecovery) payload._demand_id_recovery = String(demandIdForRecovery);
         await sbUpd('demands','id=eq.'+editId,payload);
-        delete payload._demand_id_recovery;
       }catch(spErr){
         setSyncStatus('err','⚠ Save failed');
         toast('SP save failed: '+spErr.message.substring(0,100),'red');
@@ -4102,17 +4084,51 @@ async function duplicateDemand(id){
 
 
 
-let activePriorityFilter='';
-function filterByPriority(p){
-  activePriorityFilter=(activePriorityFilter===p)?'':p;
-  ['high','risk','low'].forEach(k=>document.getElementById('f-prio-'+k)?.classList.remove('on'));
-  if(activePriorityFilter==='High')    document.getElementById('f-prio-high')?.classList.add('on');
-  if(activePriorityFilter==='At Risk') document.getElementById('f-prio-risk')?.classList.add('on');
-  if(activePriorityFilter==='Low')     document.getElementById('f-prio-low')?.classList.add('on');
-  window._priorityNavActive=true;
-  goPage('tracker');
-  renderAll();
+// ── Star — click cycles: none → High(red) → At Risk(amber) → Low(green) → none ──
+const STAR_CYCLE = ['','High','At Risk','Low'];
+function starClass(p){ return p==='High'?'star-s1':p==='At Risk'?'star-s2':p==='Low'?'star-s3':''; }
+function starTitle(p){ return p?'Priority: '+p+' (click to change)':'Click star to set priority'; }
+
+async function cycleStar(demandId, event){
+  event.stopPropagation();
+  const d=demands.find(x=>String(x.id)===String(demandId));
+  if(!d){ toast('Demand not found','red'); return; }
+  if(!d.id||d.id==='null'||d.id==='undefined'){
+    toast('Cannot save — demand ID missing. Refresh the page.','red'); return;
+  }
+  const cur=d.priority||'';
+  const next=STAR_CYCLE[(STAR_CYCLE.indexOf(cur)+1)%STAR_CYCLE.length];
+  // Optimistic update
+  d.priority=next;
+  // Update just the star buttons without full re-render
+  document.querySelectorAll('[data-star="'+demandId+'"]').forEach(btn=>{
+    btn.className='star-btn '+starClass(next);
+    btn.title=starTitle(next);
+  });
+  // Save to SP
+  try{
+    const pVal=next===''?null:next;
+    let saved=false;
+    for(const col of ['Priority','Priority0']){
+      try{
+        await gFetch(LIST_BASE()+'/items/'+d.id+'/fields','PATCH',{[col]:pVal});
+        saved=true; break;
+      }catch(e){ /* try next column name */ }
+    }
+    if(!saved){ throw new Error('SP rejected both Priority column names'); }
+    const label=next||'Cleared';
+    toast('★ '+label+' — demand #'+d.demand_id,'green');
+  }catch(e){
+    // Revert on failure
+    d.priority=cur;
+    document.querySelectorAll('[data-star="'+demandId+'"]').forEach(btn=>{
+      btn.className='star-btn '+starClass(cur);
+      btn.title=starTitle(cur);
+    });
+    toast('Star save failed: '+e.message.substring(0,80),'red');
+  }
 }
+
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
   const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
