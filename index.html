@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+if(!window._miLogged){window._miLogged=true;console.log('SP mapItem fields:',Object.keys(f));console.log('Priority:',f.Priority,f.Priority0);}
+  return{<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -558,7 +559,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Prio Fix</div>
+    <div class="sb-version">v4.9 · Prio Live</div>
   </div>
 </aside>
 
@@ -1048,7 +1049,7 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
-    priority:                   f.Priority||'',
+    priority:                   f.Priority||f.Priority0||f.OData__Priority||'',
   };
 }
 
@@ -1453,6 +1454,7 @@ function getFiltered(){
     if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
     if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
     if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)))return false;
+    if(activePriorityFilter && d.priority!==activePriorityFilter) return false;
     return true;
   });
 }
@@ -4036,7 +4038,12 @@ function filterByPriority(p){
   if(activePriorityFilter==='High')    document.getElementById('f-prio-high')?.classList.add('on');
   if(activePriorityFilter==='At Risk') document.getElementById('f-prio-risk')?.classList.add('on');
   if(activePriorityFilter==='Low')     document.getElementById('f-prio-low')?.classList.add('on');
-  goPage('tracker');renderAll();
+  // Navigate to demands list and re-render
+  const navTracker=document.getElementById('nav-tracker');
+  if(navTracker){document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));navTracker.classList.add('on');}
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('page-tracker')?.classList.add('on');
+  renderAll();
 }
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
