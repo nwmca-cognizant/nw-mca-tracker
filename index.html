@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · ID Fix</div>
+    <div class="sb-version">v4.9 · ID Fix2</div>
   </div>
 </aside>
 
@@ -1023,7 +1023,7 @@ function mapItem(item){
   // Log SP field names on first read (helps debug column name issues)
   if(!window._spLogged){ window._spLogged=true; console.log('SP fields returned:', Object.keys(f)); }
   return {
-    id:                 String(item.id),            // SP internal item ID — stored as string for type-safe comparison
+    id:                 String(item.id||item.fields?.id||''),  // SP internal item ID (top-level or inside fields)
     demand_id:          f.Title || '',              // Title column = Demand ID
     so_id:              f.SO_ID || '',
     demand_status:      f.Demand_Status || 'Open',
@@ -1147,7 +1147,11 @@ async function sbQ(table, query=''){
     items=[...items,...(data.value||[])];
     url=data['@odata.nextLink']||null;
   }
-  const mapped=items.map(mapItem);
+  // Normalize items — some SP responses nest id inside fields
+  items.forEach(item=>{
+    if(!item.id && item.fields?.id) item.id=item.fields.id;
+  });
+  const mapped=items.map(mapItem).filter(Boolean);
   // Sort by demand_id desc if demands
   if(table==='demands') mapped.sort((a,b)=>Number(a.demand_id)-Number(b.demand_id));
   if(table==='notifications') mapped.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -1209,6 +1213,7 @@ async function sbIns(table, data){
   // Step 3: GET the final created item
   try{
     const created = await gFetch(base+'/items/'+newItem.id+'?$expand=fields');
+    if(created && !created.id && created.fields?.id) created.id=created.fields.id;
     return [mapItem(created)];
   }catch(e){
     return [mapItem(newItem)];
@@ -1223,8 +1228,11 @@ async function sbUpd(table, match, data){
   if(!spId||spId==='null'||spId==='undefined'){
     // id is null/undefined — demand was loaded with a bad id
     // Try to recover: look up the SP item by Title (demand_id) from the data
-    const titleVal = data?.demand_id ? String(data.demand_id) : null;
-    if(titleVal){
+    // Try to get demand_id from payload or from local demands array
+    const titleFromPayload = data?._demand_id_recovery ? String(data._demand_id_recovery) : (data?.demand_id ? String(data.demand_id) : null);
+    const titleFromLocal   = demands.find(x=>String(x.id)===String(match.split('id=eq.')[1]||''))?.demand_id;
+    const titleVal = titleFromPayload || String(titleFromLocal||'') || null;
+    if(titleVal && titleVal!=='undefined' && titleVal!=='null'){
       console.log('sbUpd: recovering null SP id for demand_id='+titleVal);
       try{
         const searchR = await gFetch(LIST_BASE()+'/items?$expand=fields&$filter=fields/Title+eq+%27'+encodeURIComponent(titleVal)+'%27&$top=1');
@@ -2850,7 +2858,11 @@ ${prevUpd}`:newLine;
       demands[idx].priority = formPriority; // use pre-captured value
       closeModal(); renderAll(); setSyncStatus('saving','↻ Saving…');
       try{
+        // Include demand_id in payload for sbUpd null-id recovery
+        const demandIdForRecovery = demands.find(x=>String(x.id)===String(editId))?.demand_id;
+        if(demandIdForRecovery) payload._demand_id_recovery = String(demandIdForRecovery);
         await sbUpd('demands','id=eq.'+editId,payload);
+        delete payload._demand_id_recovery;
       }catch(spErr){
         setSyncStatus('err','⚠ Save failed');
         toast('SP save failed: '+spErr.message.substring(0,100),'red');
