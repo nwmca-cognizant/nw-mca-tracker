@@ -175,7 +175,7 @@ select:focus{outline:none;border-color:var(--blue)}
 
 /* Table */
 .tbl-outer{margin:10px 24px 24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:auto;flex:1;min-height:0;box-shadow:var(--sh)}
-table{width:100%;border-collapse:collapse;table-layout:auto}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
 thead{background:var(--s2);position:sticky;top:0;z-index:2}
 th{padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .12s}
 th:hover{color:var(--t2);background:var(--s3)}
@@ -484,9 +484,9 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-item input{accent-color:var(--blue);width:13px;height:13px;cursor:pointer}
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
-.star-btn{background:none;border:none;cursor:pointer;font-size:12px;
-  padding:0 1px 0 0;line-height:1;vertical-align:middle;color:#ccc;
-  transition:color .15s;display:inline;width:auto;flex-shrink:0}
+.star-btn{background:none;border:none;cursor:pointer;font-size:14px;
+  line-height:1;vertical-align:middle;color:#bbb;padding:0 3px 0 0;
+  transition:color .15s}
 .star-btn:hover{color:#999}
 .star-s1{color:#d32f2f!important}
 .star-s2{color:#f59e0b!important}
@@ -617,7 +617,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <table>
         <thead><tr>
           <th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">☐</th>
-          <th style="white-space:nowrap" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
+          <th style="width:80px" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
           <th style="width:80px" onclick="sortBy('demand_status')">Status<i class="si" id="si-st">↕</i></th>
           <th style="width:148px" onclick="sortBy('profile_status')">Profile Status<i class="si" id="si-ps">↕</i></th>
           <th style="width:65px" onclick="sortBy('demand_type')">Type<i class="si" id="si-ty">↕</i></th>
@@ -904,11 +904,21 @@ async function initMSAL(){
     cache:{ cacheLocation:'sessionStorage', storeAuthStateInCookie:false }
   });
   await msalApp.initialize();
-  const resp = await msalApp.handleRedirectPromise();
+  // Handle redirect — catch errors (e.g. expired/replayed auth code)
+  let resp = null;
+  try{
+    resp = await msalApp.handleRedirectPromise();
+  }catch(redirectErr){
+    console.warn('handleRedirectPromise error (stale code?):', redirectErr.message);
+    // Clear the hash so stale code doesn't block future loads
+    if(window.location.hash) window.history.replaceState(null,'',window.location.pathname);
+  }
   if(resp && resp.accessToken){
     graphToken  = resp.accessToken;
     tokenExpiry = Date.now() + 3500000;
     USER_NAME   = resp.account.name || 'NW MCA User';
+    // Clean up the redirect hash from URL
+    if(window.location.hash) window.history.replaceState(null,'',window.location.pathname);
     return true;
   }
   const accounts = msalApp.getAllAccounts();
@@ -919,7 +929,10 @@ async function initMSAL(){
       tokenExpiry = Date.now() + 3500000;
       USER_NAME   = accounts[0].name || 'NW MCA User';
       return true;
-    }catch(e){ return false; }
+    }catch(e){
+      console.warn('Silent token failed:', e.message);
+      return false;
+    }
   }
   return false;
 }
@@ -1307,18 +1320,29 @@ window.addEventListener('load', async()=>{
       return;
     }
     showLoader('Loading demands from SharePoint…');
-    const data = await sbQ('demands','');
+    // 45s timeout on initial load — surfaces error instead of spinning forever
+    let data;
+    try{
+      const loadPromise = sbQ('demands','');
+      const timeoutPromise = new Promise((_,rej)=>setTimeout(()=>rej(new Error('SharePoint load timed out after 45s — check network or SP permissions')),45000));
+      data = await Promise.race([loadPromise, timeoutPromise]);
+    }catch(loadErr){
+      throw loadErr; // caught by outer catch → shows error message
+    }
     demands = data;
     hideLoader();
     document.getElementById('app').style.display='flex';
     document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     document.getElementById('f-st').value='Open';
-    renderAll();
+    loadStars(); renderAll();
     setInterval(silentRefresh, 30000);
     toast('Connected to SharePoint ✓','green');
   }catch(e){
     hideLoader();
     document.getElementById('loader-msg').textContent='';
+    // Clear hash in case it's causing auth loop
+    if(window.location.hash && window.location.hash.startsWith('#code'))
+      window.history.replaceState(null,'',window.location.pathname);
     document.getElementById('loader').innerHTML += `
       <div style="max-width:420px;background:#fff;border-radius:12px;padding:24px;border:1px solid #e0ddd4;margin-top:16px;text-align:left">
         <div style="font-size:14px;font-weight:600;color:#8c1f1f;margin-bottom:8px">Sign-in failed</div>
@@ -1337,7 +1361,7 @@ async function refreshData(){
   setSyncStatus('saving','↻ Refreshing…');
   try{
     const data=await sbQ('demands','');
-    demands=data;renderAll();setSyncStatus('ok','● Live');
+    demands=data;loadStars();renderAll();setSyncStatus('ok','● Live');
   try{const _c=localStorage.getItem('nwmca_slpoc_map');if(_c){const _p=JSON.parse(_c);if(Object.keys(_p).length>0){SL_POC_MAP=_p;console.log('SL_POC_MAP restored:',Object.keys(_p).length,'SLs');}}}catch(_e){}
   loadAppConfig();
   loadSLPOCConfig();
@@ -1555,7 +1579,7 @@ function renderTbl(){
     const isChk=selectedIds.has(String(d.id));
     return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
       <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:60px"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
       <td>${tyB(d.demand_type)}</td>
@@ -1625,6 +1649,13 @@ function calcAgeingGroup(days){
   if(days>=-7) return 'H) Coming up in 1 week';
   if(days>=-14)return 'I) Coming up in 2 weeks';
   return 'J) Not due yet';
+}
+function loadStars(){
+  // Load star priorities from localStorage into demands array
+  try{
+    const store=JSON.parse(localStorage.getItem('nwmca_stars')||'{}');
+    demands.forEach(d=>{ if(store[d.demand_id]) d.priority=store[d.demand_id]; });
+  }catch(e){}
 }
 function renderAll(){
   // Ensure filters are populated before rendering
@@ -2140,7 +2171,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
-'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+ 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -4089,44 +4120,28 @@ const STAR_CYCLE = ['','High','At Risk','Low'];
 function starClass(p){ return p==='High'?'star-s1':p==='At Risk'?'star-s2':p==='Low'?'star-s3':''; }
 function starTitle(p){ return p?'Priority: '+p+' (click to change)':'Click star to set priority'; }
 
-async function cycleStar(demandId, event){
+function cycleStar(demandId, event){
   event.stopPropagation();
   const d=demands.find(x=>String(x.id)===String(demandId));
   if(!d){ toast('Demand not found','red'); return; }
-  if(!d.id||d.id==='null'||d.id==='undefined'){
-    toast('Cannot save — demand ID missing. Refresh the page.','red'); return;
-  }
   const cur=d.priority||'';
   const next=STAR_CYCLE[(STAR_CYCLE.indexOf(cur)+1)%STAR_CYCLE.length];
-  // Optimistic update
+  // Update local demand object
   d.priority=next;
-  // Update just the star buttons without full re-render
+  // Update star button(s) for this demand immediately
   document.querySelectorAll('[data-star="'+demandId+'"]').forEach(btn=>{
     btn.className='star-btn '+starClass(next);
     btn.title=starTitle(next);
   });
-  // Save to SP
+  // Persist to localStorage — keyed by demand_id so it survives refresh
   try{
-    const pVal=next===''?null:next;
-    let saved=false;
-    for(const col of ['Priority','Priority0']){
-      try{
-        await gFetch(LIST_BASE()+'/items/'+d.id+'/fields','PATCH',{[col]:pVal});
-        saved=true; break;
-      }catch(e){ /* try next column name */ }
-    }
-    if(!saved){ throw new Error('SP rejected both Priority column names'); }
-    const label=next||'Cleared';
-    toast('★ '+label+' — demand #'+d.demand_id,'green');
-  }catch(e){
-    // Revert on failure
-    d.priority=cur;
-    document.querySelectorAll('[data-star="'+demandId+'"]').forEach(btn=>{
-      btn.className='star-btn '+starClass(cur);
-      btn.title=starTitle(cur);
-    });
-    toast('Star save failed: '+e.message.substring(0,80),'red');
-  }
+    const store=JSON.parse(localStorage.getItem('nwmca_stars')||'{}');
+    if(next==='') delete store[d.demand_id];
+    else store[d.demand_id]=next;
+    localStorage.setItem('nwmca_stars',JSON.stringify(store));
+  }catch(e){}
+  const label=next||'Cleared';
+  if(next) toast('★ '+label+' — demand #'+d.demand_id,'green');
 }
 
 function exportCSV(){
