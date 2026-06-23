@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · MCA Priority</div>
+    <div class="sb-version">v4.9 · Prio Fix</div>
   </div>
 </aside>
 
@@ -2781,7 +2781,9 @@ ${prevUpd}`:newLine;
   const payload = {};
   // Fields that are safe to clear in SP (text/multitext — not required choices)
   const clearableFields = ['profile_name','backfill_resource','so_id','team_name',
-    'sepm_sel','tier1_program','fg_form_number','status_updates'];
+    'sepm_sel','tier1_program','fg_form_number','status_updates','priority'];
+  // Collect priority BEFORE the strip loop so it gets included in payload
+  _p.priority = gv('m-priority')||'';
   Object.keys(_p).forEach(k => {
     const v = _p[k];
     if(v!==null && v!==undefined && v!==''){
@@ -2791,8 +2793,6 @@ ${prevUpd}`:newLine;
     }
     // empty on new demand or non-clearable: skip
   });
-  _p.priority=gv('m-priority')||'';
-
   setSyncStatus('saving','↻ Saving…');
   console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
   try{
@@ -2802,6 +2802,8 @@ ${prevUpd}`:newLine;
       await sbUpd('demands','id=eq.'+editId,payload);
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
       demands[idx]={...demands[idx],...payload};
+      // Always sync priority from form to local cache (may be empty string = cleared)
+      demands[idx].priority = gv('m-priority')||'';
       // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
       console.log('Status change check: prev=',os,'new=',ns);
