@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Prio Final</div>
+    <div class="sb-version">v4.9 · ID Fix</div>
   </div>
 </aside>
 
@@ -1219,9 +1219,31 @@ async function sbIns(table, data){
 // ── sbUpd: Update an existing item by SharePoint item ID ──
 async function sbUpd(table, match, data){
   const _t0=performance.now();
-  const spId=String(match.split('id=eq.')[1]||'');
+  let spId=String(match.split('id=eq.')[1]||'');
   if(!spId||spId==='null'||spId==='undefined'){
-    throw new Error('sbUpd: invalid SP item ID "'+spId+'". The demand may not have been saved to SP yet. Refresh and try again.');
+    // id is null/undefined — demand was loaded with a bad id
+    // Try to recover: look up the SP item by Title (demand_id) from the data
+    const titleVal = data?.demand_id ? String(data.demand_id) : null;
+    if(titleVal){
+      console.log('sbUpd: recovering null SP id for demand_id='+titleVal);
+      try{
+        const searchR = await gFetch(LIST_BASE()+'/items?$expand=fields&$filter=fields/Title+eq+%27'+encodeURIComponent(titleVal)+'%27&$top=1');
+        const found = (searchR?.value||[])[0];
+        if(found?.id){
+          spId = String(found.id);
+          console.log('sbUpd: recovered SP id='+spId+' for demand_id='+titleVal);
+          // Fix the local demands array so future saves work too
+          const fix=demands.find(x=>String(x.demand_id)===String(titleVal));
+          if(fix) fix.id=spId;
+        } else {
+          throw new Error('sbUpd: demand #'+titleVal+' not found in SP. Refresh the page.');
+        }
+      }catch(lookupErr){
+        throw new Error('sbUpd: cannot recover SP id for demand #'+titleVal+': '+lookupErr.message);
+      }
+    } else {
+      throw new Error('sbUpd: invalid SP item ID "'+spId+'" and no demand_id to recover. Refresh the page.');
+    }
   }
   const base=table==='demands'?LIST_BASE():NOTIF_LIST_BASE();
   const allFields=mapFields(data).fields;
@@ -2854,7 +2876,13 @@ ${prevUpd}`:newLine;
       payload.ageing_days = 0;
       const res=await sbIns('demands',payload);
       const nd=Array.isArray(res)?res[0]:res;
-      if(nd)demands.push(nd);
+      if(nd){
+        // Ensure the demand has a valid SP id before pushing
+        if(!nd.id||nd.id==='null'||nd.id==='undefined'){
+          console.warn('sbIns returned demand with null id — demand_id:',nd.demand_id);
+        }
+        demands.push(nd);
+      }
       // Build a clean demand object for the notification
       // Use payload (user input) merged with nd (SP response) for completeness
       if(document.getElementById('t-new')?.checked){
