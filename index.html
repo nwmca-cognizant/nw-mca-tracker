@@ -51,6 +51,7 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 .sb{width:var(--sb-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:transform .25s ease,width .25s ease}
 .sb-top{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
 .sb-brand .tag{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--t3);text-transform:uppercase;margin-bottom:3px}
+
 .sb-brand .name{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .sb-live{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10px;color:var(--green);font-weight:600}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
@@ -546,6 +547,9 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>
     <div class="ni" onclick="runEmailTests()" style="color:var(--teal,#1d9e75);font-size:12px"><span class="ni-ic">📧</span><span class="ni-lbl">Email Tests</span></div>    
     <div class="nsect">Filters</div>
+    <div class="ni" id="f-prio-high" onclick="filterByPriority('High')"><span class="ni-ic" style="color:#d32f2f">&#9733;</span><span class="ni-lbl">High Priority</span></div>
+    <div class="ni" id="f-prio-risk" onclick="filterByPriority('At Risk')"><span class="ni-ic" style="color:#f59e0b">&#9733;</span><span class="ni-lbl">At Risk</span></div>
+    <div class="ni" id="f-prio-low"  onclick="filterByPriority('Low')"><span class="ni-ic" style="color:#16a34a">&#9733;</span><span class="ni-lbl">Low Priority</span></div>
     <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
     <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
@@ -554,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Smart Form v3 · Duplicate</div>
+    <div class="sb-version">v4.9 · MCA Priority</div>
   </div>
 </aside>
 
@@ -1044,6 +1048,7 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
+    priority:                   f.Priority||'',
   };
 }
 
@@ -1119,9 +1124,8 @@ function mapFields(d){
     f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
 
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
-  Object.keys(f).forEach(k => {
-    if(f[k]===undefined || f[k]==='') delete f[k];
-  });
+  if(d.priority!==undefined) addText('Priority',d.priority||null);
+  Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
 
   if(!window._mfLogged){window._mfLogged=true;console.log('mapFields sample (logged once):', JSON.stringify(f));}
   return {fields: f};
@@ -1412,6 +1416,12 @@ function closeMobMenu(){
 function stB(s){const m={open:'b-open',closed:'b-closed',cancel:'b-cancel','on hold':'b-hold'};return`<span class="badge ${m[(s||'').toLowerCase()]||'b-na'}">${s||'—'}</span>`}
 function tyB(t){const m={New:'b-new',Backfill:'b-backfill','Sell Bill':'b-sellbill'};return`<span class="badge ${m[t]||'b-na'}">${t||'—'}</span>`}
 function locB(l){const m={Offshore:'b-offshore',Onsite:'b-onsite',Canada:'b-canada',Mexico:'b-mexico'};return`<span class="badge ${m[(l||'').trim()]||'b-na'}">${l||'—'}</span>`}
+function prioStar(p){
+  if(p==='High')    return '<span title="High" style="color:#d32f2f;font-size:15px;margin-right:2px">&#9733;</span>';
+  if(p==='At Risk') return '<span title="At Risk" style="color:#f59e0b;font-size:15px;margin-right:2px">&#9733;</span>';
+  if(p==='Low')     return '<span title="Low" style="color:#16a34a;font-size:15px;margin-right:2px">&#9733;</span>';
+  return '';
+}
 function ageB(days,ag){
   let cls='ao';
   if(ag){if(ag.startsWith('A)')||ag.startsWith('B)'))cls='ac';else if(ag.startsWith('C)'))cls='ah';else if(ag.startsWith('D)')||ag.startsWith('E)'))cls='am';else if(ag.startsWith('F)')||ag.startsWith('G)'))cls='al';}
@@ -1592,6 +1602,7 @@ function renderFilterBadge(){
 // DASHBOARD
 // ═══════════════════════════════════════
 function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
+
 function renderDash(){
   destroyAll();
 
@@ -1755,7 +1766,7 @@ function renderDash(){
     <div class="cc w3"><div class="cc-hd"><div class="cc-title">Recruitment Pipeline — Profile Status Funnel</div><div class="cc-sub">Where open demands sit in the hiring funnel</div></div><div class="ch-wrap h160"><canvas id="ch-pipe"></canvas></div></div>
     <div class="cc w2"><div class="cc-hd"><div class="cc-title">Service Line Demand Count</div><div class="cc-sub">Open demand volume by practice area</div></div><div class="ch-wrap h200"><canvas id="ch-sl"></canvas></div></div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Top Overdue Demands</div><div class="cc-sub">Highest ageing — immediate action needed</div></div>
-      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)">#${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
+      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)">${prioStar(d.priority)}#${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
     </div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Tier-1 Programs</div><div class="cc-sub">Strategic programs with open pipeline</div></div>
       <div class="t1-list">${t1E.length?t1E.map(([k,v])=>`<div class="t1-item"><div class="t1-name">${k}</div><div class="t1-cnt">${v}</div></div>`).join(''):'<p style="font-size:12px;color:var(--t3);padding:8px 0">None in open demands</p>'}</div>
@@ -2532,7 +2543,8 @@ function openDetail(id){
         ${d.backfill_resource?`<div class="di full"><div class="dl">Current Resource (Backfill)</div><div class="dv">${d.backfill_resource}</div></div>`:''}
       </div>
     </div>
-    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>`:''}`;
+    ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>
+  `:''}`;
   document.getElementById('panel-foot').innerHTML=`
     <button class="btn" onclick="closePanel()">Close</button>
     <button class="btn primary" onclick="closePanel();openEdit(${id})">✏ Edit</button>
@@ -2547,7 +2559,10 @@ function closePanel(){document.getElementById('panel').classList.remove('on');do
 // ═══════════════════════════════════════
 // ADD / EDIT FORM
 // ═══════════════════════════════════════
-function sel(id,opts,val,onch=''){return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${opts.map(o=>`<option${o===(val||'')?` selected`:``}>${o}</option>`).join('')}</select>`}
+function sel(id,opts,val,onch=''){
+  const v=val||'';const allOpts=(v&&!opts.includes(v))?[''].concat([v]).concat(opts.filter(o=>o!=='')):opts;
+  return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${allOpts.map(o=>`<option${o===v?` selected`:``}>${o}</option>`).join('')}</select>`;
+}
 function rlbl(t){return`${t} <span class="req-star">*</span>`}
 function autoCalcTarget(){
   const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
@@ -2639,6 +2654,7 @@ function makeForm(d,isNew){
     <div class="fg-sect">Demand Details</div>
     <div class="ff2"><label>${rlbl('BSA')}</label>${sel('bsa',[''].concat(BSA_LIST),d.bsa)}</div>
     <div class="ff2"><label>${rlbl('Service Line')}</label>${sel('sl',[''].concat(SL_LIST),d.service_line)}</div>
+    <div class="ff2"><label>Priority</label><select id="m-priority" style="width:100%"><option value=""${(d.priority||'')==''?' selected':''}>— None —</option><option value="High"${d.priority==='High'?' selected':''}>&#9733; High</option><option value="At Risk"${d.priority==='At Risk'?' selected':''}>&#9733; At Risk</option><option value="Low"${d.priority==='Low'?' selected':''}>&#9733; Low</option></select></div>
     <div class="ff2"><label>Team Name</label><input id="m-team" value="${(d.team_name||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>SEPM / SEL</label><input id="m-sepm" value="${(d.sepm_sel||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>${rlbl('Skills Required')}</label><textarea id="m-sk">${d.skills||''}</textarea></div>
@@ -2655,7 +2671,7 @@ function makeForm(d,isNew){
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
-  </div>`;
+    </div>`;
 }
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():''}
 function openAdd(){
@@ -2775,6 +2791,8 @@ ${prevUpd}`:newLine;
     }
     // empty on new demand or non-clearable: skip
   });
+  _p.priority=gv('m-priority')||'';
+
   setSyncStatus('saving','↻ Saving…');
   console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
   try{
@@ -4006,6 +4024,18 @@ async function duplicateDemand(id){
   }
 }
 
+
+
+
+let activePriorityFilter='';
+function filterByPriority(p){
+  activePriorityFilter=(activePriorityFilter===p)?'':p;
+  ['high','risk','low'].forEach(k=>document.getElementById('f-prio-'+k)?.classList.remove('on'));
+  if(activePriorityFilter==='High')    document.getElementById('f-prio-high')?.classList.add('on');
+  if(activePriorityFilter==='At Risk') document.getElementById('f-prio-risk')?.classList.add('on');
+  if(activePriorityFilter==='Low')     document.getElementById('f-prio-low')?.classList.add('on');
+  goPage('tracker');renderAll();
+}
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
   const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
