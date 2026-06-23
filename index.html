@@ -1,5 +1,4 @@
-if(!window._miLogged){window._miLogged=true;console.log('SP mapItem fields:',Object.keys(f));console.log('Priority:',f.Priority,f.Priority0);}
-  return{<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -525,7 +524,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
   </div>
   <nav class="sb-nav">
-    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';renderAll();">
+    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';activePriorityFilter='';document.querySelectorAll('[id^="f-prio-"]').forEach(el=>el.classList.remove('on'));renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
     </div>
@@ -559,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Prio Live</div>
+    <div class="sb-version">v4.9 · Prio Star</div>
   </div>
 </aside>
 
@@ -1372,6 +1371,8 @@ function goPage(id,el){
   if(document.getElementById('tb-legend'))document.getElementById('tb-legend').style.display=isTracker?'flex':'none';
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
+  if(id==='tracker'&&!window._priorityNavActive){activePriorityFilter='';document.querySelectorAll('[id^="f-prio-"]').forEach(el=>el.classList.remove('on'));}
+  window._priorityNavActive=false;
   if(id==='dashboard')setTimeout(renderDash,60);
   if(id==='notif'){loadNotifLog();loadAppConfig().then(renderConfigEditor).catch(()=>renderConfigEditor());loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
   closeMobMenu();
@@ -1515,7 +1516,7 @@ function renderTbl(){
     const isChk=selectedIds.has(String(d.id));
     return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
       <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${prioStar(d.priority)}${d.demand_id}</td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
       <td>${tyB(d.demand_type)}</td>
@@ -4038,11 +4039,8 @@ function filterByPriority(p){
   if(activePriorityFilter==='High')    document.getElementById('f-prio-high')?.classList.add('on');
   if(activePriorityFilter==='At Risk') document.getElementById('f-prio-risk')?.classList.add('on');
   if(activePriorityFilter==='Low')     document.getElementById('f-prio-low')?.classList.add('on');
-  // Navigate to demands list and re-render
-  const navTracker=document.getElementById('nav-tracker');
-  if(navTracker){document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));navTracker.classList.add('on');}
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.getElementById('page-tracker')?.classList.add('on');
+  window._priorityNavActive=true;
+  goPage('tracker');
   renderAll();
 }
 function exportCSV(){
