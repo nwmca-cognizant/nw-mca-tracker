@@ -51,7 +51,18 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 .sb{width:var(--sb-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:transform .25s ease,width .25s ease}
 .sb-top{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
 .sb-brand .tag{font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--t3);text-transform:uppercase;margin-bottom:3px}
-
+/* BOTT mode sidebar theming */
+.bott-mode .sb-top{border-bottom:3px solid #1d9e75}
+.bott-mode .sb-brand .tag{color:#1d9e75}
+.bott-mode .sb-brand .name{color:#1d9e75}
+.bott-mode .sb-live{color:#1d9e75}
+.bott-mode .ni.on{border-left:3px solid #1d9e75;background:rgba(29,158,117,.08)}
+.bott-mode #tracker-switcher{border-color:#1d9e75}
+/* BOTT topbar accent */
+.bott-mode .topbar{border-bottom:2px solid #1d9e75}
+#mode-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.04em;margin-left:10px;vertical-align:middle}
+#mode-badge.mca{background:#e6f1fb;color:#185FA5;border:1px solid #b5d4f4}
+#mode-badge.bott{background:#e1f5ee;color:#0f6e56;border:1px solid #5dcaa5}
 .sb-brand .name{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .sb-live{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10px;color:var(--green);font-weight:600}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
@@ -484,13 +495,6 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-item input{accent-color:var(--blue);width:13px;height:13px;cursor:pointer}
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
-.star-btn{background:none;border:none;cursor:pointer;font-size:14px;
-  line-height:1;vertical-align:middle;color:#bbb;padding:0 3px 0 0;
-  transition:color .15s}
-.star-btn:hover{color:#999}
-.star-s1{color:#d32f2f!important}
-.star-s2{color:#f59e0b!important}
-.star-s3{color:#16a34a!important}
 </style>
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 </head>
@@ -524,6 +528,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 <!-- SIDEBAR -->
 <aside class="sb" id="sb">
   <div class="sb-top">
+    <div id="tracker-accent" style="height:3px;background:var(--blue);border-radius:2px;margin:0 0 8px;transition:background .3s"></div>
     <div class="sb-brand">
       <div class="tag">Nationwide MCA</div>
       <div class="name">Demand Tracker</div>
@@ -531,6 +536,10 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
   </div>
   <nav class="sb-nav">
+    <div id="tracker-switcher" style="display:flex;margin:6px 8px 10px;background:var(--s2);border:0.5px solid var(--border2);border-radius:var(--r);padding:3px;gap:2px">
+      <button id="sw-mca" onclick="switchTracker('MCA')" style="flex:1;padding:5px 0;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:var(--blue);color:white">MCA</button>
+      <button id="sw-bott" onclick="switchTracker('BOTT')" style="flex:1;padding:5px 0;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:none;color:var(--t2)">BOTT</button>
+    </div>
     <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
@@ -562,7 +571,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Save Fix</div>
+    <div class="sb-version">v4.9 · BOTT UI · Duplicate</div>
   </div>
 </aside>
 
@@ -572,8 +581,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <!-- Desktop Topbar -->
   <div class="topbar" id="topbar">
     <div class="topbar-left">
-      <h1 id="tb-title">Open Demands</h1>
-      <p>Nationwide Mutual — GSP-MCA · Real-time shared database</p>
+      <h1 id="tb-title">Open Demands<span id="mode-badge" class="mca">MCA</span></h1>
+      <p id="tb-subtitle">Nationwide Mutual — GSP-MCA · Real-time shared database</p>
     </div>
     <div class="topbar-right">
       <div class="legend" id="tb-legend">
@@ -617,13 +626,13 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <table>
         <thead><tr>
           <th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">☐</th>
-          <th style="width:80px" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
+          <th style="width:52px" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
           <th style="width:80px" onclick="sortBy('demand_status')">Status<i class="si" id="si-st">↕</i></th>
           <th style="width:148px" onclick="sortBy('profile_status')">Profile Status<i class="si" id="si-ps">↕</i></th>
           <th style="width:65px" onclick="sortBy('demand_type')">Type<i class="si" id="si-ty">↕</i></th>
           <th style="width:80px" onclick="sortBy('bsa')">BSA<i class="si" id="si-bsa">↕</i></th>
           <th style="width:95px" onclick="sortBy('team_name')">Team<i class="si" id="si-team">↕</i></th>
-          <th style="width:130px;max-width:130px" onclick="sortBy('skills')">Skills<i class="si" id="si-sk">↕</i></th>
+          <th style="width:138px" onclick="sortBy('skills')">Skills<i class="si" id="si-sk">↕</i></th>
           <th style="width:65px" onclick="sortBy('location')">Location<i class="si" id="si-loc">↕</i></th>
           <th style="width:70px" onclick="sortBy('service_line')">Svc Line<i class="si" id="si-sl">↕</i></th>
           <th style="width:82px" onclick="sortBy('target_date')">Target<i class="si" id="si-tgt">↕</i></th>
@@ -904,21 +913,11 @@ async function initMSAL(){
     cache:{ cacheLocation:'sessionStorage', storeAuthStateInCookie:false }
   });
   await msalApp.initialize();
-  // Handle redirect — catch errors (e.g. expired/replayed auth code)
-  let resp = null;
-  try{
-    resp = await msalApp.handleRedirectPromise();
-  }catch(redirectErr){
-    console.warn('handleRedirectPromise error (stale code?):', redirectErr.message);
-    // Clear the hash so stale code doesn't block future loads
-    if(window.location.hash) window.history.replaceState(null,'',window.location.pathname);
-  }
+  const resp = await msalApp.handleRedirectPromise();
   if(resp && resp.accessToken){
     graphToken  = resp.accessToken;
     tokenExpiry = Date.now() + 3500000;
     USER_NAME   = resp.account.name || 'NW MCA User';
-    // Clean up the redirect hash from URL
-    if(window.location.hash) window.history.replaceState(null,'',window.location.pathname);
     return true;
   }
   const accounts = msalApp.getAllAccounts();
@@ -929,10 +928,7 @@ async function initMSAL(){
       tokenExpiry = Date.now() + 3500000;
       USER_NAME   = accounts[0].name || 'NW MCA User';
       return true;
-    }catch(e){
-      console.warn('Silent token failed:', e.message);
-      return false;
-    }
+    }catch(e){ return false; }
   }
   return false;
 }
@@ -1028,19 +1024,26 @@ async function gFetch(url, method='GET', body=null){
 }
 
 // Base URL for the Demands list
-const LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${SP_LIST_ID}`;
+const LIST_BASE=()=>isBOTT()?BOTT_DEMANDS_BASE():MCA_DEMANDS_BASE();
 const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
 const POC_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/SL_POC_Config`;
 const APP_CONFIG_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/AppConfig`;
+const BOTT_DEMANDS_ID  ='3c6db472-6995-4d27-a3ac-7d2b09798a1d';
+const BOTT_NOTIF_ID    ='fb2fc615-24f2-46c3-8c7e-46b1a5e4a965';
+const MCA_DEMANDS_BASE =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/13d692ad-1d24-4091-8c46-00811d17c6e2`;
+const BOTT_DEMANDS_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_DEMANDS_ID}`;
+const BOTT_NOTIF_BASE  =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_NOTIF_ID}`;
+let TRACKER_MODE=localStorage.getItem('nwmca_tracker_mode')||'MCA';
+const isBOTT=()=>TRACKER_MODE==='BOTT';
 
 // ── Map SharePoint item to demand object ──
 function mapItem(item){
   if(!item) return null;
   const f = item.fields || {};
   // Log SP field names on first read (helps debug column name issues)
-  if(!window._spLogged){ window._spLogged=true;  }
+  if(!window._spLogged){ window._spLogged=true; console.log('SP fields returned:', Object.keys(f)); }
   return {
-    id:                 String(item.id||item.fields?.id||''),  // item.id is the real Graph numeric item ID
+    id:                 String(item.id),            // SP internal item ID — stored as string for type-safe comparison
     demand_id:          f.Title || '',              // Title column = Demand ID
     so_id:              f.SO_ID || '',
     demand_status:      f.Demand_Status || 'Open',
@@ -1065,7 +1068,12 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
-    priority:           f.Priority||f.Priority0||'',
+    band:                       f.Band||'',
+    start_date:                 f.Start_Date||'',
+    profile_name_1:             f.Profile_Name_1||'',
+    profile_1_submitted_date:   f.Profile_1_Submitted_Date||'',
+    profile_name_2:             f.Profile_Name_2||'',
+    profile_2_submitted_date:   f.Profile_2_Submitted_Date||'',
   };
 }
 
@@ -1141,9 +1149,17 @@ function mapFields(d){
     f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
 
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
-
+  if(isBOTT()){
+    if(d.band!==undefined) addText('Band',d.band);
+    if(d.start_date!==undefined)               f.Start_Date=d.start_date||null;
+    if(d.profile_name_1!==undefined)           addText('Profile_Name_1',d.profile_name_1);
+    if(d.profile_1_submitted_date!==undefined) f.Profile_1_Submitted_Date=d.profile_1_submitted_date||null;
+    if(d.profile_name_2!==undefined)           addText('Profile_Name_2',d.profile_name_2);
+    if(d.profile_2_submitted_date!==undefined) f.Profile_2_Submitted_Date=d.profile_2_submitted_date||null;
+  }
   Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
 
+  if(!window._mfLogged){window._mfLogged=true;console.log('mapFields sample (logged once):', JSON.stringify(f));}
   return {fields: f};
 }
 
@@ -1151,7 +1167,7 @@ function mapFields(d){
 // ── sbQ: Read all items from a list ──
 async function sbQ(table, query=''){
   // Only 'demands' and 'notifications' tables used
-  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
+  const base = table==='demands' ? LIST_BASE() : table==='bott_notifications' ? BOTT_NOTIF_BASE() : NOTIF_LIST_BASE();
   // Fetch all pages (Graph paginates at 200 items)
   let items=[], url=base+'/items?$expand=fields&$top=200';
   while(url){
@@ -1159,11 +1175,7 @@ async function sbQ(table, query=''){
     items=[...items,...(data.value||[])];
     url=data['@odata.nextLink']||null;
   }
-  // item.id is the real Graph numeric item ID — log a warning if any item is missing it
-  items.forEach(item=>{
-    if(!item.id) console.warn('sbQ: item missing Graph id, Title=',item.fields?.Title);
-  });
-  const mapped=items.map(mapItem).filter(Boolean);
+  const mapped=items.map(mapItem);
   // Sort by demand_id desc if demands
   if(table==='demands') mapped.sort((a,b)=>Number(a.demand_id)-Number(b.demand_id));
   if(table==='notifications') mapped.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -1225,7 +1237,6 @@ async function sbIns(table, data){
   // Step 3: GET the final created item
   try{
     const created = await gFetch(base+'/items/'+newItem.id+'?$expand=fields');
-    if(created && !created.id && created.fields?.id) created.id=created.fields.id;
     return [mapItem(created)];
   }catch(e){
     return [mapItem(newItem)];
@@ -1235,58 +1246,22 @@ async function sbIns(table, data){
 
 // ── sbUpd: Update an existing item by SharePoint item ID ──
 async function sbUpd(table, match, data){
-  const _t0=performance.now();
-  let spId=String(match.split('id=eq.')[1]||'');
-  if(!spId||spId==='null'||spId==='undefined'){
-    // id is null/undefined — demand was loaded with a bad id
-    // Recover by looking up the SP item by Title (demand_id) from the payload data
-    const titleVal = data?.demand_id ? String(data.demand_id) : null;
-    if(titleVal && titleVal!=='undefined' && titleVal!=='null'){
-      console.log('sbUpd: recovering null SP id for demand_id='+titleVal);
-      try{
-        const searchR = await gFetch(LIST_BASE()+'/items?$expand=fields&$filter=fields/Title+eq+%27'+encodeURIComponent(titleVal)+'%27&$top=1');
-        const found = (searchR?.value||[])[0];
-        if(found?.id){
-          spId = String(found.id);
-          console.log('sbUpd: recovered SP id='+spId+' for demand_id='+titleVal);
-          // Fix the local demands array so future saves work too
-          const fix=demands.find(x=>String(x.demand_id)===String(titleVal));
-          if(fix) fix.id=spId;
-        } else {
-          throw new Error('sbUpd: demand #'+titleVal+' not found in SP. Refresh the page.');
-        }
-      }catch(lookupErr){
-        throw new Error('sbUpd: cannot recover SP id for demand #'+titleVal+': '+lookupErr.message);
-      }
-    } else {
-      throw new Error('sbUpd: invalid SP item ID "'+spId+'" and no demand_id to recover. Refresh the page.');
+  const spId = String(match.split('id=eq.')[1]||'');
+  if(!spId) throw new Error('sbUpd: missing SP item ID in: '+match);
+  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
+  const fields = mapFields(data).fields;
+  if(Object.keys(fields).length===0) return;
+  // Try all at once first
+  try{
+    await gFetch(base+'/items/'+spId+'/fields','PATCH', fields);
+  }catch(e){
+    // Field-by-field fallback
+    console.warn('Bulk PATCH failed on update, trying field by field:', e.message);
+    for(const [k,v] of Object.entries(fields)){
+      try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v===null?null:v}); }
+      catch(e2){ console.warn('SP rejected field on update:', k,'=',JSON.stringify(v),'→',e2.message); }
     }
   }
-  const base=table==='demands'?LIST_BASE():NOTIF_LIST_BASE();
-  const allFields=mapFields(data).fields;
-  if(Object.keys(allFields).length===0){ console.log('sbUpd: no fields to update'); return; }
-  console.log('sbUpd: patching SP item',spId,'fields:',JSON.stringify(allFields));
-  // Send all fields in one PATCH — clean, simple, fast
-  // SP Graph accepts null values for clearing text fields
-  // Null values for choice columns are filtered in mapFields
-  const nonNull={}, nullFields={};
-  Object.entries(allFields).forEach(([k,v])=>{ v===null?nullFields[k]=v:nonNull[k]=v; });
-  // 1. Patch all non-null fields together
-  if(Object.keys(nonNull).length>0){
-    try{
-      await gFetch(base+'/items/'+spId+'/fields','PATCH',nonNull);
-      console.log('sbUpd: bulk PATCH success, fields sent:',Object.keys(nonNull).join(','));
-    }catch(e){
-      console.error('sbUpd: PATCH failed:',e.message,'fields:',JSON.stringify(nonNull));
-      throw e; // surface the error — don't silently swallow
-    }
-  }
-  // 2. Clear null fields individually (SP requires separate calls)
-  for(const [k] of Object.entries(nullFields)){
-    try{await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:null});}
-    catch(e){console.warn('sbUpd: clear failed for',k,e.message);}
-  }
-  console.log('sbUpd took',Math.round(performance.now()-_t0)+'ms');
 }
 
 
@@ -1317,29 +1292,18 @@ window.addEventListener('load', async()=>{
       return;
     }
     showLoader('Loading demands from SharePoint…');
-    // 45s timeout on initial load — surfaces error instead of spinning forever
-    let data;
-    try{
-      const loadPromise = sbQ('demands','');
-      const timeoutPromise = new Promise((_,rej)=>setTimeout(()=>rej(new Error('SharePoint load timed out after 45s — check network or SP permissions')),45000));
-      data = await Promise.race([loadPromise, timeoutPromise]);
-    }catch(loadErr){
-      throw loadErr; // caught by outer catch → shows error message
-    }
+    const data = await sbQ('demands','');
     demands = data;
     hideLoader();
     document.getElementById('app').style.display='flex';
     document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     document.getElementById('f-st').value='Open';
-    loadStars(); renderAll();
+    renderAll();
     setInterval(silentRefresh, 30000);
     toast('Connected to SharePoint ✓','green');
   }catch(e){
     hideLoader();
     document.getElementById('loader-msg').textContent='';
-    // Clear hash in case it's causing auth loop
-    if(window.location.hash && window.location.hash.startsWith('#code'))
-      window.history.replaceState(null,'',window.location.pathname);
     document.getElementById('loader').innerHTML += `
       <div style="max-width:420px;background:#fff;border-radius:12px;padding:24px;border:1px solid #e0ddd4;margin-top:16px;text-align:left">
         <div style="font-size:14px;font-weight:600;color:#8c1f1f;margin-bottom:8px">Sign-in failed</div>
@@ -1358,8 +1322,9 @@ async function refreshData(){
   setSyncStatus('saving','↻ Refreshing…');
   try{
     const data=await sbQ('demands','');
-    demands=data;loadStars();renderAll();setSyncStatus('ok','● Live');
+    demands=data;renderAll();setSyncStatus('ok','● Live');
   try{const _c=localStorage.getItem('nwmca_slpoc_map');if(_c){const _p=JSON.parse(_c);if(Object.keys(_p).length>0){SL_POC_MAP=_p;console.log('SL_POC_MAP restored:',Object.keys(_p).length,'SLs');}}}catch(_e){}
+  applySwitcherState();
   loadAppConfig();
   loadSLPOCConfig();
     try{ loadNotifSettings(); }catch(e){}
@@ -1439,7 +1404,7 @@ function goPage(id,el){
   if(document.getElementById('tb-legend'))document.getElementById('tb-legend').style.display=isTracker?'flex':'none';
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
-  if(id==='dashboard')setTimeout(renderDash,60);
+  if(id==='dashboard')setTimeout(isBOTT()?renderBOTTDashboard:renderDash,60);
   if(id==='notif'){loadNotifLog();loadAppConfig().then(renderConfigEditor).catch(()=>renderConfigEditor());loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
   closeMobMenu();
 }
@@ -1484,7 +1449,6 @@ function closeMobMenu(){
 function stB(s){const m={open:'b-open',closed:'b-closed',cancel:'b-cancel','on hold':'b-hold'};return`<span class="badge ${m[(s||'').toLowerCase()]||'b-na'}">${s||'—'}</span>`}
 function tyB(t){const m={New:'b-new',Backfill:'b-backfill','Sell Bill':'b-sellbill'};return`<span class="badge ${m[t]||'b-na'}">${t||'—'}</span>`}
 function locB(l){const m={Offshore:'b-offshore',Onsite:'b-onsite',Canada:'b-canada',Mexico:'b-mexico'};return`<span class="badge ${m[(l||'').trim()]||'b-na'}">${l||'—'}</span>`}
-
 function ageB(days,ag){
   let cls='ao';
   if(ag){if(ag.startsWith('A)')||ag.startsWith('B)'))cls='ac';else if(ag.startsWith('C)'))cls='ah';else if(ag.startsWith('D)')||ag.startsWith('E)'))cls='am';else if(ag.startsWith('F)')||ag.startsWith('G)'))cls='al';}
@@ -1516,7 +1480,7 @@ function getFiltered(){
     if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
     if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
     if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)))return false;
-      return true;
+    return true;
   });
 }
 function getSorted(a){
@@ -1576,7 +1540,7 @@ function renderTbl(){
     const isChk=selectedIds.has(String(d.id));
     return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
       <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
       <td>${tyB(d.demand_type)}</td>
@@ -1587,7 +1551,7 @@ function renderTbl(){
       <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
       <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-      <td style="font-size:11px;color:var(--t2)">${pf}${d.backfill_resource?'<br><span style="font-size:10px;color:var(--t3)">↩ '+d.backfill_resource+'</span>':''}</td>
+      <td style="font-size:11px;color:var(--t2)">${pf}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
         <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
@@ -1647,17 +1611,10 @@ function calcAgeingGroup(days){
   if(days>=-14)return 'I) Coming up in 2 weeks';
   return 'J) Not due yet';
 }
-function loadStars(){
-  // Load star priorities from localStorage into demands array
-  try{
-    const store=JSON.parse(localStorage.getItem('nwmca_stars')||'{}');
-    demands.forEach(d=>{ if(store[d.demand_id]) d.priority=store[d.demand_id]; });
-  }catch(e){}
-}
 function renderAll(){
   // Ensure filters are populated before rendering
   if(demands.length && !document.getElementById('f-bsa-list')?.querySelector('input'))
-    try{ populateFilters(); }catch(e){}renderMetrics();refreshDropdowns();renderAgeTabs();renderTbl();renderFilterBadge();requestAnimationFrame(renderCardList);updateBulkBar();}
+    try{ populateFilters(); }catch(e){}renderMetrics();refreshDropdowns();renderAgeTabs();renderTbl();renderCardList();renderFilterBadge();updateBulkBar();}
 function renderFilterBadge(){
   const el=document.getElementById('active-filter-bar');
   if(!el)return;
@@ -1672,7 +1629,61 @@ function renderFilterBadge(){
 // DASHBOARD
 // ═══════════════════════════════════════
 function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
-
+function renderBOTTDashboard(){
+  destroyAll();
+  const el=document.getElementById('charts-grid'),kpiEl=document.getElementById('kpis');
+  if(!el||!kpiEl) return;
+  const now=new Date(),thisM=now.getMonth(),thisY=now.getFullYear();
+  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const sla3Floor=35;
+  const subThisM=demands.filter(d=>{const sd=d.profile_1_submitted_date||d.profile_2_submitted_date;if(!sd)return false;const dd=new Date(sd);return dd.getMonth()===thisM&&dd.getFullYear()===thisY;});
+  const shortlistedM=subThisM.filter(d=>(d.profile_status||'').toLowerCase().includes('interview')||(d.demand_status||'').toLowerCase()==='closed');
+  const sla2=subThisM.length>0?Math.round(shortlistedM.length/subThisM.length*100):null;
+  const interviewed=demands.filter(d=>(d.profile_status||'').toLowerCase().includes('interview'));
+  const sla3=interviewed.length>0?Math.round(closed.length/interviewed.length*100):null;
+  const closedWT=closed.filter(d=>d.target_date&&d.demand_closure_date);
+  const onTime=closedWT.filter(d=>new Date(d.demand_closure_date)<=new Date(d.target_date));
+  const sla4=closedWT.length>0?Math.round(onTime.length/closedWT.length*100):null;
+  const bc={D:0,E:0,F:0,G:0,H:0};open.forEach(d=>{if(bc[d.band]!==undefined)bc[d.band]++;});
+  kpiEl.innerHTML=`
+    <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic" style="color:#1d9e75">📊</div><div><div class="kpi-v" style="color:${sla2===null?'var(--t3)':sla2>=50?'#1d9e75':'var(--amber)'}">${sla2===null?'—':sla2+'%'}</div><div class="kpi-l">SLA2 Profile Quality</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic" style="color:#5c1a7a">🎯</div><div><div class="kpi-v" style="color:${sla3===null?'var(--t3)':sla3>=sla3Floor?'#1d9e75':'var(--red)'}">${sla3===null?'—':sla3+'%'}</div><div class="kpi-l">SLA3 Interview→Hire</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic" style="color:#1a4b8c">⏱</div><div><div class="kpi-v" style="color:${sla4===null?'var(--t3)':sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'}">${sla4===null?'—':sla4+'%'}</div><div class="kpi-l">SLA4 On-Time Offer</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>`;
+  const months=[];for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({lb:d.toLocaleString('default',{month:'short'}),y:d.getFullYear(),m:d.getMonth()});}
+  const bW=40,gap=18,cH=100;let bars='',xax='';
+  months.forEach((mo,i)=>{
+    const inv=demands.filter(d=>{const ps=(d.profile_status||'').toLowerCase();if(!ps.includes('interview'))return false;const dd=new Date(d.profile_1_submitted_date||d.demand_added_on||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
+    const sel=demands.filter(d=>{if((d.demand_status||'').toLowerCase()!=='closed')return false;const dd=new Date(d.demand_closure_date||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
+    const pct=inv>0?Math.round(sel/inv*100):null;
+    const x=12+i*(bW+gap),h2=pct!==null?Math.round((pct/100)*cH):2;
+    const col=pct===null?'var(--border2)':pct>=sla3Floor?'#1d9e75':'#e24b4a';
+    bars+=`<rect x="${x}" y="${cH-h2}" width="${bW}" height="${h2}" fill="${col}" rx="3"/>`;
+    if(pct!==null) bars+=`<text x="${x+bW/2}" y="${cH-h2-5}" text-anchor="middle" font-size="9" font-weight="500" fill="${col}">${pct}%</text>`;
+    xax+=`<text x="${x+bW/2}" y="${cH+14}" text-anchor="middle" font-size="10" fill="var(--t3)">${mo.lb}</text>`;
+  });
+  const svgW=12+months.length*(bW+gap)+12;
+  bars+=`<line x1="0" y1="${cH-sla3Floor}" x2="${svgW}" y2="${cH-sla3Floor}" stroke="#e24b4a" stroke-width="1" stroke-dasharray="4 3" opacity=".6"/>`;
+  bars+=`<text x="${svgW-2}" y="${cH-sla3Floor-4}" text-anchor="end" font-size="9" fill="#e24b4a">${sla3Floor}% floor</text>`;
+  const bsaC={};open.forEach(d=>{bsaC[d.bsa]=(bsaC[d.bsa]||0)+1;});
+  const bsaE=Object.entries(bsaC).sort((a,b)=>b[1]-a[1]);const mx=bsaE[0]?.[1]||1;
+  el.innerHTML=`
+    <div class="cc w3"><div class="cc-hd"><div class="cc-title">SLA3 — Interview to hire (monthly)</div><div class="cc-sub">Green = above ${sla3Floor}% floor · Red = breach</div></div>
+      <svg width="100%" viewBox="0 0 ${svgW} ${cH+24}" style="overflow:visible;max-height:130px;display:block;padding:8px 0">${bars}${xax}</svg></div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">SLA4 — Time to offer</div><div class="cc-sub">${onTime.length} of ${closedWT.length} met target</div></div>
+      <div style="padding:10px 0"><div style="font-size:28px;font-weight:500;color:${sla4===null?'var(--t3)':sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'}">${sla4===null?'No data':sla4+'%'}</div>
+      <div style="margin-top:8px;background:var(--border2);border-radius:4px;height:6px;overflow:hidden"><div style="height:100%;background:${sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'};width:${sla4||0}%"></div></div></div></div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">SLA2 — Profile quality</div><div class="cc-sub">${shortlistedM.length} shortlisted / ${subThisM.length} submitted this month</div></div>
+      <div style="padding:10px 0"><div style="font-size:28px;font-weight:500;color:${sla2===null?'var(--t3)':sla2>=50?'#1d9e75':'var(--amber)'}">${sla2===null?'No data':sla2+'%'}</div></div></div>
+    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Open demands by BSA</div></div>
+      <div>${bsaE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/mx*100)+'%;background:#1d9e75"></div></div><div class="bsa-num">'+c+'</div></div>').join('')}</div></div>
+    <div class="cc"><div class="cc-hd"><div class="cc-title">Band distribution</div><div class="cc-sub">Open demands by band</div></div>
+      <div style="margin-top:8px">${Object.entries(bc).map(([b,c])=>'<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--border2);font-size:12px"><span style="font-weight:500">Band '+b+'</span><span style="color:#1d9e75;font-weight:500">'+c+'</span></div>').join('')}</div></div>`;
+}
 function renderDash(){
   destroyAll();
 
@@ -1836,7 +1847,7 @@ function renderDash(){
     <div class="cc w3"><div class="cc-hd"><div class="cc-title">Recruitment Pipeline — Profile Status Funnel</div><div class="cc-sub">Where open demands sit in the hiring funnel</div></div><div class="ch-wrap h160"><canvas id="ch-pipe"></canvas></div></div>
     <div class="cc w2"><div class="cc-hd"><div class="cc-title">Service Line Demand Count</div><div class="cc-sub">Open demand volume by practice area</div></div><div class="ch-wrap h200"><canvas id="ch-sl"></canvas></div></div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Top Overdue Demands</div><div class="cc-sub">Highest ageing — immediate action needed</div></div>
-      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
+      ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)">#${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
     </div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Tier-1 Programs</div><div class="cc-sub">Strategic programs with open pipeline</div></div>
       <div class="t1-list">${t1E.length?t1E.map(([k,v])=>`<div class="t1-item"><div class="t1-name">${k}</div><div class="t1-cnt">${v}</div></div>`).join(''):'<p style="font-size:12px;color:var(--t3);padding:8px 0">None in open demands</p>'}</div>
@@ -2168,24 +2179,24 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
- 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
-  'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
-  'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
-  'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
-  'CIS':             ['srividhya.balachandran@cognizant.com'],
+  'ADM':             [],
+  'QEA':             [],
+  'IDE':             [],
+  'AIA':             [],
+  'CIS':             [],
   'IPA Consulting':  [],
-  'ISG (GW)':        ['neelakantasastry.peri@cognizant.com'],
+  'ISG (GW)':        [],
 };
 
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -2211,9 +2222,9 @@ async function logNotif(type,d){
   // General updates (profile changes etc.) do not go to SL POCs
   const slPOCTypes = ['add','cancel','close'];
   // If SL_POC_MAP has no entries yet (not loaded from SP), try loading now
-  if(slPOCTypes.includes(type) && Object.keys(SL_POC_MAP).length===0 && !window._slpocLoading){
-    window._slpocLoading=true;
-    loadSLPOCConfig().catch(()=>{}).finally(()=>{window._slpocLoading=false;});
+  if(slPOCTypes.includes(type) && Object.keys(SL_POC_MAP).length===0){
+    console.log('SL_POC_MAP empty — loading from SP before sending notification...');
+    try{ await loadSLPOCConfig(); }catch(e){}
   }
   // Case-insensitive SL lookup — handles 'QEA' vs 'qea' mismatches
   let slPOCs = [];
@@ -2244,7 +2255,7 @@ async function logNotif(type,d){
     _seen.add(k); return true;
   });
   const titles={
-    add:    `New demand #${d.demand_id} added — ${d.bsa}`,
+    add:    `${isBOTT()?'[BOTT] ':''}New demand #${d.demand_id} added — ${d.bsa}`,
     cancel: `Demand #${d.demand_id} cancelled — ${d.bsa}`,
     close:  `Demand #${d.demand_id} closed/fulfilled — ${d.bsa}`,
     digest: `${d.count||''} overdue demands require action`,
@@ -2280,7 +2291,7 @@ async function logNotif(type,d){
         ' demand='+d.demand_id+' SL='+d.service_line+' recipients='+JSON.stringify(allRecipients));
     }
     for(const recipient of allRecipients){
-      const result = await sbIns('notifications',{
+      const result = await sbIns(isBOTT()?'bott_notifications':'notifications',{
         type, demand_id:d.demand_id,
         title:titles[type]||type,
         subtitle:subs[type]||'',
@@ -2614,7 +2625,18 @@ function openDetail(id){
       </div>
     </div>
     ${d.status_updates?`<div class="ps"><div class="ps-title">Status Updates & Notes</div><div class="upd-box">${d.status_updates}</div></div>
-  `:''}`;
+  ${isBOTT()?`
+  <div class='ps' style='border-top:2px solid #1d9e75;margin-top:8px'>
+    <div class='ps-title' style='color:#1d9e75'>BOTT Details</div>
+    <div style='display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-top:6px'>
+      <div><span style='color:var(--t3)'>Band</span><div style='font-weight:500'>${d.band||'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Start Date</span><div style='font-weight:500'>${d.start_date?new Date(d.start_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile Name 1</span><div style='font-weight:500'>${d.profile_name_1||'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile 1 Submitted</span><div style='font-weight:500'>${d.profile_1_submitted_date?new Date(d.profile_1_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile Name 2</span><div style='font-weight:500'>${d.profile_name_2||'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Profile 2 Submitted</span><div style='font-weight:500'>${d.profile_2_submitted_date?new Date(d.profile_2_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+    </div>
+  </div>`:''}`:''}`;
   document.getElementById('panel-foot').innerHTML=`
     <button class="btn" onclick="closePanel()">Close</button>
     <button class="btn primary" onclick="closePanel();openEdit(${id})">✏ Edit</button>
@@ -2629,10 +2651,7 @@ function closePanel(){document.getElementById('panel').classList.remove('on');do
 // ═══════════════════════════════════════
 // ADD / EDIT FORM
 // ═══════════════════════════════════════
-function sel(id,opts,val,onch=''){
-  const v=val||'';const allOpts=(v&&!opts.includes(v))?[''].concat([v]).concat(opts.filter(o=>o!=='')):opts;
-  return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${allOpts.map(o=>`<option${o===v?` selected`:``}>${o}</option>`).join('')}</select>`;
-}
+function sel(id,opts,val,onch=''){return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${opts.map(o=>`<option${o===(val||'')?` selected`:``}>${o}</option>`).join('')}</select>`}
 function rlbl(t){return`${t} <span class="req-star">*</span>`}
 function autoCalcTarget(){
   const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
@@ -2724,7 +2743,6 @@ function makeForm(d,isNew){
     <div class="fg-sect">Demand Details</div>
     <div class="ff2"><label>${rlbl('BSA')}</label>${sel('bsa',[''].concat(BSA_LIST),d.bsa)}</div>
     <div class="ff2"><label>${rlbl('Service Line')}</label>${sel('sl',[''].concat(SL_LIST),d.service_line)}</div>
-    
     <div class="ff2"><label>Team Name</label><input id="m-team" value="${(d.team_name||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>SEPM / SEL</label><input id="m-sepm" value="${(d.sepm_sel||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>${rlbl('Skills Required')}</label><textarea id="m-sk">${d.skills||''}</textarea></div>
@@ -2741,7 +2759,16 @@ function makeForm(d,isNew){
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
-    </div>`;
+  ${isBOTT()?`
+  <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">BOTT Details</div>
+  <div class="ff2"><label>Band</label>${sel('band',['_','D','E','F','G','H'],d.band||'_')}</div>
+  <div class="ff2"><label>Start Date</label><input id="m-startdate" type="date" value="${d.start_date||''}" style="width:100%"></div>
+  <div class="ff2"><label>Profile Name 1</label><input id="m-pn1" type="text" value="${(d.profile_name_1||'').replace(/"/g,'&quot;')}" placeholder="Candidate 1"></div>
+  <div class="ff2"><label>Profile 1 Submitted</label><input id="m-p1sd" type="date" value="${d.profile_1_submitted_date||''}" style="width:100%"></div>
+  <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2"></div>
+  <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
+  `:''}
+  </div>`;
 }
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():''}
 function openAdd(){
@@ -2757,20 +2784,9 @@ function openAdd(){
   bgEl.classList.add('on');
   requestAnimationFrame(()=>{ bodyEl.scrollTop=0; });
 }
-async function openEdit(id){
-  let d=demands.find(x=>String(x.id)===String(id));
-  if(!d){ toast('Demand not found','red'); return; }
-  if(!d.id||d.id===''||d.id==='null'||d.id==='undefined'){
-    setSyncStatus('saving','↻ Resolving…');
-    try{
-      const r=await gFetch(LIST_BASE()+"/items?$expand=fields&$filter=fields/Title eq '"+d.demand_id+"'&$top=1");
-      const found=(r?.value||[])[0];
-      const realId=String(found?.id||found?.fields?.id||'');
-      if(realId&&realId!=='null'){ d.id=realId; }
-    }catch(e){ console.warn('ID resolve failed:',e.message); }
-    setSyncStatus('ok','● Live');
-  }
-  editId=d.id;
+function openEdit(id){
+  editId=id;
+  const d=demands.find(x=>String(x.id)===String(id)); if(!d){ toast('Demand not found','red'); return; }
   const titleEl=document.getElementById('modal-title');
   const saveEl =document.getElementById('modal-save');
   const bodyEl =document.getElementById('modal-body');
@@ -2854,48 +2870,34 @@ async function saveDemand(){
     const rawUpd=gv('m-upd')||'';
     const dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const newLine=rawUpd.trim()?`[${dateStr} · ${USER_NAME}] ${rawUpd.trim()}`:`[${dateStr} · ${USER_NAME}] Status → ${normSt}`;
-    const alreadyFirst=prevUpd.startsWith(newLine.substring(0,40));
-    _p.status_updates=alreadyFirst?prevUpd:(prevUpd?`${newLine}
-${prevUpd}`:newLine);
+    _p.status_updates=prevUpd?`${newLine}
+${prevUpd}`:newLine;
   }
   // For NEW demands: strip empty values (SP rejects empty choice columns)
   // For EDITS: keep explicitly cleared text fields as null so SP clears them
   const payload = {};
   // Fields that are safe to clear in SP (text/multitext — not required choices)
-  const clearableFields = new Set(['profile_name','backfill_resource','so_id','team_name',
-    'sepm_sel','tier1_program','fg_form_number','status_updates']);
-  // Priority: only include in payload when user changed it
-
+  const clearableFields = ['profile_name','backfill_resource','so_id','team_name',
+    'sepm_sel','tier1_program','fg_form_number','status_updates'];
   Object.keys(_p).forEach(k => {
     const v = _p[k];
     if(v!==null && v!==undefined && v!==''){
       payload[k] = v; // non-empty: always include
-    } else if(editId && clearableFields.has(k)){
+    } else if(editId && clearableFields.includes(k)){
       payload[k] = null; // explicitly cleared on edit: send null to clear in SP
     }
     // empty on new demand or non-clearable: skip
   });
+  if(isBOTT()){_p.band=gv('m-band')==='_'?'':gv('m-band');_p.start_date=gv('m-startdate')||null;_p.profile_name_1=gv('m-pn1');_p.profile_1_submitted_date=gv('m-p1sd')||null;_p.profile_name_2=gv('m-pn2');_p.profile_2_submitted_date=gv('m-p2sd')||null;}
   setSyncStatus('saving','↻ Saving…');
   console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
   try{
     if(editId){
       const d=demands.find(x=>String(x.id)===String(editId));
       const prev=d?d.demand_status:'';
+      await sbUpd('demands','id=eq.'+editId,payload);
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
-      // Always include demand_id in payload so sbUpd recovery can look up by Title if sp id is bad
-      if(idx>=0 && demands[idx].demand_id) payload.demand_id = demands[idx].demand_id;
       demands[idx]={...demands[idx],...payload};
-      closeModal(); renderAll(); setSyncStatus('saving','↻ Saving…');
-      try{
-        await sbUpd('demands','id=eq.'+editId,payload);
-      }catch(spErr){
-        setSyncStatus('err','⚠ Save failed');
-        toast('SP save failed: '+spErr.message.substring(0,100),'red');
-        console.error('sbUpd error:',spErr);
-        await refreshData(); // revert optimistic UI to SP state
-        return;
-      }
-      setSyncStatus('ok','● Live');
       // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
       console.log('Status change check: prev=',os,'new=',ns);
@@ -2913,13 +2915,7 @@ ${prevUpd}`:newLine);
       payload.ageing_days = 0;
       const res=await sbIns('demands',payload);
       const nd=Array.isArray(res)?res[0]:res;
-      if(nd){
-        // Ensure the demand has a valid SP id before pushing
-        if(!nd.id||nd.id==='null'||nd.id==='undefined'){
-          console.warn('sbIns returned demand with null id — demand_id:',nd.demand_id);
-        }
-        demands.push(nd);
-      }
+      if(nd)demands.push(nd);
       // Build a clean demand object for the notification
       // Use payload (user input) merged with nd (SP response) for completeness
       if(document.getElementById('t-new')?.checked){
@@ -4124,38 +4120,62 @@ async function duplicateDemand(id){
   }
 }
 
-
-
-
-// ── Star — click cycles: none → High(red) → At Risk(amber) → Low(green) → none ──
-const STAR_CYCLE = ['','High','At Risk','Low'];
-function starClass(p){ return p==='High'?'star-s1':p==='At Risk'?'star-s2':p==='Low'?'star-s3':''; }
-function starTitle(p){ return p?'Priority: '+p+' (click to change)':'Click star to set priority'; }
-
-function cycleStar(demandId, event){
-  event.stopPropagation();
-  const d=demands.find(x=>String(x.id)===String(demandId));
-  if(!d){ toast('Demand not found','red'); return; }
-  const cur=d.priority||'';
-  const next=STAR_CYCLE[(STAR_CYCLE.indexOf(cur)+1)%STAR_CYCLE.length];
-  // Update local demand object
-  d.priority=next;
-  // Update star button(s) for this demand immediately
-  document.querySelectorAll('[data-star="'+demandId+'"]').forEach(btn=>{
-    btn.className='star-btn '+starClass(next);
-    btn.title=starTitle(next);
-  });
-  // Persist to localStorage — keyed by demand_id so it survives refresh
-  try{
-    const store=JSON.parse(localStorage.getItem('nwmca_stars')||'{}');
-    if(next==='') delete store[d.demand_id];
-    else store[d.demand_id]=next;
-    localStorage.setItem('nwmca_stars',JSON.stringify(store));
-  }catch(e){}
-  const label=next||'Cleared';
-  if(next) toast('★ '+label+' — demand #'+d.demand_id,'green');
+function switchTracker(mode){
+  if(TRACKER_MODE===mode) return;
+  TRACKER_MODE=mode;
+  localStorage.setItem('nwmca_tracker_mode',mode);
+  applyTrackerTheme(mode);
+  demands=[];renderAll();setSyncStatus('saving','↻ Loading '+mode+'…');
+  refreshData().then(()=>setSyncStatus('ok','● Live'));
+  toast('Switched to '+mode+' tracker','green');
 }
-
+function applyTrackerTheme(mode){
+  const isBOTTMode = mode==='BOTT';
+  // Switcher buttons
+  const swM=document.getElementById('sw-mca'),swB=document.getElementById('sw-bott');
+  if(swM&&swB){
+    swM.style.background = isBOTTMode?'none':'var(--blue)';
+    swM.style.color      = isBOTTMode?'var(--t2)':'white';
+    swB.style.background = isBOTTMode?'#1d9e75':'none';
+    swB.style.color      = isBOTTMode?'white':'var(--t2)';
+  }
+  // Sidebar accent bar colour
+  const accent=document.getElementById('tracker-accent');
+  if(accent) accent.style.background=isBOTTMode?'#1d9e75':'var(--blue)';
+  // Sidebar body class for CSS theming
+  const sidebar=document.querySelector('.sidebar');
+  if(sidebar){ sidebar.classList.toggle('bott-mode',isBOTTMode); }
+  // Mode badge in topbar
+  const badge=document.getElementById('mode-badge');
+  if(badge){
+    badge.textContent=isBOTTMode?'BOTT':'MCA';
+    badge.className=isBOTTMode?'bott':'mca';
+  }
+  // Topbar subtitle
+  const sub=document.getElementById('tb-subtitle');
+  if(sub) sub.textContent=isBOTTMode
+    ?'Nationwide Mutual — BOTT · Real-time shared database'
+    :'Nationwide Mutual — GSP-MCA · Real-time shared database';
+  // Sidebar brand tag + name
+  const tag=document.querySelector('.sb-brand .tag');
+  if(tag) tag.textContent=isBOTTMode?'BOTT Tracker':'Nationwide MCA';
+  const name=document.querySelector('.sb-brand .name');
+  if(name) name.textContent=isBOTTMode?'Demand Tracker':'Demand Tracker';
+  // Page title (dashboard)
+  const pt=document.getElementById('page-title');
+  if(pt) pt.textContent=isBOTTMode?'BOTT Dashboard':'Management Dashboard';
+  // Topbar title (demands page)
+  const tb=document.getElementById('tb-title');
+  if(tb){
+    // Keep the mode badge — update the text before it
+    const badgeEl=document.getElementById('mode-badge');
+    if(badgeEl) tb.firstChild.textContent='';
+    // The h1 text is managed by renderAll via goPage
+  }
+}
+function applySwitcherState(){
+  applyTrackerTheme(TRACKER_MODE);
+}
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
   const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
