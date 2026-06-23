@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Perf</div>
+    <div class="sb-version">v4.9 · Prio Save</div>
   </div>
 </aside>
 
@@ -1124,10 +1124,14 @@ function mapFields(d){
     f.Ageing_Days = isNaN(Number(d.ageing_days)) ? 0 : Number(d.ageing_days);
 
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
-  if(d.priority!==undefined) addText('Priority',d.priority||null);
+  // Priority: write when non-empty, clear only when explicitly null (cleared by user)
+  if(d.priority!==undefined){
+    if(d.priority===null) f.Priority=null;           // explicit clear
+    else if(d.priority!=='') f.Priority=d.priority;  // set to value
+    // if d.priority==='' — don't touch SP field (not changed by user)
+  }
   Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
 
-  if(!window._mfLogged){window._mfLogged=true;console.log('mapFields sample (logged once):', JSON.stringify(f));}
   return {fields: f};
 }
 
@@ -2791,8 +2795,12 @@ ${prevUpd}`:newLine;
   // Fields that are safe to clear in SP (text/multitext — not required choices)
   const clearableFields = new Set(['profile_name','backfill_resource','so_id','team_name',
     'sepm_sel','tier1_program','fg_form_number','status_updates','priority']);
-  // Collect priority BEFORE the strip loop so it gets included in payload
-  _p.priority = gv('m-priority')||'';
+  // Priority: only include in payload when user changed it
+  // Compare form value vs current stored value to avoid overwriting unchanged demands
+  const formPriority = gv('m-priority')||'';
+  const currentPriority = editId ? (demands.find(x=>String(x.id)===String(editId))?.priority||'') : '';
+  // Always include priority in payload (new or changed)
+  _p.priority = formPriority;
   Object.keys(_p).forEach(k => {
     const v = _p[k];
     if(v!==null && v!==undefined && v!==''){
@@ -2810,7 +2818,7 @@ ${prevUpd}`:newLine;
       const prev=d?d.demand_status:'';
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
       demands[idx]={...demands[idx],...payload};
-      demands[idx].priority = gv('m-priority')||'';
+      demands[idx].priority = formPriority; // use pre-captured value
       closeModal(); renderAll(); setSyncStatus('saving','↻ Saving…');
       await sbUpd('demands','id=eq.'+editId,payload);
       // Only notify SL POCs on meaningful status changes — not on every edit
