@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Prio Save</div>
+    <div class="sb-version">v4.9 · Prio SP Fix</div>
   </div>
 </aside>
 
@@ -1219,26 +1219,47 @@ async function sbIns(table, data){
 // ── sbUpd: Update an existing item by SharePoint item ID ──
 async function sbUpd(table, match, data){
   const _t0=performance.now();
-  const spId = String(match.split('id=eq.')[1]||'');
+  const spId=String(match.split('id=eq.')[1]||'');
   if(!spId) throw new Error('sbUpd: missing SP item ID in: '+match);
-  const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
-  const allFields = mapFields(data).fields;
+  const base=table==='demands'?LIST_BASE():NOTIF_LIST_BASE();
+  const allFields=mapFields(data).fields;
   if(Object.keys(allFields).length===0) return;
+  // Extract Priority separately — save after main batch to avoid bulk failures hiding it
+  const hasPrio=allFields.hasOwnProperty('Priority');
+  const prioVal=hasPrio?allFields.Priority:undefined;
+  if(hasPrio) delete allFields.Priority;
+  // Split remaining into non-null and null
   const nonNull={}, nullFields={};
-  Object.entries(allFields).forEach(([k,v])=>{ v===null?nullFields[k]=v:nonNull[k]=v; });
+  Object.entries(allFields).forEach(([k,v])=>{v===null?nullFields[k]=v:nonNull[k]=v;});
+  // Bulk PATCH non-null fields
   if(Object.keys(nonNull).length>0){
-    try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',nonNull); }
+    try{await gFetch(base+'/items/'+spId+'/fields','PATCH',nonNull);}
     catch(e){
       console.warn('Bulk PATCH failed, field-by-field:',e.message);
       for(const [k,v] of Object.entries(nonNull)){
-        try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v}); }
-        catch(e2){ console.warn('Field rejected:',k,e2.message); }
+        try{await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v});}
+        catch(e2){console.warn('Field rejected:',k,e2.message);}
       }
     }
   }
+  // Clear null fields
   for(const [k] of Object.entries(nullFields)){
-    try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:null}); }
-    catch(e){ console.warn('Clear failed:',k,e.message); }
+    try{await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:null});}
+    catch(e){console.warn('Clear failed:',k,e.message);}
+  }
+  // Save Priority with column name auto-detection
+  if(hasPrio){
+    const pVal=prioVal===null?null:String(prioVal||'');
+    let saved=false;
+    for(const col of ['Priority','Priority0','OData_Priority']){
+      try{
+        await gFetch(base+'/items/'+spId+'/fields','PATCH',{[col]:pVal});
+        saved=true;
+        if(col!=='Priority') console.log('Priority saved via column:',col);
+        break;
+      }catch(e){console.warn('Priority col "'+col+'" rejected:',e.message);}
+    }
+    if(!saved) throw new Error('Priority could not be saved — SP rejected all column name variants. Check SP column internal name.');
   }
   console.log('sbUpd took',Math.round(performance.now()-_t0)+'ms');
 }
@@ -2112,7 +2133,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
- 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+  'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -2820,7 +2841,16 @@ ${prevUpd}`:newLine;
       demands[idx]={...demands[idx],...payload};
       demands[idx].priority = formPriority; // use pre-captured value
       closeModal(); renderAll(); setSyncStatus('saving','↻ Saving…');
-      await sbUpd('demands','id=eq.'+editId,payload);
+      try{
+        await sbUpd('demands','id=eq.'+editId,payload);
+      }catch(spErr){
+        setSyncStatus('err','⚠ Save failed');
+        toast('SP save failed: '+spErr.message.substring(0,100),'red');
+        console.error('sbUpd error:',spErr);
+        await refreshData(); // revert optimistic UI to SP state
+        return;
+      }
+      setSyncStatus('ok','● Live');
       // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
       console.log('Status change check: prev=',os,'new=',ns);
