@@ -1038,7 +1038,7 @@ function mapItem(item){
   if(!item) return null;
   const f = item.fields || {};
   // Log SP field names on first read (helps debug column name issues)
-  if(!window._spLogged){ window._spLogged=true; console.log('SP fields returned:', Object.keys(f)); }
+  if(!window._spLogged){ window._spLogged=true;  }
   return {
     id:                 String(item.fields?.id||item.id||''),  // fields.id most reliable
     demand_id:          f.Title || '',              // Title column = Demand ID
@@ -1591,7 +1591,7 @@ function renderTbl(){
       <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
       <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-      <td style="font-size:11px;color:var(--t2)">${pf}</td>
+      <td style="font-size:11px;color:var(--t2)">${pf}${d.backfill_resource?'<br><span style="font-size:10px;color:var(--t3)">↩ '+d.backfill_resource+'</span>':''}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
         <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
@@ -2172,6 +2172,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
+ 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -2760,9 +2761,20 @@ function openAdd(){
   bgEl.classList.add('on');
   requestAnimationFrame(()=>{ bodyEl.scrollTop=0; });
 }
-function openEdit(id){
-  editId=id;
-  const d=demands.find(x=>String(x.id)===String(id)); if(!d){ toast('Demand not found','red'); return; }
+async function openEdit(id){
+  let d=demands.find(x=>String(x.id)===String(id));
+  if(!d){ toast('Demand not found','red'); return; }
+  if(!d.id||d.id===''||d.id==='null'||d.id==='undefined'){
+    setSyncStatus('saving','↻ Resolving…');
+    try{
+      const r=await gFetch(LIST_BASE()+"/items?$expand=fields&$filter=fields/Title eq '"+d.demand_id+"'&$top=1");
+      const found=(r?.value||[])[0];
+      const realId=String(found?.fields?.id||found?.id||'');
+      if(realId&&realId!=='null'){ d.id=realId; }
+    }catch(e){ console.warn('ID resolve failed:',e.message); }
+    setSyncStatus('ok','● Live');
+  }
+  editId=d.id;
   const titleEl=document.getElementById('modal-title');
   const saveEl =document.getElementById('modal-save');
   const bodyEl =document.getElementById('modal-body');
