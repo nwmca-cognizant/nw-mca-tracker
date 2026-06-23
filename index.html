@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Prio SP Fix</div>
+    <div class="sb-version">v4.9 · Prio Final</div>
   </div>
 </aside>
 
@@ -1220,46 +1220,32 @@ async function sbIns(table, data){
 async function sbUpd(table, match, data){
   const _t0=performance.now();
   const spId=String(match.split('id=eq.')[1]||'');
-  if(!spId) throw new Error('sbUpd: missing SP item ID in: '+match);
+  if(!spId||spId==='null'||spId==='undefined'){
+    throw new Error('sbUpd: invalid SP item ID "'+spId+'". The demand may not have been saved to SP yet. Refresh and try again.');
+  }
   const base=table==='demands'?LIST_BASE():NOTIF_LIST_BASE();
   const allFields=mapFields(data).fields;
-  if(Object.keys(allFields).length===0) return;
-  // Extract Priority separately — save after main batch to avoid bulk failures hiding it
-  const hasPrio=allFields.hasOwnProperty('Priority');
-  const prioVal=hasPrio?allFields.Priority:undefined;
-  if(hasPrio) delete allFields.Priority;
-  // Split remaining into non-null and null
+  if(Object.keys(allFields).length===0){ console.log('sbUpd: no fields to update'); return; }
+  console.log('sbUpd: patching SP item',spId,'fields:',JSON.stringify(allFields));
+  // Send all fields in one PATCH — clean, simple, fast
+  // SP Graph accepts null values for clearing text fields
+  // Null values for choice columns are filtered in mapFields
   const nonNull={}, nullFields={};
-  Object.entries(allFields).forEach(([k,v])=>{v===null?nullFields[k]=v:nonNull[k]=v;});
-  // Bulk PATCH non-null fields
+  Object.entries(allFields).forEach(([k,v])=>{ v===null?nullFields[k]=v:nonNull[k]=v; });
+  // 1. Patch all non-null fields together
   if(Object.keys(nonNull).length>0){
-    try{await gFetch(base+'/items/'+spId+'/fields','PATCH',nonNull);}
-    catch(e){
-      console.warn('Bulk PATCH failed, field-by-field:',e.message);
-      for(const [k,v] of Object.entries(nonNull)){
-        try{await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v});}
-        catch(e2){console.warn('Field rejected:',k,e2.message);}
-      }
+    try{
+      await gFetch(base+'/items/'+spId+'/fields','PATCH',nonNull);
+      console.log('sbUpd: bulk PATCH success, fields sent:',Object.keys(nonNull).join(','));
+    }catch(e){
+      console.error('sbUpd: PATCH failed:',e.message,'fields:',JSON.stringify(nonNull));
+      throw e; // surface the error — don't silently swallow
     }
   }
-  // Clear null fields
+  // 2. Clear null fields individually (SP requires separate calls)
   for(const [k] of Object.entries(nullFields)){
     try{await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:null});}
-    catch(e){console.warn('Clear failed:',k,e.message);}
-  }
-  // Save Priority with column name auto-detection
-  if(hasPrio){
-    const pVal=prioVal===null?null:String(prioVal||'');
-    let saved=false;
-    for(const col of ['Priority','Priority0','OData_Priority']){
-      try{
-        await gFetch(base+'/items/'+spId+'/fields','PATCH',{[col]:pVal});
-        saved=true;
-        if(col!=='Priority') console.log('Priority saved via column:',col);
-        break;
-      }catch(e){console.warn('Priority col "'+col+'" rejected:',e.message);}
-    }
-    if(!saved) throw new Error('Priority could not be saved — SP rejected all column name variants. Check SP column internal name.');
+    catch(e){console.warn('sbUpd: clear failed for',k,e.message);}
   }
   console.log('sbUpd took',Math.round(performance.now()-_t0)+'ms');
 }
