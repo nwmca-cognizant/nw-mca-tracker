@@ -484,9 +484,9 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-item input{accent-color:var(--blue);width:13px;height:13px;cursor:pointer}
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
-.star-btn{background:none;border:none;cursor:pointer;font-size:16px;
-  padding:0 3px;line-height:1;vertical-align:middle;color:#ccc;
-  transition:color .15s;flex-shrink:0}
+.star-btn{background:none;border:none;cursor:pointer;font-size:13px;
+  padding:0 2px 0 0;line-height:1;vertical-align:middle;color:#ccc;
+  transition:color .15s;display:inline;width:auto}
 .star-btn:hover{color:#999}
 .star-s1{color:#d32f2f!important}
 .star-s2{color:#f59e0b!important}
@@ -1555,7 +1555,7 @@ function renderTbl(){
     const isChk=selectedIds.has(String(d.id));
     return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
       <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button>${d.demand_id}</td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
       <td>${tyB(d.demand_type)}</td>
@@ -2140,7 +2140,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
-'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+ 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
