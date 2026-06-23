@@ -524,7 +524,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="sb-live"><span class="live-dot"></span>Live · SharePoint M365</div>
   </div>
   <nav class="sb-nav">
-    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';activePriorityFilter='';document.querySelectorAll('[id^="f-prio-"]').forEach(el=>el.classList.remove('on'));renderAll();">
+    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';activePriorityFilter='';document.querySelectorAll('[id^=f-prio-]').forEach(el=>el.classList.remove('on'));renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
     </div>
@@ -558,7 +558,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Prio Star</div>
+    <div class="sb-version">v4.9 · Perf</div>
   </div>
 </aside>
 
@@ -1214,22 +1214,29 @@ async function sbIns(table, data){
 
 // ── sbUpd: Update an existing item by SharePoint item ID ──
 async function sbUpd(table, match, data){
+  const _t0=performance.now();
   const spId = String(match.split('id=eq.')[1]||'');
   if(!spId) throw new Error('sbUpd: missing SP item ID in: '+match);
   const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
-  const fields = mapFields(data).fields;
-  if(Object.keys(fields).length===0) return;
-  // Try all at once first
-  try{
-    await gFetch(base+'/items/'+spId+'/fields','PATCH', fields);
-  }catch(e){
-    // Field-by-field fallback
-    console.warn('Bulk PATCH failed on update, trying field by field:', e.message);
-    for(const [k,v] of Object.entries(fields)){
-      try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v===null?null:v}); }
-      catch(e2){ console.warn('SP rejected field on update:', k,'=',JSON.stringify(v),'→',e2.message); }
+  const allFields = mapFields(data).fields;
+  if(Object.keys(allFields).length===0) return;
+  const nonNull={}, nullFields={};
+  Object.entries(allFields).forEach(([k,v])=>{ v===null?nullFields[k]=v:nonNull[k]=v; });
+  if(Object.keys(nonNull).length>0){
+    try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',nonNull); }
+    catch(e){
+      console.warn('Bulk PATCH failed, field-by-field:',e.message);
+      for(const [k,v] of Object.entries(nonNull)){
+        try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:v}); }
+        catch(e2){ console.warn('Field rejected:',k,e2.message); }
+      }
     }
   }
+  for(const [k] of Object.entries(nullFields)){
+    try{ await gFetch(base+'/items/'+spId+'/fields','PATCH',{[k]:null}); }
+    catch(e){ console.warn('Clear failed:',k,e.message); }
+  }
+  console.log('sbUpd took',Math.round(performance.now()-_t0)+'ms');
 }
 
 
@@ -1371,7 +1378,7 @@ function goPage(id,el){
   if(document.getElementById('tb-legend'))document.getElementById('tb-legend').style.display=isTracker?'flex':'none';
   if(document.getElementById('tb-add'))document.getElementById('tb-add').style.display=isTracker?'':'none';
   // Page-specific init
-  if(id==='tracker'&&!window._priorityNavActive){activePriorityFilter='';document.querySelectorAll('[id^="f-prio-"]').forEach(el=>el.classList.remove('on'));}
+  if(id==='tracker'&&!window._priorityNavActive){activePriorityFilter='';document.querySelectorAll('[id^=f-prio-]').forEach(el=>el.classList.remove('on'));}
   window._priorityNavActive=false;
   if(id==='dashboard')setTimeout(renderDash,60);
   if(id==='notif'){loadNotifLog();loadAppConfig().then(renderConfigEditor).catch(()=>renderConfigEditor());loadSLPOCConfig().then(()=>renderPOCEditor()).catch(()=>renderPOCEditor());setTimeout(renderEmailPrev,60)}
@@ -1590,7 +1597,7 @@ function calcAgeingGroup(days){
 function renderAll(){
   // Ensure filters are populated before rendering
   if(demands.length && !document.getElementById('f-bsa-list')?.querySelector('input'))
-    try{ populateFilters(); }catch(e){}renderMetrics();refreshDropdowns();renderAgeTabs();renderTbl();renderCardList();renderFilterBadge();updateBulkBar();}
+    try{ populateFilters(); }catch(e){}renderMetrics();refreshDropdowns();renderAgeTabs();renderTbl();renderFilterBadge();requestAnimationFrame(renderCardList);updateBulkBar();}
 function renderFilterBadge(){
   const el=document.getElementById('active-filter-bar');
   if(!el)return;
@@ -2145,8 +2152,7 @@ async function logNotif(type,d){
   const slPOCTypes = ['add','cancel','close'];
   // If SL_POC_MAP has no entries yet (not loaded from SP), try loading now
   if(slPOCTypes.includes(type) && Object.keys(SL_POC_MAP).length===0){
-    console.log('SL_POC_MAP empty — loading from SP before sending notification...');
-    try{ await loadSLPOCConfig(); }catch(e){}
+    loadSLPOCConfig().catch(()=>{}); // non-blocking
   }
   // Case-insensitive SL lookup — handles 'QEA' vs 'qea' mismatches
   let slPOCs = [];
@@ -2783,15 +2789,15 @@ ${prevUpd}`:newLine;
   // For EDITS: keep explicitly cleared text fields as null so SP clears them
   const payload = {};
   // Fields that are safe to clear in SP (text/multitext — not required choices)
-  const clearableFields = ['profile_name','backfill_resource','so_id','team_name',
-    'sepm_sel','tier1_program','fg_form_number','status_updates','priority'];
+  const clearableFields = new Set(['profile_name','backfill_resource','so_id','team_name',
+    'sepm_sel','tier1_program','fg_form_number','status_updates','priority']);
   // Collect priority BEFORE the strip loop so it gets included in payload
   _p.priority = gv('m-priority')||'';
   Object.keys(_p).forEach(k => {
     const v = _p[k];
     if(v!==null && v!==undefined && v!==''){
       payload[k] = v; // non-empty: always include
-    } else if(editId && clearableFields.includes(k)){
+    } else if(editId && clearableFields.has(k)){
       payload[k] = null; // explicitly cleared on edit: send null to clear in SP
     }
     // empty on new demand or non-clearable: skip
@@ -2802,11 +2808,11 @@ ${prevUpd}`:newLine;
     if(editId){
       const d=demands.find(x=>String(x.id)===String(editId));
       const prev=d?d.demand_status:'';
-      await sbUpd('demands','id=eq.'+editId,payload);
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
       demands[idx]={...demands[idx],...payload};
-      // Always sync priority from form to local cache (may be empty string = cleared)
       demands[idx].priority = gv('m-priority')||'';
+      closeModal(); renderAll(); setSyncStatus('saving','↻ Saving…');
+      await sbUpd('demands','id=eq.'+editId,payload);
       // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
       console.log('Status change check: prev=',os,'new=',ns);
