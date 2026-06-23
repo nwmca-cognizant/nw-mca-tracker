@@ -562,7 +562,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
     <div class="sb-date" id="sb-date"></div>
-    <div class="sb-version">v4.9 · Star</div>
+    <div class="sb-version">v4.9 · Save Fix</div>
   </div>
 </aside>
 
@@ -1040,7 +1040,7 @@ function mapItem(item){
   // Log SP field names on first read (helps debug column name issues)
   if(!window._spLogged){ window._spLogged=true; console.log('SP fields returned:', Object.keys(f)); }
   return {
-    id:                 String(item.id||item.fields?.id||''),  // SP internal item ID (top-level or inside fields)
+    id:                 String(item.fields?.id||item.id||''),  // fields.id most reliable
     demand_id:          f.Title || '',              // Title column = Demand ID
     so_id:              f.SO_ID || '',
     demand_status:      f.Demand_Status || 'Open',
@@ -1159,9 +1159,10 @@ async function sbQ(table, query=''){
     items=[...items,...(data.value||[])];
     url=data['@odata.nextLink']||null;
   }
-  // Normalize items — some SP responses nest id inside fields
+  // Always use fields.id — SP Graph omits top-level id when using $expand=fields
   items.forEach(item=>{
-    if(!item.id && item.fields?.id) item.id=item.fields.id;
+    if(item.fields?.id) item.id=item.fields.id;
+    else if(!item.id) console.warn('sbQ: item missing id, Title=',item.fields?.Title);
   });
   const mapped=items.map(mapItem).filter(Boolean);
   // Sort by demand_id desc if demands
@@ -1241,9 +1242,9 @@ async function sbUpd(table, match, data){
     // id is null/undefined — demand was loaded with a bad id
     // Try to recover: look up the SP item by Title (demand_id) from the data
     // Try to get demand_id from payload or from local demands array
-    const titleFromPayload = null;
-    const titleFromLocal   = demands.find(x=>String(x.id)===String(match.split('id=eq.')[1]||''))?.demand_id;
-    const titleVal = titleFromPayload || String(titleFromLocal||'') || null;
+    const editIdStr = String(match.split('id=eq.')[1]||'');
+    const localDemand = demands.find(x=>String(x.id)===editIdStr);
+    const titleVal = localDemand?.demand_id ? String(localDemand.demand_id) : null;
     if(titleVal && titleVal!=='undefined' && titleVal!=='null'){
       console.log('sbUpd: recovering null SP id for demand_id='+titleVal);
       try{
@@ -2171,7 +2172,6 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
- 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -2214,8 +2214,9 @@ async function logNotif(type,d){
   // General updates (profile changes etc.) do not go to SL POCs
   const slPOCTypes = ['add','cancel','close'];
   // If SL_POC_MAP has no entries yet (not loaded from SP), try loading now
-  if(slPOCTypes.includes(type) && Object.keys(SL_POC_MAP).length===0){
-    loadSLPOCConfig().catch(()=>{}); // non-blocking
+  if(slPOCTypes.includes(type) && Object.keys(SL_POC_MAP).length===0 && !window._slpocLoading){
+    window._slpocLoading=true;
+    loadSLPOCConfig().catch(()=>{}).finally(()=>{window._slpocLoading=false;});
   }
   // Case-insensitive SL lookup — handles 'QEA' vs 'qea' mismatches
   let slPOCs = [];
@@ -2845,8 +2846,9 @@ async function saveDemand(){
     const rawUpd=gv('m-upd')||'';
     const dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const newLine=rawUpd.trim()?`[${dateStr} · ${USER_NAME}] ${rawUpd.trim()}`:`[${dateStr} · ${USER_NAME}] Status → ${normSt}`;
-    _p.status_updates=prevUpd?`${newLine}
-${prevUpd}`:newLine;
+    const alreadyFirst=prevUpd.startsWith(newLine.substring(0,40));
+    _p.status_updates=alreadyFirst?prevUpd:(prevUpd?`${newLine}
+${prevUpd}`:newLine);
   }
   // For NEW demands: strip empty values (SP rejects empty choice columns)
   // For EDITS: keep explicitly cleared text fields as null so SP clears them
