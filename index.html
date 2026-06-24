@@ -854,6 +854,8 @@ let SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting'
 const LOC_LIST=['Offshore','Onsite','Canada','Mexico'];
 const ST_LIST=['Open','Closed','Cancel','On Hold'];
 const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Coming up in 1 week','H) Coming up in 2 weeks','I) Not due yet'];
+const BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
+const BOTT_BAND_LIST=['','D','E','F','G','H'];
 // ── Microsoft 365 Configuration ──
 const SP_SITE_URL  = 'https://cognizantonline.sharepoint.com/sites/NWMCADemandTracker';
 const SP_LIST_ID   = '13d692ad-1d24-4091-8c46-00811d17c6e2';
@@ -1518,64 +1520,64 @@ function setAg(ag){activeAg=ag;activeSpecial='';renderTbl();renderCardList();ren
 function refreshDropdowns(){ try{ populateFilters(); }catch(e){} }
 function renderTbl(){
   const rows=getSorted(getFiltered());
-  document.getElementById('rcount').textContent=`${rows.length} record${rows.length!==1?'s':''}`;
+  document.getElementById('rcount').textContent=rows.length+' record'+(rows.length!==1?'s':'');
   const tb=document.getElementById('tbody');
   const bott=isBOTT();
-  // colspan: cb + id + status + profile_status + (MCA:type+team | BOTT:band) + bsa + skills + location + svc_line + target + ageing + profile(s) + jp_id + actions
-  const colspan=bott?14:14;
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="${colspan}"><div class="empty-state"><div class="ei">◎</div><p>No demands match the current filters.</p></div></td></tr>`;return}
-  tb.innerHTML=rows.map(d=>{
-    const pf=(d.profile_name||'').split('\n')[0]||'—';
-    const bf=(d.backfill_resource||'').trim();
-    const isChk=selectedIds.has(String(d.id));
+  if(!rows.length){tb.innerHTML='<tr><td colspan="14"><div class="empty-state"><div class="ei">&#9678;</div><p>No demands match the current filters.</p></div></td></tr>';return}
+  tb.innerHTML=rows.map(function(d){
+    var pf=(d.profile_name||'').split('\n')[0]||'&#8212;';
+    var bf=(d.backfill_resource||'').trim();
+    var isChk=selectedIds.has(String(d.id));
+    var cancelBtn=(d.demand_status||'').toLowerCase()==='open'
+      ?'<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel(\''+d.id+'\')" title="Cancel">&#10005;</button>'
+      :'';
+    var actCell='<td onclick="event.stopPropagation()"><div class="row-acts">'
+      +'<button class="btn ghost sm" onclick="openEdit(\''+d.id+'\')" title="Edit">&#9999;</button>'
+      +cancelBtn
+      +'<button class="btn ghost sm" onclick="confDelete(\''+d.id+'\')" title="Delete permanently" style="color:var(--t3)">&#128465;</button>'
+      +'</div></td>';
+    var rowClass=rowCls(d.ageing_group)+(isChk?' selected':'');
+    var cbCell='<td class="cb-cell" onclick="event.stopPropagation();toggleRow('+d.id+',event)">'
+      +'<div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="'+d.id+'" '+(isChk?'checked':'')+' onclick="event.stopPropagation();toggleRow('+d.id+',event)"></div></td>';
     if(bott){
-      // BOTT columns: ID | Status | Profile Status | Band | BSA | Skills | Location | Svc Line | Target | Ageing | Profile 1 | Profile 2 | JP ID | Actions
-      const pf1=(d.profile_name_1||'').trim()||'—';
-      const pf2=(d.profile_name_2||'').trim()||'—';
-      return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
-        <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-        <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
-        <td>${stB(d.demand_status)}</td>
-        <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
-        <td style="font-size:11px;color:var(--t2);font-weight:600">${d.band||'—'}</td>
-        <td style="font-weight:600;font-size:12px">${d.bsa||'—'}</td>
-        <td style="font-size:11px" title="${d.skills||''}">${d.skills||'—'}</td>
-        <td>${locB((d.location||'').trim())}</td>
-        <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
-        <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
-        <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-        <td style="font-size:11px;color:var(--t2)">${pf1}${d.profile_1_submitted_date?('<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_1_submitted_date)+'</div>'):''}</td>
-        <td style="font-size:11px;color:var(--t2)">${pf2}${d.profile_2_submitted_date?('<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_2_submitted_date)+'</div>'):''}</td>
-        <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
-        <td onclick="event.stopPropagation()"><div class="row-acts">
-          <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
-          ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel('${d.id}')" title="Cancel">✕</button>`:''}
-          <button class="btn ghost sm" onclick="confDelete('${d.id}')" title="Delete permanently" style="color:var(--t3)">🗑</button>
-        </div></td>
-      </tr>`;
+      var pf1=(d.profile_name_1||'').trim()||'&#8212;';
+      var pf2=(d.profile_name_2||'').trim()||'&#8212;';
+      var p1sub=d.profile_1_submitted_date?'<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_1_submitted_date)+'</div>':'';
+      var p2sub=d.profile_2_submitted_date?'<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_2_submitted_date)+'</div>':'';
+      return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
+        +cbCell
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+'</td>'
+        +'<td>'+stB(d.demand_status)+'</td>'
+        +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
+        +'<td style="font-size:11px;color:var(--t2);font-weight:600">'+(d.band||'&#8212;')+'</td>'
+        +'<td style="font-weight:600;font-size:12px">'+(d.bsa||'&#8212;')+'</td>'
+        +'<td style="font-size:11px" title="'+(d.skills||'')+'">'+( d.skills||'&#8212;')+'</td>'
+        +'<td>'+locB((d.location||'').trim())+'</td>'
+        +'<td style="font-size:11px;color:var(--t2)">'+(d.service_line||'&#8212;')+'</td>'
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t2)">'+fmt(d.target_date)+'</td>'
+        +'<td>'+ageB(d.ageing_days,d.ageing_group)+'</td>'
+        +'<td style="font-size:11px;color:var(--t2)">'+pf1+p1sub+'</td>'
+        +'<td style="font-size:11px;color:var(--t2)">'+pf2+p2sub+'</td>'
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:var(--teal)" title="'+(d.fg_form_number||'')+'">'+( d.fg_form_number||'&#8212;')+'</td>'
+        +actCell+'</tr>';
     }
-    // MCA columns: ID | Status | Profile Status | Type | BSA | Team | Skills | Location | Svc Line | Target | Ageing | Profile | FG/JP ID | Actions
-    return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
-      <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
-      <td>${stB(d.demand_status)}</td>
-      <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
-      <td>${tyB(d.demand_type)}</td>
-      <td style="font-weight:600;font-size:12px">${d.bsa||'—'}</td>
-      <td style="color:var(--t2);font-size:11px" title="${d.team_name||''}">${d.team_name||'—'}</td>
-      <td style="font-size:11px" title="${d.skills||''}">${d.skills||'—'}</td>
-      <td>${locB((d.location||'').trim())}</td>
-      <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
-      <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-      <td style="font-size:11px;color:var(--t2)">${pf}${bf?('<div style="font-size:10px;color:var(--t3);margin-top:2px">\u21A9 '+bf+'</div>'):''}</td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
-      <td onclick="event.stopPropagation()"><div class="row-acts">
-        <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
-        ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm" style="color:var(--red);border-color:var(--red);padding:4px 7px" onclick="confCancel('${d.id}')" title="Cancel">✕</button>`:''}
-        <button class="btn ghost sm" onclick="confDelete('${d.id}')" title="Delete permanently" style="color:var(--t3)">🗑</button>
-      </div></td>
-    </tr>`;
+    var bfSub=bf?'<div style="font-size:10px;color:var(--t3);margin-top:2px">&#x21A9; '+bf+'</div>':'';
+    return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
+      +cbCell
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+'</td>'
+      +'<td>'+stB(d.demand_status)+'</td>'
+      +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
+      +'<td>'+tyB(d.demand_type)+'</td>'
+      +'<td style="font-weight:600;font-size:12px">'+(d.bsa||'&#8212;')+'</td>'
+      +'<td style="color:var(--t2);font-size:11px" title="'+(d.team_name||'')+'">'+( d.team_name||'&#8212;')+'</td>'
+      +'<td style="font-size:11px" title="'+(d.skills||'')+'">'+( d.skills||'&#8212;')+'</td>'
+      +'<td>'+locB((d.location||'').trim())+'</td>'
+      +'<td style="font-size:11px;color:var(--t2)">'+(d.service_line||'&#8212;')+'</td>'
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t2)">'+fmt(d.target_date)+'</td>'
+      +'<td>'+ageB(d.ageing_days,d.ageing_group)+'</td>'
+      +'<td style="font-size:11px;color:var(--t2)">'+pf+bfSub+'</td>'
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:var(--teal)" title="'+(d.fg_form_number||'')+'">'+( d.fg_form_number||'&#8212;')+'</td>'
+      +actCell+'</tr>';
   }).join('');
 }
 
@@ -1583,50 +1585,69 @@ function renderTbl(){
 function renderCardList(){
   const rows=getSorted(getFiltered());
   const cl=document.getElementById('card-list');
-  if(!rows.length){cl.innerHTML=`<div class="empty-state"><div class="ei">◎</div><p>No demands match filters.</p></div>`;return}
+  if(!rows.length){cl.innerHTML='<div class="empty-state"><div class="ei">&#9678;</div><p>No demands match filters.</p></div>';return}
   const bott=isBOTT();
-  cl.innerHTML=rows.map(d=>{
-    const rc=rowCls(d.ageing_group);
-    const pf=(d.profile_name||'').split('\n')[0];
-    const isChkC=selectedIds.has(d.id);
-    const bottBadges=bott?`${stB(d.demand_status)}${ageB(d.ageing_days,d.ageing_group)}`
-                        :`${stB(d.demand_status)}${tyB(d.demand_type)}${ageB(d.ageing_days,d.ageing_group)}`;
-    const bottMeta=bott?`
-        <div><div class="dc-meta-label">Band</div><div class="dc-meta-item" style="font-weight:600">${d.band||'—'}</div></div>
-        <div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">${d.bsa||'—'}</div></div>
-        <div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">${d.service_line||'—'}</div></div>
-        <div><div class="dc-meta-label">Location</div><div class="dc-meta-item">${locB((d.location||'').trim())}</div></div>
-        <div><div class="dc-meta-label">Target Date</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.target_date)}</div></div>
-        ${d.fg_form_number?('<div><div class="dc-meta-label">JP ID</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--teal)">'+d.fg_form_number+'</div></div>'):''}`:
-      `<div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">${d.bsa||'—'}</div></div>
-        <div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">${d.service_line||'—'}</div></div>
-        <div><div class="dc-meta-label">Location</div><div class="dc-meta-item">${locB((d.location||'').trim())}</div></div>
-        <div><div class="dc-meta-label">Target Date</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.target_date)}</div></div>
-        ${d.team_name?`<div><div class="dc-meta-label">Team</div><div class="dc-meta-item">${d.team_name}</div></div>`:''}
-        ${d.fg_form_number?`<div><div class="dc-meta-label">FG/JP ID</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}`;
-    const bottFooterProfile=bott?`
-        <div style="display:flex;flex-direction:column;gap:3px">
-          <div style="font-size:11px;color:var(--t2)">${d.profile_name_1?('\uD83D\uDC64 '+d.profile_name_1):'No profile 1 yet'}</div>
-          <div style="font-size:11px;color:var(--t2)">${d.profile_name_2?('\uD83D\uDC64 '+d.profile_name_2):'No profile 2 yet'}</div>
-        </div>`:
-      `<div class="dc-profile" style="color:var(--t2)">${pf?('\uD83D\uDC64 '+pf):'No profile yet'}</div>`;
-    return`<div class="demand-card${isChkC?' selected':''}" onclick="bulkMode?toggleRow(${d.id},event):openDetail(${d.id})" style="position:relative">
-      <div class="dc-stripe ${rc}"></div>
-      ${bulkMode?`<div class="card-cb-wrap" onclick="event.stopPropagation()"><input type="checkbox" class="card-cb" data-id="${d.id}" ${isChkC?'checked':''} onchange="toggleRow(${d.id},event)"></div>`:''}
-      <div class="dc-header">
-        <div><div class="dc-id">#${d.demand_id}</div></div>
-        <div class="dc-badges">${bottBadges}</div>
-      </div>
-      <div class="dc-title">${d.skills||'No skills specified'}</div>
-      <div class="dc-meta">${bottMeta}</div>
-      <div class="dc-footer">
-        ${bottFooterProfile}
-        <div class="dc-actions" onclick="event.stopPropagation()">
-          <button class="btn ghost sm" onclick="openEdit('${d.id}')">Edit</button>
-          ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm danger" onclick="confCancel('${d.id}')">Cancel</button>`:''}
-        </div>
-      </div>
-    </div>`;
+  cl.innerHTML=rows.map(function(d){
+    var rc=rowCls(d.ageing_group);
+    var pf=(d.profile_name||'').split('\n')[0];
+    var isChkC=selectedIds.has(d.id);
+    var cbWrap=bulkMode
+      ?'<div class="card-cb-wrap" onclick="event.stopPropagation()"><input type="checkbox" class="card-cb" data-id="'+d.id+'" '+(isChkC?'checked':'')+' onchange="toggleRow('+d.id+',event)"></div>'
+      :'';
+    var badges=bott
+      ?stB(d.demand_status)+ageB(d.ageing_days,d.ageing_group)
+      :stB(d.demand_status)+tyB(d.demand_type)+ageB(d.ageing_days,d.ageing_group);
+    var cancelBtn=(d.demand_status||'').toLowerCase()==='open'
+      ?'<button class="btn sm danger" onclick="confCancel(\''+d.id+'\')">Cancel</button>'
+      :'';
+    var meta,footerProfile;
+    if(bott){
+      var jpDiv=d.fg_form_number
+        ?'<div><div class="dc-meta-label">JP ID</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--teal)">'+d.fg_form_number+'</div></div>'
+        :'';
+      meta='<div><div class="dc-meta-label">Band</div><div class="dc-meta-item" style="font-weight:600">'+(d.band||'&#8212;')+'</div></div>'
+          +'<div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">'+(d.bsa||'&#8212;')+'</div></div>'
+          +'<div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">'+(d.service_line||'&#8212;')+'</div></div>'
+          +'<div><div class="dc-meta-label">Location</div><div class="dc-meta-item">'+locB((d.location||'').trim())+'</div></div>'
+          +'<div><div class="dc-meta-label">Target Date</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px">'+fmt(d.target_date)+'</div></div>'
+          +jpDiv;
+      var pn1=d.profile_name_1?('&#x1F464; '+d.profile_name_1):'No profile 1 yet';
+      var pn2=d.profile_name_2?('&#x1F464; '+d.profile_name_2):'No profile 2 yet';
+      footerProfile='<div style="display:flex;flex-direction:column;gap:3px">'
+        +'<div style="font-size:11px;color:var(--t2)">'+pn1+'</div>'
+        +'<div style="font-size:11px;color:var(--t2)">'+pn2+'</div>'
+        +'</div>';
+    } else {
+      var teamDiv=d.team_name
+        ?'<div><div class="dc-meta-label">Team</div><div class="dc-meta-item">'+d.team_name+'</div></div>'
+        :'';
+      var fgDiv=d.fg_form_number
+        ?'<div><div class="dc-meta-label">FG/JP ID</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--teal)">'+d.fg_form_number+'</div></div>'
+        :'';
+      meta='<div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">'+(d.bsa||'&#8212;')+'</div></div>'
+          +'<div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">'+(d.service_line||'&#8212;')+'</div></div>'
+          +'<div><div class="dc-meta-label">Location</div><div class="dc-meta-item">'+locB((d.location||'').trim())+'</div></div>'
+          +'<div><div class="dc-meta-label">Target Date</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px">'+fmt(d.target_date)+'</div></div>'
+          +teamDiv+fgDiv;
+      footerProfile='<div class="dc-profile" style="color:var(--t2)">'+(pf?'&#x1F464; '+pf:'No profile yet')+'</div>';
+    }
+    return'<div class="demand-card'+(isChkC?' selected':'')+'" onclick="bulkMode?toggleRow('+d.id+',event):openDetail('+d.id+')" style="position:relative">'
+      +'<div class="dc-stripe '+rc+'"></div>'
+      +cbWrap
+      +'<div class="dc-header">'
+        +'<div><div class="dc-id">#'+d.demand_id+'</div></div>'
+        +'<div class="dc-badges">'+badges+'</div>'
+      +'</div>'
+      +'<div class="dc-title">'+(d.skills||'No skills specified')+'</div>'
+      +'<div class="dc-meta">'+meta+'</div>'
+      +'<div class="dc-footer">'
+        +footerProfile
+        +'<div class="dc-actions" onclick="event.stopPropagation()">'
+          +'<button class="btn ghost sm" onclick="openEdit(\''+d.id+'\')">Edit</button>'
+          +cancelBtn
+        +'</div>'
+      +'</div>'
+    +'</div>';
   }).join('');
 }
 function filterChanged(){activeSpecial='';renderAll();}
@@ -2763,12 +2784,14 @@ function makeForm(d,isNew){
   const today=new Date().toISOString().split('T')[0];
   const addedVal=d.demand_added_on||today;
   let tgtVal=d.target_date||'';
-  if(isNew){const dt=new Date(addedVal);dt.setDate(dt.getDate()+21);tgtVal=dt.toISOString().split('T')[0]}
+  if(isNew){const dt=new Date(addedVal);dt.setDate(dt.getDate()+21);tgtVal=dt.toISOString().split('T')[0];}
+  if(isBOTT()) return makeBOTTForm(d,isNew,addedVal,tgtVal);
+  // ── MCA form (unchanged) ─────────────────────────────────────────────────
   return`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:8px 12px;border-radius:var(--r);margin-bottom:16px;font-weight:500">
     Fields marked <span class="req-star">*</span> are mandatory
   </div>
   <div class="fg">
-    <div class="fg-sect">Status & Classification</div>
+    <div class="fg-sect">Status &amp; Classification</div>
     <div class="ff2"><label>Status</label>${sel('st',ST_LIST,d.demand_status,'onStatusChange()')}<div id="m-st-hint" style="font-size:10px;margin-top:3px"></div></div>
     <div class="ff2"><label>Demand Type</label>${sel('ty',DT_LIST,d.demand_type,'onTypeChange()')}</div>
     <div class="ff2 fg-full"><label>Profile Status</label>${sel('ps',PS_LIST,d.profile_status)}</div>
@@ -2782,7 +2805,7 @@ function makeForm(d,isNew){
     <div class="ff2"><label>SO ID</label><input id="m-soid" value="${d.so_id||''}"></div>
     <div class="fg-sect">Dates</div>
     <div class="ff2"><label>${rlbl('Demand Added On')}</label><input type="date" id="m-added" value="${addedVal}" onchange="autoCalcTarget()"></div>
-    <div class="ff2"><label>${rlbl('Target Start Date')} <span style="font-size:10px;color:var(--t3);font-weight:400">(auto +21 days · editable)</span></label><input type="date" id="m-tgt" value="${tgtVal}"></div>
+    <div class="ff2"><label>${rlbl('Target Start Date')} <span style="font-size:10px;color:var(--t3);font-weight:400">(auto +21 days &middot; editable)</span></label><input type="date" id="m-tgt" value="${tgtVal}"></div>
     <div class="ff2"><label>Closure Date</label><input type="date" id="m-closed" value="${d.demand_closure_date||''}"></div>
     <div class="ff2"><label>Ageing Group</label>${sel('ag',[''].concat(AGS),d.ageing_group)}</div>
     <div class="fg-sect">Profile Information</div>
@@ -2791,15 +2814,44 @@ function makeForm(d,isNew){
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
-  ${isBOTT()?`
-  <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">BOTT Details</div>
-  <div class="ff2"><label>Band</label>${sel('band',['_','D','E','F','G','H'],d.band||'_')}</div>
-  <div class="ff2"><label>Start Date</label><input id="m-startdate" type="date" value="${d.start_date||''}" style="width:100%"></div>
-  <div class="ff2"><label>Profile Name 1</label><input id="m-pn1" type="text" value="${(d.profile_name_1||'').replace(/"/g,'&quot;')}" placeholder="Candidate 1"></div>
-  <div class="ff2"><label>Profile 1 Submitted</label><input id="m-p1sd" type="date" value="${d.profile_1_submitted_date||''}" style="width:100%"></div>
-  <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2"></div>
-  <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
-  `:''}
+  </div>`;
+}
+function makeBOTTForm(d,isNew,addedVal,tgtVal){
+  // ── BOTT-specific Add/Edit form ──────────────────────────────────────────
+  const psBOTT = sel('ps', BOTT_PS_LIST, d.profile_status);
+  const bandSel= sel('band', BOTT_BAND_LIST, d.band||'');
+  return`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:8px 12px;border-radius:var(--r);margin-bottom:16px;font-weight:500">
+    Fields marked <span class="req-star">*</span> are mandatory
+  </div>
+  <div class="fg">
+    <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Status &amp; Classification</div>
+    <div class="ff2"><label>Status</label>${sel('st',ST_LIST,d.demand_status||'Open','onStatusChange()')}<div id="m-st-hint" style="font-size:10px;margin-top:3px"></div></div>
+    <div class="ff2"><label>Demand Type</label>${sel('ty',DT_LIST,d.demand_type,'onTypeChange()')}</div>
+    <div class="ff2 fg-full"><label>Profile Status</label>${psBOTT}</div>
+
+    <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Demand Details</div>
+    <div class="ff2"><label>${rlbl('BSA')}</label>${sel('bsa',[''].concat(BSA_LIST),d.bsa)}</div>
+    <div class="ff2"><label>${rlbl('Service Line')}</label>${sel('sl',[''].concat(SL_LIST),d.service_line)}</div>
+    <div class="ff2"><label>Band</label>${bandSel}</div>
+    <div class="ff2"><label>SEPM / SEL</label><input id="m-sepm" value="${(d.sepm_sel||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2 fg-full"><label>${rlbl('Skills Required')}</label><textarea id="m-sk">${d.skills||''}</textarea></div>
+    <div class="ff2"><label>${rlbl('Location')}</label>${sel('loc',[''].concat(LOC_LIST),d.location)}</div>
+    <div class="ff2"><label>SO ID</label><input id="m-soid" value="${d.so_id||''}"></div>
+
+    <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Dates</div>
+    <div class="ff2"><label>${rlbl('Demand Added On')}</label><input type="date" id="m-added" value="${addedVal}" onchange="autoCalcTarget()"></div>
+    <div class="ff2"><label>Start Date (FG)</label><input type="date" id="m-startdate" value="${d.start_date||''}" style="width:100%"></div>
+    <div class="ff2"><label>${rlbl('Target Start Date')} <span style="font-size:10px;color:var(--t3);font-weight:400">(auto +21 days &middot; editable)</span></label><input type="date" id="m-tgt" value="${tgtVal}"></div>
+    <div class="ff2"><label>Closure Date</label><input type="date" id="m-closed" value="${d.demand_closure_date||''}"></div>
+
+    <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Profile Information</div>
+    <div class="ff2"><label>Profile Name 1</label><input id="m-pn1" type="text" value="${(d.profile_name_1||'').replace(/"/g,'&quot;')}" placeholder="Candidate 1"></div>
+    <div class="ff2"><label>Profile 1 Submitted</label><input id="m-p1sd" type="date" value="${d.profile_1_submitted_date||''}" style="width:100%"></div>
+    <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2"></div>
+    <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
+    <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
+    <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
   </div>`;
 }
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():''}
@@ -2834,6 +2886,7 @@ function openEdit(id){
 async function saveDemand(){
   const sk=gv('m-sk'),bsa=gv('m-bsa'),sl=gv('m-sl'),loc=gv('m-loc'),added=gv('m-added'),tgt=gv('m-tgt');
   const ty=gv('m-ty'), bf=gv('m-bf'), st=(gv('m-st')||'open').toLowerCase();
+  const bott=isBOTT();
   const today=new Date().toISOString().split('T')[0];
   const errs=[];
   if(!added)errs.push('Demand Added On');
@@ -2842,7 +2895,6 @@ async function saveDemand(){
   if(!sl)errs.push('Service Line');
   if(!loc)errs.push('Location');
   if(!tgt)errs.push('Target Start Date');
-  // Rule 3: Backfill must have current resource
   if(ty==='Backfill'&&!bf)errs.push('Current Resource (required for Backfill)');
   if(errs.length){
     ['m-sk','m-bsa','m-sl','m-loc','m-added','m-tgt'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.borderColor=el.value.trim()?'':'var(--red)'});
@@ -2851,78 +2903,80 @@ async function saveDemand(){
     toast('Required: '+errs.join(' · '),'red');return;
   }
   ['m-sk','m-bsa','m-sl','m-loc','m-added','m-tgt','m-bf'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.borderColor=''});
-  // Rule 1: Closed → profile status = NW Onboarding + closure date = today
   const psEl=document.getElementById('m-ps');
   const clEl=document.getElementById('m-closed');
   if(st==='closed'){
-    if(psEl)psEl.value='6. NW Onboarding';
+    if(psEl)psEl.value=bott?'7. Closed':'6. NW Onboarding';
     if(clEl&&!clEl.value)clEl.value=today;
   }
-  // Rule 2: Cancel → closure date = today
-  if(st==='cancel'){
-    if(clEl&&!clEl.value)clEl.value=today;
-  }
+  if(st==='cancel'){if(clEl&&!clEl.value)clEl.value=today;}
   const finalClosure=gv('m-closed')||((st==='closed'||st==='cancel')?today:null);
   const today2=new Date();
   const tgtDate=tgt?new Date(tgt):null;
   const ageingDays=tgtDate?Math.floor((today2-tgtDate)/(1000*60*60*24)):0;
-  // Get status with correct casing for SP choice column
-  const rawSt = gv('m-st') || 'Open';
-  // Map to exact SP choice values
-  const statusMap = {'open':'Open','closed':'Closed','cancel':'Cancel','on hold':'On Hold'};
-  const normSt = statusMap[rawSt.toLowerCase()] || rawSt;
-  // Build payload — strip null/empty values to prevent SP 400
-  const _p = {
-    demand_status: normSt,
-    profile_status: gv('m-ps'),
-    ageing_days: ageingDays,
-    demand_type: ty,
-    bsa: bsa,
-    service_line: sl,
-    team_name: gv('m-team'),
-    sepm_sel: gv('m-sepm'),
-    skills: sk,
-    location: loc,
-    so_id: gv('m-soid'),
-    demand_added_on: added,
-    target_date: tgt,
+  const rawSt=gv('m-st')||'Open';
+  const statusMap={'open':'Open','closed':'Closed','cancel':'Cancel','on hold':'On Hold'};
+  const normSt=statusMap[rawSt.toLowerCase()]||rawSt;
+  const _p={
+    demand_status:       normSt,
+    profile_status:      gv('m-ps'),
+    ageing_days:         ageingDays,
+    demand_type:         ty,
+    bsa:                 bsa,
+    service_line:        sl,
+    sepm_sel:            gv('m-sepm'),
+    skills:              sk,
+    location:            loc,
+    so_id:               gv('m-soid'),
+    demand_added_on:     added,
+    target_date:         tgt,
     demand_closure_date: finalClosure,
-    ageing_group: gv('m-ag') || calcAgeingGroup(ageingDays),
-    profile_name: gv('m-prof'),
-    backfill_resource: bf,
-    tier1_program: gv('m-t1'),
-    fg_form_number: gv('m-fg'),
-    status_updates: gv('m-upd'),
-    updated_by: USER_NAME,
+    ageing_group:        gv('m-ag')||calcAgeingGroup(ageingDays),
+    backfill_resource:   bf,
+    fg_form_number:      gv('m-fg'),
+    status_updates:      gv('m-upd'),
+    updated_by:          USER_NAME,
   };
-  // FIX 1: Prepend timestamped status entry for audit trail on edits
+  if(bott){
+    // BOTT-specific fields — read from BOTT form fields
+    _p.band              = gv('m-band')||'';
+    _p.start_date        = gv('m-startdate')||null;
+    _p.profile_name_1    = gv('m-pn1');
+    _p.profile_1_submitted_date = gv('m-p1sd')||null;
+    _p.profile_name_2    = gv('m-pn2');
+    _p.profile_2_submitted_date = gv('m-p2sd')||null;
+    // BOTT does not use team_name or tier1_program — set to null to avoid stale data
+    _p.team_name         = null;
+    _p.tier1_program     = null;
+    _p.profile_name      = null;
+  } else {
+    // MCA-only fields
+    _p.team_name         = gv('m-team');
+    _p.tier1_program     = gv('m-t1');
+    _p.profile_name      = gv('m-prof');
+  }
   if(editId){
     const prev=demands.find(x=>String(x.id)===String(editId));
     const prevUpd=(prev?.status_updates||'').trim();
     const rawUpd=gv('m-upd')||'';
     const dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-    const newLine=rawUpd.trim()?`[${dateStr} · ${USER_NAME}] ${rawUpd.trim()}`:`[${dateStr} · ${USER_NAME}] Status → ${normSt}`;
-    _p.status_updates=prevUpd?`${newLine}
-${prevUpd}`:newLine;
+    const newLine=rawUpd.trim()?`[${dateStr} \u00B7 ${USER_NAME}] ${rawUpd.trim()}`:`[${dateStr} \u00B7 ${USER_NAME}] Status \u2192 ${normSt}`;
+    _p.status_updates=prevUpd?newLine+'\n'+prevUpd:newLine;
   }
-  // For NEW demands: strip empty values (SP rejects empty choice columns)
-  // For EDITS: keep explicitly cleared text fields as null so SP clears them
-  const payload = {};
-  // Fields that are safe to clear in SP (text/multitext — not required choices)
-  const clearableFields = ['profile_name','backfill_resource','so_id','team_name',
-    'sepm_sel','tier1_program','fg_form_number','status_updates'];
-  Object.keys(_p).forEach(k => {
-    const v = _p[k];
-    if(v!==null && v!==undefined && v!==''){
-      payload[k] = v; // non-empty: always include
-    } else if(editId && clearableFields.includes(k)){
-      payload[k] = null; // explicitly cleared on edit: send null to clear in SP
+  const clearableFields=bott
+    ?['profile_name_1','profile_name_2','backfill_resource','so_id','sepm_sel','fg_form_number','status_updates','band','start_date','profile_1_submitted_date','profile_2_submitted_date']
+    :['profile_name','backfill_resource','so_id','team_name','sepm_sel','tier1_program','fg_form_number','status_updates'];
+  const payload={};
+  Object.keys(_p).forEach(k=>{
+    const v=_p[k];
+    if(v!==null&&v!==undefined&&v!==''){
+      payload[k]=v;
+    } else if(editId&&clearableFields.includes(k)){
+      payload[k]=null;
     }
-    // empty on new demand or non-clearable: skip
   });
-  if(isBOTT()){_p.band=gv('m-band')==='_'?'':gv('m-band');_p.start_date=gv('m-startdate')||null;_p.profile_name_1=gv('m-pn1');_p.profile_1_submitted_date=gv('m-p1sd')||null;_p.profile_name_2=gv('m-pn2');_p.profile_2_submitted_date=gv('m-p2sd')||null;}
   setSyncStatus('saving','↻ Saving…');
-  console.log('saveDemand payload:', JSON.stringify(mapFields(payload).fields, null, 2));
+  console.log('saveDemand payload:',JSON.stringify(mapFields(payload).fields,null,2));
   try{
     if(editId){
       const d=demands.find(x=>String(x.id)===String(editId));
@@ -2930,49 +2984,37 @@ ${prevUpd}`:newLine;
       await sbUpd('demands','id=eq.'+editId,payload);
       const idx=demands.findIndex(x=>String(x.id)===String(editId));
       demands[idx]={...demands[idx],...payload};
-      // Only notify SL POCs on meaningful status changes — not on every edit
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
       console.log('Status change check: prev=',os,'new=',ns);
       if(ns!==os){
         if(ns==='cancel'||ns==='cancelled') logNotif('cancel',demands[idx]);
         else if(ns==='closed'||ns==='close') logNotif('close',demands[idx]);
-        // No notification for other status changes (e.g. Open → On Hold)
       }
-      // No notification for general field edits (profile name, skills, etc.)
-      toast(`Demand #${demands[idx].demand_id} updated ✓`,'green');
+      toast('Demand #'+demands[idx].demand_id+' updated \u2713','green');
     }else{
-      // Get next ID from local demands array (Title column = demand ID)
-      const maxId = demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a, 3000);
-      payload.demand_id = maxId + 1;
-      payload.ageing_days = 0;
+      const maxId=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,3000);
+      payload.demand_id=maxId+1;
+      payload.ageing_days=0;
       const res=await sbIns('demands',payload);
       const nd=Array.isArray(res)?res[0]:res;
       if(nd)demands.push(nd);
-      // Build a clean demand object for the notification
-      // Use payload (user input) merged with nd (SP response) for completeness
       if(document.getElementById('t-new')?.checked){
-        // payload has service_line, bsa, skills etc. from form
-        // demands[last] may not be populated yet if SP was slow
-        const notifDemand = {
+        const notifDemand={
           ...payload,
-          demand_id: payload.demand_id || (nd?.fields?.Title||nd?.Title||''),
-          service_line: payload.service_line || gv('m-sl'),
-          bsa: payload.bsa || gv('m-bsa'),
-          skills: payload.skills || gv('m-sk'),
-          demand_type: payload.demand_type || gv('m-ty'),
-          location: payload.location || gv('m-loc'),
-          team_name: payload.team_name || gv('m-team'),
-          sepm_sel: payload.sepm_sel || gv('m-sepm'),
-          fg_form_number: payload.fg_form_number || gv('m-fg'),
-          target_date: payload.target_date || gv('m-tgt'),
+          demand_id:    payload.demand_id||(nd?.fields?.Title||nd?.Title||''),
+          service_line: payload.service_line||gv('m-sl'),
+          bsa:          payload.bsa||gv('m-bsa'),
+          skills:       payload.skills||gv('m-sk'),
+          demand_type:  payload.demand_type||gv('m-ty'),
+          location:     payload.location||gv('m-loc'),
+          fg_form_number:payload.fg_form_number||gv('m-fg'),
+          target_date:  payload.target_date||gv('m-tgt'),
         };
-        console.log('logNotif add — ID:', notifDemand.demand_id,
-          'SL:', notifDemand.service_line, 'BSA:', notifDemand.bsa);
-        logNotif('add', notifDemand);
+        logNotif('add',notifDemand);
       }
-      toast('New demand added ✓','green');
+      toast('New demand added \u2713','green');
     }
-    setSyncStatus('ok','● Live');
+    setSyncStatus('ok','\u25CF Live');
     closeModal();renderAll();
   }catch(e){
     setSyncStatus('err','⚠ Error');
@@ -4162,90 +4204,66 @@ function switchTracker(mode){
   toast('Switched to '+mode+' tracker','green');
 }
 function applyTrackerTheme(mode){
-  const isBOTTMode = mode==='BOTT';
-  // Switcher buttons
+  const isBOTTMode=mode==='BOTT';
   const swM=document.getElementById('sw-mca'),swB=document.getElementById('sw-bott');
-  if(swM&&swB){
-    swM.style.background = isBOTTMode?'none':'var(--blue)';
-    swM.style.color      = isBOTTMode?'var(--t2)':'white';
-    swB.style.background = isBOTTMode?'#1d9e75':'none';
-    swB.style.color      = isBOTTMode?'white':'var(--t2)';
-  }
-  // Sidebar accent bar colour
+  if(swM&&swB){swM.style.background=isBOTTMode?'none':'var(--blue)';swM.style.color=isBOTTMode?'var(--t2)':'white';swB.style.background=isBOTTMode?'#1d9e75':'none';swB.style.color=isBOTTMode?'white':'var(--t2)';}
   const accent=document.getElementById('tracker-accent');
   if(accent) accent.style.background=isBOTTMode?'#1d9e75':'var(--blue)';
-  // Sidebar body class for CSS theming
   const sidebar=document.querySelector('.sidebar');
-  if(sidebar){ sidebar.classList.toggle('bott-mode',isBOTTMode); }
-  // Mode badge in topbar
+  if(sidebar) sidebar.classList.toggle('bott-mode',isBOTTMode);
   const badge=document.getElementById('mode-badge');
-  if(badge){
-    badge.textContent=isBOTTMode?'BOTT':'MCA';
-    badge.className=isBOTTMode?'bott':'mca';
-  }
-  // Topbar subtitle
+  if(badge){badge.textContent=isBOTTMode?'BOTT':'MCA';badge.className=isBOTTMode?'bott':'mca';}
   const sub=document.getElementById('tb-subtitle');
-  if(sub) sub.textContent=isBOTTMode
-    ?'Nationwide Mutual — BOTT · Real-time shared database'
-    :'Nationwide Mutual — GSP-MCA · Real-time shared database';
-  // Sidebar brand tag + name
+  if(sub) sub.textContent=isBOTTMode?'Nationwide Mutual \u2014 BOTT \u00B7 Real-time shared database':'Nationwide Mutual \u2014 GSP-MCA \u00B7 Real-time shared database';
   const tag=document.querySelector('.sb-brand .tag');
   if(tag) tag.textContent=isBOTTMode?'BOTT Tracker':'Nationwide MCA';
-  const name=document.querySelector('.sb-brand .name');
-  if(name) name.textContent=isBOTTMode?'Demand Tracker':'Demand Tracker';
-  // Page title (dashboard)
+  const nm=document.querySelector('.sb-brand .name');
+  if(nm) nm.textContent='Demand Tracker';
   const pt=document.getElementById('page-title');
   if(pt) pt.textContent=isBOTTMode?'BOTT Dashboard':'Management Dashboard';
-  // Topbar title (demands page)
-  const tb=document.getElementById('tb-title');
-  if(tb){
-    // Keep the mode badge — update the text before it
-    const badgeEl=document.getElementById('mode-badge');
-    if(badgeEl) tb.firstChild.textContent='';
-    // The h1 text is managed by renderAll via goPage
-  }
-  // ── Dynamic table header: swap columns per mode ───────────────────────────
-  const theadRow=document.getElementById('thead-row');
-  if(theadRow){
+  const tbtl=document.getElementById('tb-title');
+  if(tbtl){const badgeEl=document.getElementById('mode-badge');if(badgeEl)tbtl.firstChild.textContent='';}
+  // ── Dynamic thead per mode ───────────────────────────────────────────────
+  const tr=document.getElementById('thead-row');
+  if(tr){
+    var si='<i class="si">&#8597;</i>';
     if(isBOTTMode){
-      // BOTT: ID | Status | Profile Status | Band | BSA | Skills | Location | Svc Line | Target | Ageing | Profile 1 | Profile 2 | JP ID | Actions
-      theadRow.innerHTML=`
-        <th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">☐</th>
-        <th style="width:52px" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
-        <th style="width:80px" onclick="sortBy('demand_status')">Status<i class="si" id="si-st">↕</i></th>
-        <th style="width:148px" onclick="sortBy('profile_status')">Profile Status<i class="si" id="si-ps">↕</i></th>
-        <th style="width:55px" onclick="sortBy('band')">Band<i class="si" id="si-band">↕</i></th>
-        <th style="width:80px" onclick="sortBy('bsa')">BSA<i class="si" id="si-bsa">↕</i></th>
-        <th style="width:138px" onclick="sortBy('skills')">Skills<i class="si" id="si-sk">↕</i></th>
-        <th style="width:65px" onclick="sortBy('location')">Location<i class="si" id="si-loc">↕</i></th>
-        <th style="width:70px" onclick="sortBy('service_line')">Svc Line<i class="si" id="si-sl">↕</i></th>
-        <th style="width:82px" onclick="sortBy('target_date')">Target<i class="si" id="si-tgt">↕</i></th>
-        <th style="width:65px" onclick="sortBy('ageing_days')">Ageing<i class="si" id="si-age">↕</i></th>
-        <th style="width:110px" onclick="sortBy('profile_name_1')">Profile 1<i class="si" id="si-pn1">↕</i></th>
-        <th style="width:110px" onclick="sortBy('profile_name_2')">Profile 2<i class="si" id="si-pn2">↕</i></th>
-        <th style="width:108px" onclick="sortBy('fg_form_number')">JP ID<i class="si" id="si-fg">↕</i></th>
-        <th style="width:108px">Actions</th>`;
+      tr.innerHTML=''
+        +'<th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">&#9634;</th>'
+        +'<th style="width:52px" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
+        +'<th style="width:80px" onclick="sortBy(\'demand_status\')">Status'+si+'</th>'
+        +'<th style="width:148px" onclick="sortBy(\'profile_status\')">Profile Status'+si+'</th>'
+        +'<th style="width:55px" onclick="sortBy(\'band\')">Band'+si+'</th>'
+        +'<th style="width:80px" onclick="sortBy(\'bsa\')">BSA'+si+'</th>'
+        +'<th style="width:138px" onclick="sortBy(\'skills\')">Skills'+si+'</th>'
+        +'<th style="width:65px" onclick="sortBy(\'location\')">Location'+si+'</th>'
+        +'<th style="width:70px" onclick="sortBy(\'service_line\')">Svc Line'+si+'</th>'
+        +'<th style="width:82px" onclick="sortBy(\'target_date\')">Target'+si+'</th>'
+        +'<th style="width:65px" onclick="sortBy(\'ageing_days\')">Ageing'+si+'</th>'
+        +'<th style="width:110px" onclick="sortBy(\'profile_name_1\')">Profile 1'+si+'</th>'
+        +'<th style="width:110px" onclick="sortBy(\'profile_name_2\')">Profile 2'+si+'</th>'
+        +'<th style="width:108px" onclick="sortBy(\'fg_form_number\')">JP ID'+si+'</th>'
+        +'<th style="width:108px">Actions</th>';
     } else {
-      // MCA: ID | Status | Profile Status | Type | BSA | Team | Skills | Location | Svc Line | Target | Ageing | Profile | FG/JP ID | Actions
-      theadRow.innerHTML=`
-        <th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">☐</th>
-        <th style="width:52px" onclick="sortBy('demand_id')">ID<i class="si" id="si-id">↕</i></th>
-        <th style="width:80px" onclick="sortBy('demand_status')">Status<i class="si" id="si-st">↕</i></th>
-        <th style="width:148px" onclick="sortBy('profile_status')">Profile Status<i class="si" id="si-ps">↕</i></th>
-        <th style="width:65px" onclick="sortBy('demand_type')">Type<i class="si" id="si-ty">↕</i></th>
-        <th style="width:80px" onclick="sortBy('bsa')">BSA<i class="si" id="si-bsa">↕</i></th>
-        <th style="width:95px" onclick="sortBy('team_name')">Team<i class="si" id="si-team">↕</i></th>
-        <th style="width:138px" onclick="sortBy('skills')">Skills<i class="si" id="si-sk">↕</i></th>
-        <th style="width:65px" onclick="sortBy('location')">Location<i class="si" id="si-loc">↕</i></th>
-        <th style="width:70px" onclick="sortBy('service_line')">Svc Line<i class="si" id="si-sl">↕</i></th>
-        <th style="width:82px" onclick="sortBy('target_date')">Target<i class="si" id="si-tgt">↕</i></th>
-        <th style="width:65px" onclick="sortBy('ageing_days')">Ageing<i class="si" id="si-age">↕</i></th>
-        <th style="width:95px">Profile</th>
-        <th style="width:108px" onclick="sortBy('fg_form_number')">FG / JP ID<i class="si" id="si-fg">↕</i></th>
-        <th style="width:108px">Actions</th>`;
+      tr.innerHTML=''
+        +'<th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">&#9634;</th>'
+        +'<th style="width:52px" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
+        +'<th style="width:80px" onclick="sortBy(\'demand_status\')">Status'+si+'</th>'
+        +'<th style="width:148px" onclick="sortBy(\'profile_status\')">Profile Status'+si+'</th>'
+        +'<th style="width:65px" onclick="sortBy(\'demand_type\')">Type'+si+'</th>'
+        +'<th style="width:80px" onclick="sortBy(\'bsa\')">BSA'+si+'</th>'
+        +'<th style="width:95px" onclick="sortBy(\'team_name\')">Team'+si+'</th>'
+        +'<th style="width:138px" onclick="sortBy(\'skills\')">Skills'+si+'</th>'
+        +'<th style="width:65px" onclick="sortBy(\'location\')">Location'+si+'</th>'
+        +'<th style="width:70px" onclick="sortBy(\'service_line\')">Svc Line'+si+'</th>'
+        +'<th style="width:82px" onclick="sortBy(\'target_date\')">Target'+si+'</th>'
+        +'<th style="width:65px" onclick="sortBy(\'ageing_days\')">Ageing'+si+'</th>'
+        +'<th style="width:95px">Profile</th>'
+        +'<th style="width:108px" onclick="sortBy(\'fg_form_number\')">FG / JP ID'+si+'</th>'
+        +'<th style="width:108px">Actions</th>';
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────
 }
 function applySwitcherState(){
   applyTrackerTheme(TRACKER_MODE);
