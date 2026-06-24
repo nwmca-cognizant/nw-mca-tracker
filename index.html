@@ -495,6 +495,18 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-item input{accent-color:var(--blue);width:13px;height:13px;cursor:pointer}
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
+/* ── Star priority button ── */
+.star-btn{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0 3px 0 0;color:#ccc;vertical-align:middle;transition:color .15s,transform .1s;flex-shrink:0}
+.star-btn:hover{color:#999;transform:scale(1.2)}
+.star-s1{color:#e24b4a}   /* 1-click: Red  = High priority  */
+.star-s2{color:#d29922}   /* 2-click: Amber = At Risk        */
+.star-s3{color:#1d9e75}   /* 3-click: Green = Low priority   */
+/* demand-id cell: star + id always inline, no wrap */
+.demand-id-cell{display:inline-flex;align-items:center;white-space:nowrap;gap:0}
+/* backfill resource sub-line in profile cell */
+.bf-sub{font-size:10px;color:var(--t3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+/* mobile card: backfill tag */
+.dc-bf{font-size:10px;color:var(--t3);margin-top:1px}
 </style>
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 </head>
@@ -1074,6 +1086,7 @@ function mapItem(item){
     profile_1_submitted_date:   f.Profile_1_Submitted_Date||'',
     profile_name_2:             f.Profile_Name_2||'',
     profile_2_submitted_date:   f.Profile_2_Submitted_Date||'',
+    priority:                   '',   // set by loadStars() from localStorage
   };
 }
 
@@ -1294,6 +1307,7 @@ window.addEventListener('load', async()=>{
     showLoader('Loading demands from SharePoint…');
     const data = await sbQ('demands','');
     demands = data;
+    loadStars();  // restore star priorities from localStorage
     hideLoader();
     document.getElementById('app').style.display='flex';
     document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
@@ -1322,7 +1336,7 @@ async function refreshData(){
   setSyncStatus('saving','↻ Refreshing…');
   try{
     const data=await sbQ('demands','');
-    demands=data;renderAll();setSyncStatus('ok','● Live');
+    demands=data;loadStars();renderAll();setSyncStatus('ok','● Live');
   try{const _c=localStorage.getItem('nwmca_slpoc_map');if(_c){const _p=JSON.parse(_c);if(Object.keys(_p).length>0){SL_POC_MAP=_p;console.log('SL_POC_MAP restored:',Object.keys(_p).length,'SLs');}}}catch(_e){}
   applySwitcherState();
   loadAppConfig();
@@ -1537,10 +1551,11 @@ function renderTbl(){
   if(!rows.length){tb.innerHTML=`<tr><td colspan="14"><div class="empty-state"><div class="ei">◎</div><p>No demands match the current filters.</p></div></td></tr>`;return}
   tb.innerHTML=rows.map(d=>{
     const pf=(d.profile_name||'').split('\n')[0]||'—';
+    const bf=(d.backfill_resource||'').trim();
     const isChk=selectedIds.has(String(d.id));
     return`<tr class="${rowCls(d.ageing_group)}${isChk?' selected':''}" onclick="openDetail(${d.id})">
       <td class="cb-cell" onclick="event.stopPropagation();toggleRow(${d.id},event)"><div class="cb-wrap"><input type="checkbox" class="row-cb" data-id="${d.id}" ${isChk?'checked':''} onclick="event.stopPropagation();toggleRow(${d.id},event)"></div></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600">${d.demand_id}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap" onclick="event.stopPropagation()"><span class="demand-id-cell"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button> ${d.demand_id}</span></td>
       <td>${stB(d.demand_status)}</td>
       <td style="font-size:11px;color:var(--t2)" title="${d.profile_status||''}">${d.profile_status||'—'}</td>
       <td>${tyB(d.demand_type)}</td>
@@ -1551,7 +1566,7 @@ function renderTbl(){
       <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
       <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-      <td style="font-size:11px;color:var(--t2)">${pf}</td>
+      <td style="font-size:11px;color:var(--t2)">${pf}${bf?`<div class="bf-sub" title="${bf}">↩ ${bf}</div>`:''}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
         <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
@@ -1570,12 +1585,13 @@ function renderCardList(){
   cl.innerHTML=rows.map(d=>{
     const rc=rowCls(d.ageing_group);
     const pf=(d.profile_name||'').split('\n')[0];
+    const bf=(d.backfill_resource||'').trim();
     const isChkC=selectedIds.has(d.id);
     return`<div class="demand-card${isChkC?' selected':''}" onclick="bulkMode?toggleRow(${d.id},event):openDetail(${d.id})" style="position:relative">
       <div class="dc-stripe ${rc}"></div>
       ${bulkMode?`<div class="card-cb-wrap" onclick="event.stopPropagation()"><input type="checkbox" class="card-cb" data-id="${d.id}" ${isChkC?'checked':''} onchange="toggleRow(${d.id},event)"></div>`:''}
       <div class="dc-header">
-        <div><div class="dc-id">#${d.demand_id}</div></div>
+        <div style="display:flex;align-items:center;gap:0" onclick="event.stopPropagation()"><button class="star-btn ${starClass(d.priority)}" data-star="${d.id}" onclick="cycleStar(${d.id},event)" title="${starTitle(d.priority)}">&#9733;</button><div class="dc-id" style="margin-left:3px">#${d.demand_id}</div></div>
         <div class="dc-badges">${stB(d.demand_status)}${tyB(d.demand_type)}${ageB(d.ageing_days,d.ageing_group)}</div>
       </div>
       <div class="dc-title">${d.skills||'No skills specified'}</div>
@@ -1588,7 +1604,10 @@ function renderCardList(){
         ${d.fg_form_number?`<div><div class="dc-meta-label">FG/JP ID</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}
       </div>
       <div class="dc-footer">
-        <div class="dc-profile" style="color:var(--t2)">${pf?`👤 ${pf}`:'No profile yet'}</div>
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <div class="dc-profile" style="color:var(--t2)">${pf?`👤 ${pf}`:'No profile yet'}</div>
+          ${bf?`<div class="dc-bf">↩ Current Resource: ${bf}</div>`:''}
+        </div>
         <div class="dc-actions" onclick="event.stopPropagation()">
           <button class="btn ghost sm" onclick="openEdit('${d.id}')">Edit</button>
           ${(d.demand_status||'').toLowerCase()==='open'?`<button class="btn sm danger" onclick="confCancel('${d.id}')">Cancel</button>`:''}
@@ -4217,6 +4236,45 @@ function toast(msg,type=''){
   // (async wrapping removed)
 
   // intercepts removed
+
+// ── Star Priority Functions ─────────────────────────────────────────────────
+// Priority cycle: '' → 'High'(red) → 'At Risk'(amber) → 'Low'(green) → ''
+function starClass(p){ return p==='High'?'star-s1':p==='At Risk'?'star-s2':p==='Low'?'star-s3':''; }
+function starTitle(p){
+  if(p==='High')    return 'Priority: High (Red) — click to change';
+  if(p==='At Risk') return 'Priority: At Risk (Amber) — click to change';
+  if(p==='Low')     return 'Priority: Low (Green) — click to change';
+  return 'Click to set priority (Red=High, Amber=At Risk, Green=Low)';
+}
+function cycleStar(demandId, event){
+  event.stopPropagation();
+  const d=demands.find(x=>String(x.id)===String(demandId));
+  if(!d) return;
+  const cycle=['','High','At Risk','Low'];
+  const cur=d.priority||'';
+  const next=cycle[(cycle.indexOf(cur)+1)%cycle.length];
+  d.priority=next;
+  // Update all star buttons for this demand (table + overdue panel may both exist)
+  document.querySelectorAll(`.star-btn[data-star="${demandId}"]`).forEach(btn=>{
+    btn.className='star-btn '+starClass(next);
+    btn.title=starTitle(next);
+  });
+  // Persist to localStorage keyed by demand_id (survives refreshData)
+  try{
+    const store=JSON.parse(localStorage.getItem('nwmca_stars')||'{}');
+    if(next) store[d.demand_id]=next; else delete store[d.demand_id];
+    localStorage.setItem('nwmca_stars',JSON.stringify(store));
+  }catch(e){}
+}
+function loadStars(){
+  try{
+    const store=JSON.parse(localStorage.getItem('nwmca_stars')||'{}');
+    demands.forEach(d=>{ d.priority = store[d.demand_id]||''; });
+  }catch(e){}
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+
 
 
 
