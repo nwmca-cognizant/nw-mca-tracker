@@ -1544,8 +1544,8 @@ function renderTbl(){
         <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
         <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
         <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-        <td style="font-size:11px;color:var(--t2)">${pf1}${d.profile_1_submitted_date?`<div style="font-size:10px;color:var(--t3)">${fmt(d.profile_1_submitted_date)}</div>`:''}</td>
-        <td style="font-size:11px;color:var(--t2)">${pf2}${d.profile_2_submitted_date?`<div style="font-size:10px;color:var(--t3)">${fmt(d.profile_2_submitted_date)}</div>`:''}</td>
+        <td style="font-size:11px;color:var(--t2)">${pf1}${d.profile_1_submitted_date?('<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_1_submitted_date)+'</div>'):''}</td>
+        <td style="font-size:11px;color:var(--t2)">${pf2}${d.profile_2_submitted_date?('<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_2_submitted_date)+'</div>'):''}</td>
         <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-acts">
           <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
@@ -1568,7 +1568,7 @@ function renderTbl(){
       <td style="font-size:11px;color:var(--t2)">${d.service_line||'—'}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t2)">${fmt(d.target_date)}</td>
       <td>${ageB(d.ageing_days,d.ageing_group)}</td>
-      <td style="font-size:11px;color:var(--t2)">${pf}${bf?`<div style="font-size:10px;color:var(--t3);margin-top:2px">↩ ${bf}</div>`:''}</td>
+      <td style="font-size:11px;color:var(--t2)">${pf}${bf?('<div style="font-size:10px;color:var(--t3);margin-top:2px">\u21A9 '+bf+'</div>'):''}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--teal)" title="${d.fg_form_number||''}">${d.fg_form_number||'—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-acts">
         <button class="btn ghost sm" onclick="openEdit('${d.id}')" title="Edit">✏</button>
@@ -1597,7 +1597,7 @@ function renderCardList(){
         <div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">${d.service_line||'—'}</div></div>
         <div><div class="dc-meta-label">Location</div><div class="dc-meta-item">${locB((d.location||'').trim())}</div></div>
         <div><div class="dc-meta-label">Target Date</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.target_date)}</div></div>
-        ${d.fg_form_number?`<div><div class="dc-meta-label">JP ID</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}`:
+        ${d.fg_form_number?('<div><div class="dc-meta-label">JP ID</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--teal)">'+d.fg_form_number+'</div></div>'):''}`:
       `<div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">${d.bsa||'—'}</div></div>
         <div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">${d.service_line||'—'}</div></div>
         <div><div class="dc-meta-label">Location</div><div class="dc-meta-item">${locB((d.location||'').trim())}</div></div>
@@ -1606,10 +1606,10 @@ function renderCardList(){
         ${d.fg_form_number?`<div><div class="dc-meta-label">FG/JP ID</div><div class="dc-meta-item" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}`;
     const bottFooterProfile=bott?`
         <div style="display:flex;flex-direction:column;gap:3px">
-          <div style="font-size:11px;color:var(--t2)">${d.profile_name_1?`👤 ${d.profile_name_1}`:'No profile 1 yet'}</div>
-          <div style="font-size:11px;color:var(--t2)">${d.profile_name_2?`👤 ${d.profile_name_2}`:'No profile 2 yet'}</div>
+          <div style="font-size:11px;color:var(--t2)">${d.profile_name_1?('\uD83D\uDC64 '+d.profile_name_1):'No profile 1 yet'}</div>
+          <div style="font-size:11px;color:var(--t2)">${d.profile_name_2?('\uD83D\uDC64 '+d.profile_name_2):'No profile 2 yet'}</div>
         </div>`:
-      `<div class="dc-profile" style="color:var(--t2)">${pf?`👤 ${pf}`:'No profile yet'}</div>`;
+      `<div class="dc-profile" style="color:var(--t2)">${pf?('\uD83D\uDC64 '+pf):'No profile yet'}</div>`;
     return`<div class="demand-card${isChkC?' selected':''}" onclick="bulkMode?toggleRow(${d.id},event):openDetail(${d.id})" style="position:relative">
       <div class="dc-stripe ${rc}"></div>
       ${bulkMode?`<div class="card-cb-wrap" onclick="event.stopPropagation()"><input type="checkbox" class="card-cb" data-id="${d.id}" ${isChkC?'checked':''} onchange="toggleRow(${d.id},event)"></div>`:''}
@@ -2223,12 +2223,12 @@ let SL_POC_MAP={
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com''Sanjith.Alex@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com''Sanjith.Alex@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com''Sanjith.Alex@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com''Sanjith.Alex@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
