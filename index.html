@@ -2258,7 +2258,8 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
- 'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
+ 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+  'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
   'CIS':             ['srividhya.balachandran@cognizant.com'],
@@ -2734,6 +2735,7 @@ function slaB(slaBreached){
   if(slaBreached==='Yes') return '<span class="badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red);font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;white-space:nowrap">SLA Breached</span>';
   return '';
 }
+function sel(id,opts,val,onch=''){return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${opts.map(o=>`<option${o===(val||'')?` selected`:``}>${o}</option>`).join('')}</select>`}
 function rlbl(t){return`${t} <span class="req-star">*</span>`}
 function autoCalcTarget(){
   const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
