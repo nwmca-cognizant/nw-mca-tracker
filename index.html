@@ -874,7 +874,7 @@ const BOTT_SP={
   profileName2:    'Profile_Name_2',
   profile1SubDate: 'Profile_1_Submitted_Date',
   profile2SubDate: 'Profile_2_Submitted_Date',
-  skillsSLA:       'Skills_Category_SLA',
+  skillsSLA:       'Skill_Category_SLA',       // SP column: Single line of text (not Skills_)
   slaBreached:     'SLA_Breached',
   band:            'Band',
   startDate:       'Start_Date',
@@ -1093,7 +1093,7 @@ function mapItem(item){
     profile_1_submitted_date:   f[BOTT_SP.profile1SubDate] ? f[BOTT_SP.profile1SubDate].split('T')[0] : '',
     profile_name_2:             f[BOTT_SP.profileName2]||'',
     profile_2_submitted_date:   f[BOTT_SP.profile2SubDate] ? f[BOTT_SP.profile2SubDate].split('T')[0] : '',
-    skills_category_sla:        f[BOTT_SP.skillsSLA]!==undefined && f[BOTT_SP.skillsSLA]!==null ? Number(f[BOTT_SP.skillsSLA]) : '',
+    skills_category_sla:        f[BOTT_SP.skillsSLA]!==undefined && f[BOTT_SP.skillsSLA]!==null && f[BOTT_SP.skillsSLA]!=='' ? Number(f[BOTT_SP.skillsSLA])||'' : '',
     sla_breached:               f[BOTT_SP.slaBreached]||'',
   };
 }
@@ -1199,9 +1199,9 @@ function mapFields(d){
       if(d.profile_2_submitted_date) addDate(BOTT_SP.profile2SubDate, d.profile_2_submitted_date);
       else f[BOTT_SP.profile2SubDate]=null;
     }
-    // Skill Category SLA
+    // Skill Category SLA — SP column is Single line of text, write as string
     if(d.skills_category_sla!==undefined && d.skills_category_sla!==null && d.skills_category_sla!=='')
-      f[BOTT_SP.skillsSLA]=Number(d.skills_category_sla)||0;
+      f[BOTT_SP.skillsSLA]=String(d.skills_category_sla);
     // SLA Breached — only write when a definitive value exists
     if(d.sla_breached==='Yes'||d.sla_breached==='No') addText(BOTT_SP.slaBreached, d.sla_breached);
   }
@@ -1347,6 +1347,7 @@ window.addEventListener('load', async()=>{
     document.getElementById('app').style.display='flex';
     document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     document.getElementById('f-st').value='Open';
+    applySwitcherState(); // inject correct thead BEFORE renderAll draws the table
     renderAll();
     setInterval(silentRefresh, 30000);
     toast('Connected to SharePoint ✓','green');
