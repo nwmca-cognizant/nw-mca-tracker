@@ -575,6 +575,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
     <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
     <div class="ni" onclick="quickFilter('thisweek')"><span class="ni-ic">📅</span><span class="ni-lbl">Due This Week</span></div>
+    <div class="ni" onclick="quickCheckBOTTColumns()" id="sb-bott-fix" style="display:none"><span class="ni-ic">🔧</span><span class="ni-lbl">Fix BOTT Columns</span></div>
     <div class="ni" id="sb-priority-ni" onclick="quickFilter('priority')"><span class="ni-ic">🚩</span><span class="ni-lbl">Priority Demands</span><span class="ni-badge red" id="sb-pf">—</span></div>
   </nav>
   <div class="sb-foot">
@@ -1363,8 +1364,95 @@ async function sbDel(table, match){
   await gFetch(base+'/items/'+String(spId),'DELETE');
 }
 
-// ═══════════════════════════════════════
-// LOADER
+// ── Quick BOTT column check — runs on BOTT mode load ─────────────────────────
+async function quickCheckBOTTColumns(){
+  try{
+    const bottCols=await gFetch(BOTT_DEMANDS_BASE()+'/columns?$select=name,typeAsString');
+    const colNames=(bottCols?.value||[]).map(c=>c.name);
+    const required=[
+      {name:'Profile_Name_1',            type:'Text'},
+      {name:'Profile_Name_2',            type:'Text'},
+      {name:'Profile_1_Submitted_Date',  type:'DateTime'},
+      {name:'Profile_2_Submitted_Date',  type:'DateTime'},
+      {name:'Band',                       type:'Text'},
+      {name:'Start_Date',                 type:'DateTime'},
+      {name:'Skill_Category_SLA',         type:'Text'},
+      {name:'SLA_Breached',               type:'Text'},
+      {name:'SEPM_SEL',                   type:'Text'},
+      {name:'Ageing_Days',                type:'Number'},
+      {name:'Ageing_Group',               type:'Text'},
+      {name:'Status_Updates',             type:'Note'},
+      {name:'FG_Form_Number',             type:'Text'},
+      {name:'Backfill_Resource',          type:'Text'},
+    ];
+    const missing=required.filter(c=>!colNames.includes(c.name));
+    const fixBtn=document.getElementById('sb-bott-fix');
+    if(missing.length){
+      console.warn('BOTT_Demands missing '+missing.length+' columns: '+missing.map(c=>c.name).join(', '));
+      if(fixBtn) fixBtn.style.display='';
+      const msg='BOTT list is missing '+missing.length+' column(s): '+missing.map(c=>c.name).join(', ')+'\n\nClick OK to create them automatically via SharePoint API.';
+      if(confirm(msg)){
+        await createBOTTColumns(missing,null,()=>{});
+        // Re-check after creation
+        await quickCheckBOTTColumns();
+      }
+    } else {
+      if(fixBtn) fixBtn.style.display='none';
+      console.log('BOTT_Demands: all required columns present ('+colNames.filter(n=>!n.startsWith('_')).length+' total)');
+      toast('All BOTT columns are present ✓','green');
+      // Reset resolver so mapItem re-discovers the correct names
+      window._bottSpResolved=false;
+      _bottSpResolved=false;
+    }
+  }catch(e){
+    console.error('quickCheckBOTTColumns failed:', e.message);
+    toast('Could not check BOTT columns: '+e.message.substring(0,60),'red');
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+async function createBOTTColumns(missing, log, setStatus){
+  if(!missing||!missing.length) return;
+  setStatus('Creating missing BOTT columns…',0);
+  let created=0, failed=[];
+  // SP Graph API column type definitions
+  const typeMap={
+    'Text':     {text:{}},
+    'Note':     {text:{allowMultipleLines:true,appendChangesToExistingText:false,linesForEditing:6,textType:'plain'}},
+    'DateTime': {dateTime:{displayAs:'standard',format:'dateOnly'}},
+    'Number':   {number:{decimalPlaces:'automatic',displayAs:'number'}},
+  };
+  for(let i=0;i<missing.length;i++){
+    const col=missing[i];
+    setStatus('Creating column: '+col.name+' ('+(i+1)+'/'+missing.length+')',Math.round((i/missing.length)*100));
+    try{
+      const body={
+        name: col.name,
+        displayName: col.display||col.name,
+        enforceUniqueValues: false,
+        hidden: false,
+        indexed: false,
+        ...typeMap[col.type||'Text']
+      };
+      await gFetch(BOTT_DEMANDS_BASE()+'/columns','POST',body);
+      created++;
+      if(log) log('Created column: '+col.name,true,'Type: '+col.type,'BOTT-CREATE');
+    }catch(e){
+      failed.push(col.name+': '+e.message);
+      if(log) log('Failed to create: '+col.name,false,e.message,'BOTT-CREATE');
+    }
+  }
+  setStatus('Done. '+created+' created, '+failed.length+' failed.',100);
+  if(log){
+    if(created>0) log('BOTT columns created',true,created+' column(s) created successfully. Refresh the page to verify.','BOTT-CREATE');
+    if(failed.length) log('Some columns failed',false,failed.join(' | '),'BOTT-CREATE');
+  }
+  if(created>0){
+    // Reset the BOTT_SP resolver so it re-reads the new columns
+    window._bottSpResolved=false;
+    toast('✓ '+created+' BOTT column(s) created. Refresh to apply.','green');
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════
 function showLoader(msg){document.getElementById('loader-msg').textContent=msg||'Loading…';document.getElementById('loader').classList.remove('hidden')}
 function hideLoader(){document.getElementById('loader').classList.add('hidden')}
@@ -3932,7 +4020,6 @@ async function runDiagnostics(){
   try{
     const r=await gFetch(NOTIF_LIST_BASE()+'/items?$expand=fields&$top=1');
     log('Notifications list readable',true,`${r?.value?.length||0} items`,'NOTIF');
-    // Check EmailBody column
     const cols=await gFetch(NOTIF_LIST_BASE()+'/columns?$select=name');
     const colNames=(cols?.value||[]).map(c=>c.name);
     log('EmailBody column exists',colNames.includes('EmailBody'),
@@ -3940,6 +4027,56 @@ async function runDiagnostics(){
     log('NotifType column exists',colNames.includes('NotifType'),
       colNames.includes('NotifType')?'NotifType column confirmed':'MISSING','NOTIF');
   }catch(e){log('Notifications list',false,'Cannot access: '+e.message,'NOTIF');}
+
+  // ── SUITE 7b: BOTT COLUMN CHECK ──────────────────────────────────────────
+  if(isBOTT()){
+    setStatus('Checking BOTT_Demands columns…',75);
+    try{
+      const bottCols=await gFetch(BOTT_DEMANDS_BASE()+'/columns?$select=name,displayName,typeAsString');
+      const bottColNames=(bottCols?.value||[]).map(c=>c.name);
+      const required=[
+        {name:'Profile_Name_1',     type:'Text',     display:'Profile_Name_1'},
+        {name:'Profile_Name_2',     type:'Text',     display:'Profile_Name_2'},
+        {name:'Profile_1_Submitted_Date', type:'DateTime', display:'Profile_1_Submitted_Date'},
+        {name:'Profile_2_Submitted_Date', type:'DateTime', display:'Profile_2_Submitted_Date'},
+        {name:'Band',               type:'Text',     display:'Band'},
+        {name:'Start_Date',         type:'DateTime', display:'Start_Date'},
+        {name:'Skill_Category_SLA', type:'Text',     display:'Skill_Category_SLA'},
+        {name:'SLA_Breached',       type:'Text',     display:'SLA_Breached'},
+        {name:'SEPM_SEL',           type:'Text',     display:'SEPM_SEL'},
+        {name:'Team_Name',          type:'Text',     display:'Team_Name'},
+        {name:'Ageing_Days',        type:'Number',   display:'Ageing_Days'},
+        {name:'Ageing_Group',       type:'Text',     display:'Ageing_Group'},
+        {name:'Status_Updates',     type:'Note',     display:'Status_Updates'},
+        {name:'FG_Form_Number',     type:'Text',     display:'FG_Form_Number'},
+        {name:'Backfill_Resource',  type:'Text',     display:'Backfill_Resource'},
+      ];
+      const missing=required.filter(c=>!bottColNames.includes(c.name));
+      const present=required.filter(c=>bottColNames.includes(c.name));
+      log('BOTT_Demands: columns present',present.length,
+        present.map(c=>c.name).join(', '),'BOTT');
+      if(missing.length){
+        log('BOTT_Demands: MISSING columns',false,
+          'Missing: '+missing.map(c=>c.name).join(', ')+'\nClick "Create Missing BOTT Columns" below to fix.','BOTT',{missing});
+        // Add create button to footer
+        const footer=document.getElementById('diag-footer');
+        if(footer){
+          const createBtn=document.createElement('button');
+          createBtn.textContent='🔧 Create Missing BOTT Columns';
+          createBtn.style.cssText='background:#1d9e75;color:white;border:none;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500';
+          createBtn.onclick=()=>createBOTTColumns(missing,log,setStatus);
+          footer.insertBefore(createBtn,footer.firstChild);
+        }
+      } else {
+        log('BOTT_Demands: all required columns present',true,
+          'All '+required.length+' columns confirmed','BOTT');
+      }
+      log('BOTT_Demands: all SP columns',null,
+        bottColNames.filter(n=>!n.startsWith('_')&&n!=='id'&&n!=='ContentType').join(', '),'BOTT');
+    }catch(e){
+      log('BOTT_Demands columns check',false,'Cannot read columns: '+e.message,'BOTT');
+    }
+  }
 
   // ── SUITE 8: FILTER CHECK ──
   setStatus('Checking filter data…',82);
@@ -4563,6 +4700,9 @@ function applyTrackerTheme(mode){
 }
 function applySwitcherState(){
   applyTrackerTheme(TRACKER_MODE);
+  if(TRACKER_MODE==='BOTT' && typeof quickCheckBOTTColumns==='function'){
+    quickCheckBOTTColumns().catch(()=>{});
+  }
 }
 function exportCSV(){
   const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
