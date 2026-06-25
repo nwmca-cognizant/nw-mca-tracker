@@ -495,6 +495,13 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-item input{accent-color:var(--blue);width:13px;height:13px;cursor:pointer}
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
+/* ── Priority Flag ── */
+.pf-btn{background:none;border:none;cursor:pointer;font-size:15px;line-height:1;padding:0;color:#ccc;transition:color .15s,transform .1s;flex-shrink:0;display:inline-block}
+.pf-btn:hover{transform:scale(1.2)}
+.pf-btn.pf-on{color:#e24b4a}
+.pf-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(226,75,74,0.12);color:var(--red);border:1px solid rgba(226,75,74,0.35);white-space:nowrap;vertical-align:middle;margin-left:4px}
+.pf-filter-btn{font-size:11px;font-weight:600;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border);background:none;cursor:pointer;color:var(--t2);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.pf-filter-btn.active{background:rgba(226,75,74,0.10);border-color:var(--red);color:var(--red)}
 </style>
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 </head>
@@ -567,6 +574,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
     <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
     <div class="ni" onclick="quickFilter('thisweek')"><span class="ni-ic">📅</span><span class="ni-lbl">Due This Week</span></div>
+    <div class="ni" id="sb-priority-ni" onclick="quickFilter('priority')"><span class="ni-ic">🚩</span><span class="ni-lbl">Priority Demands</span><span class="ni-badge red" id="sb-pf">—</span></div>
   </nav>
   <div class="sb-foot">
     <div class="sb-user" id="sb-user">NW MCA Tracker</div>
@@ -606,6 +614,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <div class="multi-dd" id="bsa-dd"><button class="multi-dd-btn" onclick="toggleDD('bsa-dd',event)" id="f-bsa-btn">All BSAs ▾</button><div class="multi-dd-list" id="f-bsa-list" onclick="event.stopPropagation()"></div></div>
       <div class="multi-dd sel-hide-mob" id="sl-dd"><button class="multi-dd-btn" onclick="toggleDD('sl-dd',event)" id="f-sl-btn">All SLs ▾</button><div class="multi-dd-list" id="f-sl-list" onclick="event.stopPropagation()"></div></div>
       <select id="f-loc" onchange="filterChanged()" class="sel-hide-mob"><option value="">All locations</option><option>Offshore</option><option>Onsite</option><option>Canada</option><option>Mexico</option></select>
+      <button id="pf-filter-btn" class="pf-filter-btn" onclick="togglePriorityFilter()" title="Show only Priority demands">🚩 Priority Only</button>
       <span class="rcount-pill" id="rcount">—</span>
     </div>
     <div id="bulk-bar" class="bulk-bar">
@@ -856,6 +865,19 @@ const ST_LIST=['Open','Closed','Cancel','On Hold'];
 const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Coming up in 1 week','H) Coming up in 2 weeks','I) Not due yet'];
 const BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
 const BOTT_BAND_LIST=['','D','E','F','G','H'];
+// ── BOTT SharePoint internal column names ──────────────────────────────────
+// These must match the StaticName of each column in the BOTT SP list exactly.
+// To find a column's StaticName: List Settings → click column → check URL for Field=XXXX
+const BOTT_SP={
+  profileName1:    'Profile_Name_1',
+  profileName2:    'Profile_Name_2',
+  profile1SubDate: 'Profile_1_Submitted_Date',
+  profile2SubDate: 'Profile_2_Submitted_Date',
+  skillsSLA:       'Skills_Category_SLA',
+  slaBreached:     'SLA_Breached',
+  band:            'Band',
+  startDate:       'Start_Date',
+};
 // ── Microsoft 365 Configuration ──
 const SP_SITE_URL  = 'https://cognizantonline.sharepoint.com/sites/NWMCADemandTracker';
 const SP_LIST_ID   = '13d692ad-1d24-4091-8c46-00811d17c6e2';
@@ -876,7 +898,7 @@ let tokenExpiry = 0;
 // ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
-let demands=[], sortField='ageing_days', sortDir='desc', activeAg='', activeSpecial='', editId=null;
+let demands=[], sortField='ageing_days', sortDir='desc', activeAg='', activeSpecial='', editId=null, isPriorityFilter=false;
 let selectedIds=new Set(), bulkMode=false;
 let charts={}, notifLog=[], currentPage='tracker';
 
@@ -1029,7 +1051,15 @@ function mapItem(item){
   if(!item) return null;
   const f = item.fields || {};
   // Log SP field names on first read (helps debug column name issues)
-  if(!window._spLogged){ window._spLogged=true; console.log('SP fields returned:', Object.keys(f)); }
+  if(!window._spLogged){
+    window._spLogged=true;
+    console.log('SP fields returned:', Object.keys(f));
+    // BOTT column name diagnostic — logs which BOTT columns SP actually returned
+    const bottCols=Object.values(BOTT_SP);
+    const missing=bottCols.filter(c=>!(c in f));
+    if(missing.length) console.warn('BOTT SP columns NOT found (check StaticName in List Settings):', missing);
+    else console.log('BOTT SP columns all present:', bottCols);
+  }
   return {
     id:                 String(item.id),            // SP internal item ID — stored as string for type-safe comparison
     demand_id:          f.Title || '',              // Title column = Demand ID
@@ -1056,14 +1086,14 @@ function mapItem(item){
     fieldglass_status:  f.Fieldglass_Status || '',
     updated_by:         f.Updated_By || '',
     type:               'MCA',
-    band:                       f.Band||'',
-    start_date:                 f.Start_Date ? f.Start_Date.split('T')[0] : '',
-    profile_name_1:             f.Profile_Name_1||'',
-    profile_1_submitted_date:   f.Profile_1_Submitted_Date ? f.Profile_1_Submitted_Date.split('T')[0] : '',
-    profile_name_2:             f.Profile_Name_2||'',
-    profile_2_submitted_date:   f.Profile_2_Submitted_Date ? f.Profile_2_Submitted_Date.split('T')[0] : '',
-    skills_category_sla:        f.Skills_Category_SLA!==undefined && f.Skills_Category_SLA!==null ? Number(f.Skills_Category_SLA) : '',
-    sla_breached:               f.SLA_Breached||'',
+    band:                       f[BOTT_SP.band]||'',
+    start_date:                 f[BOTT_SP.startDate] ? f[BOTT_SP.startDate].split('T')[0] : '',
+    profile_name_1:             f[BOTT_SP.profileName1]||'',
+    profile_1_submitted_date:   f[BOTT_SP.profile1SubDate] ? f[BOTT_SP.profile1SubDate].split('T')[0] : '',
+    profile_name_2:             f[BOTT_SP.profileName2]||'',
+    profile_2_submitted_date:   f[BOTT_SP.profile2SubDate] ? f[BOTT_SP.profile2SubDate].split('T')[0] : '',
+    skills_category_sla:        f[BOTT_SP.skillsSLA]!==undefined && f[BOTT_SP.skillsSLA]!==null ? Number(f[BOTT_SP.skillsSLA]) : '',
+    sla_breached:               f[BOTT_SP.slaBreached]||'',
   };
 }
 
@@ -1109,9 +1139,9 @@ function mapFields(d){
   addText  ('Status_Updates',     d.status_updates);
   addText  ('Tier1_Program',      d.tier1_program);
   addText  ('FG_Form_Number',     d.fg_form_number);
-  // Fieldglass_Status column not present in SP list — skip
-  // addText('Fieldglass_Status', d.fieldglass_status);
-  addText  ('Updated_By',         d.updated_by || USER_NAME);
+  // Updated_By: skip — SP internal name conflicts with system columns on some list configurations.
+  // Audit trail is captured via Status_Updates timestamped entries instead.
+  // addText('Updated_By', d.updated_by);
 
   // Date fields — SP requires ISO 8601 with time: "2026-05-19T00:00:00Z"
   const addDate = (spCol, val) => {
@@ -1141,34 +1171,38 @@ function mapFields(d){
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
   if(isBOTT()){
     // Band
-    if(d.band!==undefined) addText('Band', d.band);
+    if(d.band!==undefined) addText(BOTT_SP.band, d.band);
     // Start Date
-    if(d.start_date!==undefined) addDate('Start_Date', d.start_date);
-    // Profile Name 1 — always write (null clears in SP, non-empty saves value)
+    if(d.start_date!==undefined) addDate(BOTT_SP.startDate, d.start_date);
+    // ── BOTT Profile fields ──────────────────────────────────────────────────
+    // Uses module-level BOTT_SP constant (defined near top of script).
+    // To change SP column names, update BOTT_SP at the top — mapItem and mapFields
+    // both reference it so they stay in sync automatically.
+    // Profile Name 1
     if(d.profile_name_1!==undefined){
-      if(d.profile_name_1===null||d.profile_name_1==='') f.Profile_Name_1=null;
-      else f.Profile_Name_1=String(d.profile_name_1);
+      if(d.profile_name_1===null||d.profile_name_1==='') f[BOTT_SP.profileName1]=null;
+      else f[BOTT_SP.profileName1]=String(d.profile_name_1);
     }
     // Profile 1 Submitted Date
     if(d.profile_1_submitted_date!==undefined){
-      if(d.profile_1_submitted_date) addDate('Profile_1_Submitted_Date', d.profile_1_submitted_date);
-      else f.Profile_1_Submitted_Date=null;
+      if(d.profile_1_submitted_date) addDate(BOTT_SP.profile1SubDate, d.profile_1_submitted_date);
+      else f[BOTT_SP.profile1SubDate]=null;
     }
-    // Profile Name 2 — always write (null clears in SP, non-empty saves value)
+    // Profile Name 2
     if(d.profile_name_2!==undefined){
-      if(d.profile_name_2===null||d.profile_name_2==='') f.Profile_Name_2=null;
-      else f.Profile_Name_2=String(d.profile_name_2);
+      if(d.profile_name_2===null||d.profile_name_2==='') f[BOTT_SP.profileName2]=null;
+      else f[BOTT_SP.profileName2]=String(d.profile_name_2);
     }
     // Profile 2 Submitted Date
     if(d.profile_2_submitted_date!==undefined){
-      if(d.profile_2_submitted_date) addDate('Profile_2_Submitted_Date', d.profile_2_submitted_date);
-      else f.Profile_2_Submitted_Date=null;
+      if(d.profile_2_submitted_date) addDate(BOTT_SP.profile2SubDate, d.profile_2_submitted_date);
+      else f[BOTT_SP.profile2SubDate]=null;
     }
-    // Skill Category SLA (number of days) — Requirement 3
+    // Skill Category SLA
     if(d.skills_category_sla!==undefined && d.skills_category_sla!==null && d.skills_category_sla!=='')
-      f.Skills_Category_SLA=Number(d.skills_category_sla)||0;
-    // SLA Breached flag (computed, stored as text choice in SP)
-    if(d.sla_breached!==undefined) addText('SLA_Breached', d.sla_breached);
+      f[BOTT_SP.skillsSLA]=Number(d.skills_category_sla)||0;
+    // SLA Breached — only write when a definitive value exists
+    if(d.sla_breached==='Yes'||d.sla_breached==='No') addText(BOTT_SP.slaBreached, d.sla_breached);
   }
   Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
 
@@ -1307,6 +1341,7 @@ window.addEventListener('load', async()=>{
     showLoader('Loading demands from SharePoint…');
     const data = await sbQ('demands','');
     demands = data;
+    loadPriority();
     hideLoader();
     document.getElementById('app').style.display='flex';
     document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
@@ -1335,7 +1370,7 @@ async function refreshData(){
   setSyncStatus('saving','↻ Refreshing…');
   try{
     const data=await sbQ('demands','');
-    demands=data;renderAll();setSyncStatus('ok','● Live');
+    demands=data;loadPriority();renderAll();setSyncStatus('ok','● Live');
   try{const _c=localStorage.getItem('nwmca_slpoc_map');if(_c){const _p=JSON.parse(_c);if(Object.keys(_p).length>0){SL_POC_MAP=_p;console.log('SL_POC_MAP restored:',Object.keys(_p).length,'SLs');}}}catch(_e){}
   applySwitcherState();
   loadAppConfig();
@@ -1387,7 +1422,7 @@ async function silentRefresh(){
   }
   try{
     const data=await sbQ('demands','');
-    if(JSON.stringify(data)!==JSON.stringify(demands)){demands=data;renderAll();toast('↻ Updated by another user','')}
+    if(JSON.stringify(data)!==JSON.stringify(demands)){demands=data;loadPriority();renderAll();toast('↻ Updated by another user','')}
   }catch(e){}
 }
 function setSyncStatus(cls,msg){const el=document.getElementById('sync-pill');el.className='sync-pill '+cls;el.textContent=msg}
@@ -1423,7 +1458,8 @@ function goPage(id,el){
 }
 function showAll(el){
   document.getElementById('f-st').value='';
-  activeAg=''; activeSpecial='';
+  activeAg=''; activeSpecial=''; isPriorityFilter=false;
+  const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');
   goPage('tracker',el||document.getElementById('nav-tracker'));
   renderAll();
 }
@@ -1438,7 +1474,10 @@ function quickFilter(type){
   else if(type==='noprofile'){document.getElementById('f-st').value='Open';activeSpecial='noprofile';}
   else if(type==='interview'){document.getElementById('f-st').value='Open';activeSpecial='interview';}
   else if(type==='thisweek'){document.getElementById('f-st').value='Open';activeSpecial='thisweek';}
+  else if(type==='priority'){activeSpecial='priority';isPriorityFilter=false;}
   else if(type==='open'){document.getElementById('f-st').value='Open';}
+  const pfBtn=document.getElementById('pf-filter-btn');
+  if(pfBtn) pfBtn.classList.toggle('active', isPriorityFilter);
   renderAll();
   closeMobMenu();
 }
@@ -1474,6 +1513,49 @@ function fmt(v){if(!v)return'—';return String(v).substring(0,10)}
 // ═══════════════════════════════════════
 // TRACKER RENDER
 // ═══════════════════════════════════════
+// ═══════════════════════════════════════
+// PRIORITY FLAGGING
+// ═══════════════════════════════════════
+function _loadPrioritySet(){
+  try{ return new Set(JSON.parse(localStorage.getItem('nwmca_priority')||'[]')); }
+  catch(e){ return new Set(); }
+}
+function _savePrioritySet(set){
+  try{ localStorage.setItem('nwmca_priority',JSON.stringify([...set])); }catch(e){}
+}
+function loadPriority(){
+  const set=_loadPrioritySet();
+  demands.forEach(d=>{ d.is_priority=set.has(String(d.demand_id)); });
+}
+function togglePriority(demandId, event){
+  if(event) event.stopPropagation();
+  const d=demands.find(x=>String(x.demand_id)===String(demandId)||String(x.id)===String(demandId));
+  if(!d) return;
+  d.is_priority=!d.is_priority;
+  const set=_loadPrioritySet();
+  if(d.is_priority) set.add(String(d.demand_id));
+  else set.delete(String(d.demand_id));
+  _savePrioritySet(set);
+  // Update all flag buttons for this demand without full re-render
+  document.querySelectorAll('.pf-btn[data-did="'+d.demand_id+'"]').forEach(btn=>{
+    btn.classList.toggle('pf-on', d.is_priority);
+    btn.title=d.is_priority?'Priority — click to remove':'Mark as Priority';
+  });
+  // Update sidebar badge count
+  const cnt=demands.filter(x=>x.is_priority).length;
+  const sbEl=document.getElementById('sb-pf');
+  if(sbEl) sbEl.textContent=cnt||'—';
+  // If priority filter is active and we just un-flagged, re-render to remove row
+  if(isPriorityFilter && !d.is_priority) { renderTbl(); renderCardList(); }
+}
+function togglePriorityFilter(){
+  isPriorityFilter=!isPriorityFilter;
+  const btn=document.getElementById('pf-filter-btn');
+  if(btn) btn.classList.toggle('active', isPriorityFilter);
+  activeSpecial=''; activeAg='';
+  renderAll();
+}
+
 function getFiltered(){
   const q=(document.getElementById('q').value||'').toLowerCase();
   const fs=document.getElementById('f-st').value;
@@ -1493,11 +1575,18 @@ function getFiltered(){
     if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
     if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
     if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)))return false;
+    if(activeSpecial==='priority'&&!d.is_priority)return false;
+    if(isPriorityFilter&&!d.is_priority)return false;
     return true;
   });
 }
 function getSorted(a){
   return[...a].sort((x,y)=>{
+    // Priority sort: flagged demands always float to top when sorting by is_priority
+    if(sortField==='is_priority'){
+      const pa=x.is_priority?1:0, pb=y.is_priority?1:0;
+      return sortDir==='desc'?pb-pa:pa-pb;
+    }
     let av=x[sortField],bv=y[sortField];
     if(av==null)av='';if(bv==null)bv='';
     if(typeof av==='number'&&typeof bv==='number')return sortDir==='asc'?av-bv:bv-av;
@@ -1505,7 +1594,7 @@ function getSorted(a){
   });
 }
 function sortBy(f){
-  const mp={demand_id:'si-id',demand_status:'si-st',profile_status:'si-ps',demand_type:'si-ty',bsa:'si-bsa',team_name:'si-team',skills:'si-sk',location:'si-loc',service_line:'si-sl',target_date:'si-tgt',ageing_days:'si-age',fg_form_number:'si-fg'};
+  const mp={demand_id:'si-id',demand_status:'si-st',profile_status:'si-ps',demand_type:'si-ty',bsa:'si-bsa',team_name:'si-team',skills:'si-sk',location:'si-loc',service_line:'si-sl',target_date:'si-tgt',ageing_days:'si-age',fg_form_number:'si-fg',is_priority:'si-pf',band:'si-band',profile_name_1:'si-pn1',profile_name_2:'si-pn2'};
   if(sortField===f)sortDir=sortDir==='asc'?'desc':'asc';else{sortField=f;sortDir='desc'}
   document.querySelectorAll('.si').forEach(i=>i.textContent='↕');
   document.querySelectorAll('th').forEach(t=>t.classList.remove('srt'));
@@ -1571,7 +1660,8 @@ function renderTbl(){
       var p2sub=d.profile_2_submitted_date?'<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_2_submitted_date)+'</div>':'';
       return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
         +cbCell
-        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+'</td>'
+        +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x1F6A9;</button></td>'
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
         +'<td>'+stB(d.demand_status)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
         +'<td style="font-size:11px;color:var(--t2);font-weight:600">'+(d.band||'&#8212;')+'</td>'
@@ -1589,7 +1679,8 @@ function renderTbl(){
     var bfSub=bf?'<div style="font-size:10px;color:var(--t3);margin-top:2px">&#x21A9; '+bf+'</div>':'';
     return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
       +cbCell
-      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+'</td>'
+      +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x1F6A9;</button></td>'
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
       +'<td>'+stB(d.demand_status)+'</td>'
       +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
       +'<td>'+tyB(d.demand_type)+'</td>'
@@ -1657,12 +1748,18 @@ function renderCardList(){
           +teamDiv+fgDiv;
       footerProfile='<div class="dc-profile" style="color:var(--t2)">'+(pf?'&#x1F464; '+pf:'No profile yet')+'</div>';
     }
-    return'<div class="demand-card'+(isChkC?' selected':'')+'" onclick="bulkMode?toggleRow('+d.id+',event):openDetail('+d.id+')" style="position:relative">'
+    return'<div class="demand-card'+(isChkC?' selected':'')+(d.is_priority?' pf-card':'')+'" onclick="bulkMode?toggleRow('+d.id+',event):openDetail('+d.id+')" style="position:relative'+(d.is_priority?';border-left:3px solid var(--red)':'')+'">'
       +'<div class="dc-stripe '+rc+'"></div>'
       +cbWrap
       +'<div class="dc-header">'
-        +'<div><div class="dc-id">#'+d.demand_id+'</div></div>'
-        +'<div class="dc-badges">'+badges+'</div>'
+        +'<div style="display:flex;align-items:center;gap:5px">'
+          +'<div class="dc-id">#'+d.demand_id+'</div>'
+          +(d.is_priority?'<span class="pf-badge">Priority</span>':'')
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+          +'<div class="dc-badges">'+badges+'</div>'
+          +'<button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'" style="font-size:16px">&#x1F6A9;</button>'
+        +'</div>'
       +'</div>'
       +'<div class="dc-title">'+(d.skills||'No skills specified')+'</div>'
       +'<div class="dc-meta">'+meta+'</div>'
@@ -1676,7 +1773,7 @@ function renderCardList(){
     +'</div>';
   }).join('');
 }
-function filterChanged(){activeSpecial='';renderAll();}
+function filterChanged(){activeSpecial='';isPriorityFilter=false;const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');renderAll();}
 function calcAgeingGroup(days){
   if(days===null||days===undefined||isNaN(days)) return '';
   if(days>70)  return 'A) > 10 weeks Overdue';
@@ -1697,8 +1794,24 @@ function renderAll(){
 function renderFilterBadge(){
   const el=document.getElementById('active-filter-bar');
   if(!el)return;
-  const L={overdue:'⚠ Showing overdue demands only (A–C)',noprofile:'👤 Showing demands with no profile assigned',interview:'💬 Showing demands at interview stage',thisweek:'📅 Showing demands due this week'};
-  if(activeSpecial&&L[activeSpecial]){
+  // Update sidebar priority count
+  const pCnt=demands.filter(d=>d.is_priority).length;
+  const sbPf=document.getElementById('sb-pf');
+  if(sbPf) sbPf.textContent=pCnt||'—';
+  // Update filter button state
+  const pfBtn=document.getElementById('pf-filter-btn');
+  if(pfBtn) pfBtn.classList.toggle('active', isPriorityFilter);
+  const L={
+    overdue:  '⚠ Showing overdue demands only (A\u2013C)',
+    noprofile:'👤 Showing demands with no profile assigned',
+    interview:'💬 Showing demands at interview stage',
+    thisweek: '📅 Showing demands due this week',
+    priority: '🚩 Showing Priority demands only',
+  };
+  if(isPriorityFilter){
+    el.style.display='flex';
+    el.innerHTML='<span style="font-size:12px;font-weight:500;color:var(--red)">🚩 Showing Priority demands only</span><button class="btn ghost sm" style="font-size:11px;padding:2px 8px;margin-left:auto" onclick="isPriorityFilter=false;const b=document.getElementById(\'pf-filter-btn\');if(b)b.classList.remove(\'active\');renderAll()">✕ Clear</button>';
+  } else if(activeSpecial&&L[activeSpecial]){
     el.style.display='flex';
     el.innerHTML='<span style="font-size:12px;font-weight:500;color:var(--blue)">'+L[activeSpecial]+'</span><button class="btn ghost sm" style="font-size:11px;padding:2px 8px;margin-left:auto" onclick="activeSpecial=\'\';renderAll()">✕ Clear</button>';
   } else { el.style.display='none'; }
@@ -2694,7 +2807,7 @@ function openDetail(id){
         <div class="di"><div class="dl">Added On</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.demand_added_on)}</div></div>
         <div class="di"><div class="dl">Target Start Date</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.target_date)}</div></div>
         ${d.demand_closure_date?`<div class="di"><div class="dl">Closure Date</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${fmt(d.demand_closure_date)}</div></div>`:''}
-        ${d.updated_by?`<div class="di full"><div class="dl">Last Updated By</div><div class="dv">${d.updated_by} · ${new Date(d.updated_at).toLocaleString()}</div></div>`:''}
+        ${d.updated_by?`<div class="di full"><div class="dl">Last Updated By</div><div class="dv">${d.updated_by}</div></div>`:''}
       </div>
     </div>
     <div class="ps"><div class="ps-title">Profile Information</div>
@@ -2868,7 +2981,8 @@ function makeForm(d,isNew){
     <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
-    <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
+    <div class="ff2 fg-full"><label>Status Updates / Notes <span style="font-size:10px;color:var(--t3);font-weight:400">(new entry only — existing history shown below)</span></label><textarea id="m-upd" placeholder="Type new note here…"></textarea></div>
+    ${d.status_updates?('<div class="ff2 fg-full"><label style="color:var(--t3)">Existing History (read-only)</label><div style="font-size:11px;color:var(--t2);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;max-height:120px;overflow-y:auto;white-space:pre-wrap;line-height:1.5">'+d.status_updates.replace(/</g,'&lt;')+'</div></div>'):''}
   </div>`;
 }
 function makeBOTTForm(d,isNew,addedVal,tgtVal){
@@ -2907,7 +3021,8 @@ function makeBOTTForm(d,isNew,addedVal,tgtVal){
     <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
     <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
-    <div class="ff2 fg-full"><label>Status Updates / Notes</label><textarea id="m-upd">${d.status_updates||''}</textarea></div>
+    <div class="ff2 fg-full"><label>Status Updates / Notes <span style="font-size:10px;color:var(--t3);font-weight:400">(new entry only — existing history shown below)</span></label><textarea id="m-upd" placeholder="Type new note here…"></textarea></div>
+    ${d.status_updates?('<div class="ff2 fg-full"><label style="color:var(--t3)">Existing History (read-only)</label><div style="font-size:11px;color:var(--t2);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;max-height:120px;overflow-y:auto;white-space:pre-wrap;line-height:1.5">'+d.status_updates.replace(/</g,'&lt;')+'</div></div>'):''}
   </div>`;
 }
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():''}
@@ -3004,8 +3119,10 @@ async function saveDemand(){
     // Skill Category SLA (days) — Requirement 3
     const slaRaw=gv('m-sla');
     _p.skills_category_sla = slaRaw ? parseInt(slaRaw,10) : null;
-    // Recalculate target date from Added On + SLA (in case user changed SLA without touching date)
-    if(_p.skills_category_sla && _p.demand_added_on){
+    // Recalculate target date only when: (a) new demand, or (b) SLA was entered/changed
+    // On edit we do NOT overwrite a user-manually-set target date
+    const slaChangedOrNew = !editId || (slaRaw && slaRaw !== String(demands.find(x=>String(x.id)===String(editId))?.skills_category_sla||''));
+    if(slaChangedOrNew && _p.skills_category_sla && _p.demand_added_on){
       const dtA=new Date(_p.demand_added_on);
       dtA.setDate(dtA.getDate()+_p.skills_category_sla);
       _p.target_date=dtA.toISOString().split('T')[0];
@@ -3057,9 +3174,9 @@ async function saveDemand(){
   // ─────────────────────────────────────────────────────────────────────────
   const clearableFields=bott
     ?['profile_name_1','profile_name_2','backfill_resource','so_id','sepm_sel','fg_form_number',
-      'status_updates','band','start_date','profile_1_submitted_date','profile_2_submitted_date',
-      'skills_category_sla','sla_breached']
-    :['profile_name','backfill_resource','so_id','team_name','sepm_sel','tier1_program','fg_form_number','status_updates'];
+      'band','start_date','profile_1_submitted_date','profile_2_submitted_date',
+      'skills_category_sla']
+    :['profile_name','backfill_resource','so_id','team_name','sepm_sel','tier1_program','fg_form_number'];
   const payload={};
   Object.keys(_p).forEach(k=>{
     const v=_p[k];
@@ -3093,7 +3210,9 @@ async function saveDemand(){
       if(isBOTT()){
         try{
           const spBase=LIST_BASE();
-          const spR=await gFetch(spBase+'/items?$expand=fields&$select=fields/Title&$orderby=fields/Title%20desc&$top=5');
+          // Note: SP Graph rejects $select=fields/Title combined with $orderby=fields/Title desc
+          // Use $expand=fields with $orderby only — returns full items, take Title from fields
+          const spR=await gFetch(spBase+'/items?$expand=fields&$orderby=fields/Title%20desc&$top=5');
           const spItems=spR?.value||[];
           const maxSP=spItems.reduce((mx,it)=>{const n=Number(it.fields?.Title||0);return n>mx?n:mx;},0);
           const maxLocal=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,0);
@@ -4344,6 +4463,7 @@ function applyTrackerTheme(mode){
     if(isBOTTMode){
       tr.innerHTML=''
         +'<th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">&#9634;</th>'
+        +'<th style="width:28px;text-align:center;padding:0" onclick="sortBy(\'is_priority\')" title="Sort by Priority"><i id="si-pf" class="si" style="font-style:normal">🚩</i></th>'
         +'<th style="width:52px" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
         +'<th style="width:80px" onclick="sortBy(\'demand_status\')">Status'+si+'</th>'
         +'<th style="width:148px" onclick="sortBy(\'profile_status\')">Profile Status'+si+'</th>'
@@ -4361,6 +4481,7 @@ function applyTrackerTheme(mode){
     } else {
       tr.innerHTML=''
         +'<th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">&#9634;</th>'
+        +'<th style="width:28px;text-align:center;padding:0" onclick="sortBy(\'is_priority\')" title="Sort by Priority"><i id="si-pf" class="si" style="font-style:normal">🚩</i></th>'
         +'<th style="width:52px" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
         +'<th style="width:80px" onclick="sortBy(\'demand_status\')">Status'+si+'</th>'
         +'<th style="width:148px" onclick="sortBy(\'profile_status\')">Profile Status'+si+'</th>'
