@@ -1057,11 +1057,13 @@ function mapItem(item){
     updated_by:         f.Updated_By || '',
     type:               'MCA',
     band:                       f.Band||'',
-    start_date:                 f.Start_Date||'',
+    start_date:                 f.Start_Date ? f.Start_Date.split('T')[0] : '',
     profile_name_1:             f.Profile_Name_1||'',
-    profile_1_submitted_date:   f.Profile_1_Submitted_Date||'',
+    profile_1_submitted_date:   f.Profile_1_Submitted_Date ? f.Profile_1_Submitted_Date.split('T')[0] : '',
     profile_name_2:             f.Profile_Name_2||'',
-    profile_2_submitted_date:   f.Profile_2_Submitted_Date||'',
+    profile_2_submitted_date:   f.Profile_2_Submitted_Date ? f.Profile_2_Submitted_Date.split('T')[0] : '',
+    skills_category_sla:        f.Skills_Category_SLA!==undefined && f.Skills_Category_SLA!==null ? Number(f.Skills_Category_SLA) : '',
+    sla_breached:               f.SLA_Breached||'',
   };
 }
 
@@ -1138,12 +1140,35 @@ function mapFields(d){
 
   // Remove undefined and empty string — but KEEP null (intentional SP field clear)
   if(isBOTT()){
-    if(d.band!==undefined) addText('Band',d.band);
-    if(d.start_date!==undefined)               f.Start_Date=d.start_date||null;
-    if(d.profile_name_1!==undefined)           addText('Profile_Name_1',d.profile_name_1);
-    if(d.profile_1_submitted_date!==undefined) f.Profile_1_Submitted_Date=d.profile_1_submitted_date||null;
-    if(d.profile_name_2!==undefined)           addText('Profile_Name_2',d.profile_name_2);
-    if(d.profile_2_submitted_date!==undefined) f.Profile_2_Submitted_Date=d.profile_2_submitted_date||null;
+    // Band
+    if(d.band!==undefined) addText('Band', d.band);
+    // Start Date
+    if(d.start_date!==undefined) addDate('Start_Date', d.start_date);
+    // Profile Name 1 — always write (null clears in SP, non-empty saves value)
+    if(d.profile_name_1!==undefined){
+      if(d.profile_name_1===null||d.profile_name_1==='') f.Profile_Name_1=null;
+      else f.Profile_Name_1=String(d.profile_name_1);
+    }
+    // Profile 1 Submitted Date
+    if(d.profile_1_submitted_date!==undefined){
+      if(d.profile_1_submitted_date) addDate('Profile_1_Submitted_Date', d.profile_1_submitted_date);
+      else f.Profile_1_Submitted_Date=null;
+    }
+    // Profile Name 2 — always write (null clears in SP, non-empty saves value)
+    if(d.profile_name_2!==undefined){
+      if(d.profile_name_2===null||d.profile_name_2==='') f.Profile_Name_2=null;
+      else f.Profile_Name_2=String(d.profile_name_2);
+    }
+    // Profile 2 Submitted Date
+    if(d.profile_2_submitted_date!==undefined){
+      if(d.profile_2_submitted_date) addDate('Profile_2_Submitted_Date', d.profile_2_submitted_date);
+      else f.Profile_2_Submitted_Date=null;
+    }
+    // Skill Category SLA (number of days) — Requirement 3
+    if(d.skills_category_sla!==undefined && d.skills_category_sla!==null && d.skills_category_sla!=='')
+      f.Skills_Category_SLA=Number(d.skills_category_sla)||0;
+    // SLA Breached flag (computed, stored as text choice in SP)
+    if(d.sla_breached!==undefined) addText('SLA_Breached', d.sla_breached);
   }
   Object.keys(f).forEach(k=>{ if(f[k]===undefined||f[k]==='') delete f[k]; });
 
@@ -1557,7 +1582,7 @@ function renderTbl(){
         +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t2)">'+fmt(d.target_date)+'</td>'
         +'<td>'+ageB(d.ageing_days,d.ageing_group)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)">'+pf1+p1sub+'</td>'
-        +'<td style="font-size:11px;color:var(--t2)">'+pf2+p2sub+'</td>'
+        +'<td style="font-size:11px;color:var(--t2)">'+pf2+p2sub+(d.sla_breached==='Yes'?'<div style="margin-top:2px">'+slaB(d.sla_breached)+'</div>':'')+'</td>'
         +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:var(--teal)" title="'+(d.fg_form_number||'')+'">'+( d.fg_form_number||'&#8212;')+'</td>'
         +actCell+'</tr>';
     }
@@ -1616,6 +1641,7 @@ function renderCardList(){
       footerProfile='<div style="display:flex;flex-direction:column;gap:3px">'
         +'<div style="font-size:11px;color:var(--t2)">'+pn1+'</div>'
         +'<div style="font-size:11px;color:var(--t2)">'+pn2+'</div>'
+        +(d.sla_breached==='Yes'?'<div style="margin-top:2px">'+slaB(d.sla_breached)+'</div>':'')
         +'</div>';
     } else {
       var teamDiv=d.team_name
@@ -2232,8 +2258,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
- 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
-  'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
+ 'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
   'CIS':             ['srividhya.balachandran@cognizant.com'],
@@ -2244,12 +2269,12 @@ let SL_POC_MAP={
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -2704,11 +2729,31 @@ function closePanel(){document.getElementById('panel').classList.remove('on');do
 // ═══════════════════════════════════════
 // ADD / EDIT FORM
 // ═══════════════════════════════════════
-function sel(id,opts,val,onch=''){return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${opts.map(o=>`<option${o===(val||'')?` selected`:``}>${o}</option>`).join('')}</select>`}
+function slaB(slaBreached){
+  if(!slaBreached||slaBreached==='No') return '';
+  if(slaBreached==='Yes') return '<span class="badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red);font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;white-space:nowrap">SLA Breached</span>';
+  return '';
+}
 function rlbl(t){return`${t} <span class="req-star">*</span>`}
 function autoCalcTarget(){
   const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
-  if(a&&t&&a.value){const dt=new Date(a.value);dt.setDate(dt.getDate()+21);t.value=dt.toISOString().split('T')[0]}
+  if(!a||!t||!a.value) return;
+  if(isBOTT()){
+    // BOTT: Target Date = Demand Added On + Skill Category SLA days
+    const slaEl=document.getElementById('m-sla');
+    const slaDays=slaEl&&slaEl.value?parseInt(slaEl.value,10):21;
+    if(!isNaN(slaDays)&&slaDays>0){
+      const dt=new Date(a.value);dt.setDate(dt.getDate()+slaDays);
+      t.value=dt.toISOString().split('T')[0];
+    }
+  } else {
+    // MCA: fixed +21 days
+    const dt=new Date(a.value);dt.setDate(dt.getDate()+21);t.value=dt.toISOString().split('T')[0];
+  }
+}
+function onSLAInput(){
+  // Recalculate Target Date whenever SLA days changes (BOTT only)
+  autoCalcTarget();
 }
 function onProfileNameInput(inp){
   const psEl=document.getElementById('m-ps');
@@ -2784,7 +2829,15 @@ function makeForm(d,isNew){
   const today=new Date().toISOString().split('T')[0];
   const addedVal=d.demand_added_on||today;
   let tgtVal=d.target_date||'';
-  if(isNew){const dt=new Date(addedVal);dt.setDate(dt.getDate()+21);tgtVal=dt.toISOString().split('T')[0];}
+  if(isNew){
+    if(isBOTT()&&d.skills_category_sla){
+      // BOTT new: Target = Added On + SLA days
+      const dt=new Date(addedVal);dt.setDate(dt.getDate()+Number(d.skills_category_sla));
+      tgtVal=dt.toISOString().split('T')[0];
+    } else {
+      const dt=new Date(addedVal);dt.setDate(dt.getDate()+21);tgtVal=dt.toISOString().split('T')[0];
+    }
+  }
   if(isBOTT()) return makeBOTTForm(d,isNew,addedVal,tgtVal);
   // ── MCA form (unchanged) ─────────────────────────────────────────────────
   return`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:8px 12px;border-radius:var(--r);margin-bottom:16px;font-weight:500">
@@ -2837,11 +2890,12 @@ function makeBOTTForm(d,isNew,addedVal,tgtVal){
     <div class="ff2 fg-full"><label>${rlbl('Skills Required')}</label><textarea id="m-sk">${d.skills||''}</textarea></div>
     <div class="ff2"><label>${rlbl('Location')}</label>${sel('loc',[''].concat(LOC_LIST),d.location)}</div>
     <div class="ff2"><label>SO ID</label><input id="m-soid" value="${d.so_id||''}"></div>
+    <div class="ff2"><label>Skill Category SLA <span style="font-size:10px;color:var(--t3);font-weight:400">(days)</span></label><input type="number" id="m-sla" min="1" max="365" value="${d.skills_category_sla||''}" placeholder="e.g. 14" oninput="onSLAInput()"></div>
 
     <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Dates</div>
     <div class="ff2"><label>${rlbl('Demand Added On')}</label><input type="date" id="m-added" value="${addedVal}" onchange="autoCalcTarget()"></div>
     <div class="ff2"><label>Start Date (FG)</label><input type="date" id="m-startdate" value="${d.start_date||''}" style="width:100%"></div>
-    <div class="ff2"><label>${rlbl('Target Start Date')} <span style="font-size:10px;color:var(--t3);font-weight:400">(auto +21 days &middot; editable)</span></label><input type="date" id="m-tgt" value="${tgtVal}"></div>
+    <div class="ff2"><label>${rlbl('Target Start Date')} <span style="font-size:10px;color:var(--t3);font-weight:400">(Added On + SLA days &middot; editable)</span></label><input type="date" id="m-tgt" value="${tgtVal}"></div>
     <div class="ff2"><label>Closure Date</label><input type="date" id="m-closed" value="${d.demand_closure_date||''}"></div>
 
     <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Profile Information</div>
@@ -2934,8 +2988,8 @@ async function saveDemand(){
     ageing_group:        gv('m-ag')||calcAgeingGroup(ageingDays),
     backfill_resource:   bf,
     fg_form_number:      gv('m-fg'),
-    status_updates:      gv('m-upd'),
-    updated_by:          USER_NAME,
+    // status_updates and updated_by are set conditionally below
+    // — only when the user has entered new notes text
   };
   if(bott){
     // BOTT-specific fields — read from BOTT form fields
@@ -2945,6 +2999,26 @@ async function saveDemand(){
     _p.profile_1_submitted_date = gv('m-p1sd')||null;
     _p.profile_name_2    = gv('m-pn2');
     _p.profile_2_submitted_date = gv('m-p2sd')||null;
+    // Skill Category SLA (days) — Requirement 3
+    const slaRaw=gv('m-sla');
+    _p.skills_category_sla = slaRaw ? parseInt(slaRaw,10) : null;
+    // Recalculate target date from Added On + SLA (in case user changed SLA without touching date)
+    if(_p.skills_category_sla && _p.demand_added_on){
+      const dtA=new Date(_p.demand_added_on);
+      dtA.setDate(dtA.getDate()+_p.skills_category_sla);
+      _p.target_date=dtA.toISOString().split('T')[0];
+    }
+    // SLA Breached — computed automatically:
+    // If either profile submission date > target date → SLA Breached
+    const tgtD=_p.target_date?new Date(_p.target_date):null;
+    const p1D =_p.profile_1_submitted_date?new Date(_p.profile_1_submitted_date):null;
+    const p2D =_p.profile_2_submitted_date?new Date(_p.profile_2_submitted_date):null;
+    if(tgtD && (p1D||p2D)){
+      const breached=(p1D&&p1D>tgtD)||(p2D&&p2D>tgtD);
+      _p.sla_breached=breached?'Yes':'No';
+    } else {
+      _p.sla_breached=null;
+    }
     // BOTT does not use team_name or tier1_program — set to null to avoid stale data
     _p.team_name         = null;
     _p.tier1_program     = null;
@@ -2955,16 +3029,34 @@ async function saveDemand(){
     _p.tier1_program     = gv('m-t1');
     _p.profile_name      = gv('m-prof');
   }
-  if(editId){
-    const prev=demands.find(x=>String(x.id)===String(editId));
-    const prevUpd=(prev?.status_updates||'').trim();
-    const rawUpd=gv('m-upd')||'';
+  // ── Status Updates / Updated By — conditional on user entering new notes ──
+  // Scenario 1: User entered notes → prepend timestamped entry, capture date + user
+  // Scenario 2: User changed other fields only (notes blank) → do NOT touch notes or updated_by
+  // Scenario 3: Notes blank on new demand → do NOT write notes or updated_by at all
+  const rawUpd=(gv('m-upd')||'').trim();
+  if(rawUpd){
+    // User entered new notes — capture date + user and prepend to history
     const dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-    const newLine=rawUpd.trim()?`[${dateStr} \u00B7 ${USER_NAME}] ${rawUpd.trim()}`:`[${dateStr} \u00B7 ${USER_NAME}] Status \u2192 ${normSt}`;
-    _p.status_updates=prevUpd?newLine+'\n'+prevUpd:newLine;
+    const newLine='['+dateStr+' \u00B7 '+USER_NAME+'] '+rawUpd;
+    if(editId){
+      const prevDemand=demands.find(x=>String(x.id)===String(editId));
+      const prevUpd=(prevDemand?.status_updates||'').trim();
+      _p.status_updates=prevUpd?newLine+'\n'+prevUpd:newLine;
+    } else {
+      // New demand with notes
+      _p.status_updates=newLine;
+    }
+    _p.updated_by=USER_NAME;
   }
+  // If rawUpd is blank:
+  //   - On edit: status_updates is not added to _p → SP field is left unchanged
+  //   - On new:  status_updates is not added to _p → SP field stays empty
+  //   - updated_by is not set in either case
+  // ─────────────────────────────────────────────────────────────────────────
   const clearableFields=bott
-    ?['profile_name_1','profile_name_2','backfill_resource','so_id','sepm_sel','fg_form_number','status_updates','band','start_date','profile_1_submitted_date','profile_2_submitted_date']
+    ?['profile_name_1','profile_name_2','backfill_resource','so_id','sepm_sel','fg_form_number',
+      'status_updates','band','start_date','profile_1_submitted_date','profile_2_submitted_date',
+      'skills_category_sla','sla_breached']
     :['profile_name','backfill_resource','so_id','team_name','sepm_sel','tier1_program','fg_form_number','status_updates'];
   const payload={};
   Object.keys(_p).forEach(k=>{
@@ -2992,8 +3084,28 @@ async function saveDemand(){
       }
       toast('Demand #'+demands[idx].demand_id+' updated \u2713','green');
     }else{
-      const maxId=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,3000);
-      payload.demand_id=maxId+1;
+      // ── Demand ID auto-increment ─────────────────────────────────────────
+      // BOTT: fetch true latest ID from SP to handle concurrent users correctly.
+      // MCA:  local array max is sufficient.
+      let nextId;
+      if(isBOTT()){
+        try{
+          const spBase=LIST_BASE();
+          const spR=await gFetch(spBase+'/items?$expand=fields&$select=fields/Title&$orderby=fields/Title%20desc&$top=5');
+          const spItems=spR?.value||[];
+          const maxSP=spItems.reduce((mx,it)=>{const n=Number(it.fields?.Title||0);return n>mx?n:mx;},0);
+          const maxLocal=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,0);
+          nextId=Math.max(maxSP,maxLocal)+1;
+          console.log('BOTT demand_id: SP max='+maxSP+' local max='+maxLocal+' next='+nextId);
+        }catch(idErr){
+          console.warn('BOTT: SP id fetch failed, using local max:', idErr.message);
+          nextId=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,0)+1;
+        }
+      } else {
+        const maxId=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,3000);
+        nextId=maxId+1;
+      }
+      payload.demand_id=nextId;
       payload.ageing_days=0;
       const res=await sbIns('demands',payload);
       const nd=Array.isArray(res)?res[0]:res;
