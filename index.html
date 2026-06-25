@@ -877,14 +877,15 @@ function spField(item, candidates){
 }
 // These are resolved lazily on first mapItem call — see resolveBOTT_SP()
 const BOTT_SP_CANDIDATES={
-  profileName1:    ['Profile_Name_1','ProfileName1','Profile_x0020_Name_x0020_1','Profile_Name_10','ProfileName_1'],
-  profileName2:    ['Profile_Name_2','ProfileName2','Profile_x0020_Name_x0020_2','Profile_Name_20','ProfileName_2'],
-  profile1SubDate: ['Profile_1_Submitted_Date','Profile1SubmittedDate','Profile_x0020_1_x0020_Submitted_x0020_Date','Profile_1_Submitted_Date0'],
-  profile2SubDate: ['Profile_2_Submitted_Date','Profile2SubmittedDate','Profile_x0020_2_x0020_Submitted_x0020_Date','Profile_2_Submitted_Date0'],
-  skillsSLA:       ['Skill_Category_SLA','Skills_Category_SLA','Skill_x0020_Category_x0020_SLA','SkillCategorySLA'],
-  slaBreached:     ['SLA_Breached','SLABreached','SLA_x0020_Breached','Sla_Breached'],
-  band:            ['Band','Band0'],
-  startDate:       ['Start_Date','StartDate','Start_x0020_Date'],
+  // Exact StaticNames from the BOTT_Demands SharePoint list (confirmed via image)
+  profileName1:    ['Profile_Name_1','ProfileName1'],
+  profileName2:    ['Profile_Name_2','ProfileName2'],
+  profile1SubDate: ['Profile_1_Submitted_Date','Profile1SubmittedDate','Profile_1_Subm'],
+  profile2SubDate: ['Profile_2_Submitted_Date','Profile2SubmittedDate','Profile_2_Subm'],
+  skillsSLA:       ['Skill_Category_SLA','Skills_Category_SLA'],
+  slaBreached:     ['SLA_Breached','SLABreached'],
+  band:            ['Band'],
+  startDate:       ['Start_Date','StartDate'],
 };
 let BOTT_SP={
   profileName1:    'Profile_Name_1',
@@ -1067,10 +1068,11 @@ const LIST_BASE=()=>isBOTT()?BOTT_DEMANDS_BASE():MCA_DEMANDS_BASE();
 const NOTIF_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/1d5784dd-ae28-4232-8217-4689d7126f85`;
 const POC_LIST_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/SL_POC_Config`;
 const APP_CONFIG_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/AppConfig`;
-const BOTT_DEMANDS_ID  ='3c6db472-6995-4d27-a3ac-7d2b09798a1d';
+const BOTT_DEMANDS_ID  ='3c6db472-6995-4d27-a3ac-7d2b09798a1d';  // kept for reference
 const BOTT_NOTIF_ID    ='fb2fc615-24f2-46c3-8c7e-46b1a5e4a965';
 const MCA_DEMANDS_BASE =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/13d692ad-1d24-4091-8c46-00811d17c6e2`;
-const BOTT_DEMANDS_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_DEMANDS_ID}`;
+// BOTT_Demands is a separate SP list — referenced by its list name (visible in URL: /Lists/BOTT_Demands/)
+const BOTT_DEMANDS_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/BOTT_Demands`;
 const BOTT_NOTIF_BASE  =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_NOTIF_ID}`;
 let TRACKER_MODE=localStorage.getItem('nwmca_tracker_mode')||'MCA';
 const isBOTT=()=>TRACKER_MODE==='BOTT';
@@ -1088,12 +1090,17 @@ function mapItem(item){
     const missing=bottCols.filter(c=>!(c in f));
     const found=bottCols.filter(c=>(c in f));
     if(missing.length){
-      console.warn('BOTT SP columns NOT found — SP rejected names:\n  '+missing.join('\n  '));
+      console.warn(
+        'BOTT SP columns NOT found — these columns do not exist in the SharePoint list.\n'+
+        'ACTION REQUIRED: Create the following columns in List Settings:\n  '+
+        missing.join('\n  ')+'\n'+
+        'Until created, those fields will not save. All other fields (Band, Status_Updates, etc.) save normally.'
+      );
       const hints=['profile','Profile','name','Name','submit','Submit','sla','SLA','breach','Breach'];
       const relevant=allKeys.filter(k=>hints.some(h=>k.includes(h)));
-      console.log('SP fields with profile/SLA keywords (use these in BOTT_SP config):\n  '+relevant.join('\n  '));
+      if(relevant.length) console.log('SP fields with profile/SLA keywords:\n  '+relevant.join('\n  '));
     } else {
-      console.log('BOTT SP columns all present:', found);
+      console.log('All BOTT SP columns present and mapped correctly.');
     }
   }
   resolveBOTT_SP(f);
