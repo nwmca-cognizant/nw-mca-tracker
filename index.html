@@ -496,9 +496,10 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 .multi-dd-sep{height:0.5px;background:var(--border2);margin:4px 0}
 .multi-dd-clear{padding:4px 12px;font-size:11px;color:var(--blue);cursor:pointer;text-align:right}
 /* ── Priority Flag ── */
-.pf-btn{background:none;border:none;cursor:pointer;font-size:15px;line-height:1;padding:0;color:#ccc;transition:color .15s,transform .1s;flex-shrink:0;display:inline-block}
-.pf-btn:hover{transform:scale(1.2)}
+.pf-btn{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;color:#bbb;transition:color .15s,transform .1s;flex-shrink:0;display:inline-block;font-style:normal;user-select:none}
+.pf-btn:hover{color:#e24b4a;transform:scale(1.15)}
 .pf-btn.pf-on{color:#e24b4a}
+.pf-btn.pf-on:hover{color:#c03030}
 .pf-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(226,75,74,0.12);color:var(--red);border:1px solid rgba(226,75,74,0.35);white-space:nowrap;vertical-align:middle;margin-left:4px}
 .pf-filter-btn{font-size:11px;font-weight:600;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border);background:none;cursor:pointer;color:var(--t2);display:flex;align-items:center;gap:5px;white-space:nowrap}
 .pf-filter-btn.active{background:rgba(226,75,74,0.10);border-color:var(--red);color:var(--red)}
@@ -1660,7 +1661,7 @@ function renderTbl(){
       var p2sub=d.profile_2_submitted_date?'<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_2_submitted_date)+'</div>':'';
       return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
         +cbCell
-        +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x1F6A9;</button></td>'
+        +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
         +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
         +'<td>'+stB(d.demand_status)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
@@ -1679,7 +1680,7 @@ function renderTbl(){
     var bfSub=bf?'<div style="font-size:10px;color:var(--t3);margin-top:2px">&#x21A9; '+bf+'</div>':'';
     return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
       +cbCell
-      +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x1F6A9;</button></td>'
+      +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
       +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
       +'<td>'+stB(d.demand_status)+'</td>'
       +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
@@ -1758,7 +1759,7 @@ function renderCardList(){
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:6px">'
           +'<div class="dc-badges">'+badges+'</div>'
-          +'<button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'" style="font-size:16px">&#x1F6A9;</button>'
+          +'<button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'" style="font-size:16px">&#x2691;&#xFE0E;</button>'
         +'</div>'
       +'</div>'
       +'<div class="dc-title">'+(d.skills||'No skills specified')+'</div>'
