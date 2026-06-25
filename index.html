@@ -867,18 +867,46 @@ const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks 
 const BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
 const BOTT_BAND_LIST=['','D','E','F','G','H'];
 // ── BOTT SharePoint internal column names ──────────────────────────────────
-// These must match the StaticName of each column in the BOTT SP list exactly.
-// To find a column's StaticName: List Settings → click column → check URL for Field=XXXX
-const BOTT_SP={
+// SP Graph API uses the column's StaticName (internal name), not its display name.
+// When SP rejects a field name, check the console diagnostic for correct names.
+// spField() tries multiple encodings and returns the first one found in the SP item.
+function spField(item, candidates){
+  const f=item.fields||item||{};
+  for(const c of candidates){ if(c in f) return c; }
+  return candidates[0]; // fallback to first
+}
+// These are resolved lazily on first mapItem call — see resolveBOTT_SP()
+const BOTT_SP_CANDIDATES={
+  profileName1:    ['Profile_Name_1','ProfileName1','Profile_x0020_Name_x0020_1','Profile_Name_10','ProfileName_1'],
+  profileName2:    ['Profile_Name_2','ProfileName2','Profile_x0020_Name_x0020_2','Profile_Name_20','ProfileName_2'],
+  profile1SubDate: ['Profile_1_Submitted_Date','Profile1SubmittedDate','Profile_x0020_1_x0020_Submitted_x0020_Date','Profile_1_Submitted_Date0'],
+  profile2SubDate: ['Profile_2_Submitted_Date','Profile2SubmittedDate','Profile_x0020_2_x0020_Submitted_x0020_Date','Profile_2_Submitted_Date0'],
+  skillsSLA:       ['Skill_Category_SLA','Skills_Category_SLA','Skill_x0020_Category_x0020_SLA','SkillCategorySLA'],
+  slaBreached:     ['SLA_Breached','SLABreached','SLA_x0020_Breached','Sla_Breached'],
+  band:            ['Band','Band0'],
+  startDate:       ['Start_Date','StartDate','Start_x0020_Date'],
+};
+let BOTT_SP={
   profileName1:    'Profile_Name_1',
   profileName2:    'Profile_Name_2',
   profile1SubDate: 'Profile_1_Submitted_Date',
   profile2SubDate: 'Profile_2_Submitted_Date',
-  skillsSLA:       'Skill_Category_SLA',       // SP column: Single line of text (not Skills_)
+  skillsSLA:       'Skill_Category_SLA',
   slaBreached:     'SLA_Breached',
   band:            'Band',
   startDate:       'Start_Date',
 };
+let _bottSpResolved=false;
+function resolveBOTT_SP(f){
+  if(_bottSpResolved) return;
+  _bottSpResolved=true;
+  const resolved={};
+  for(const [key,candidates] of Object.entries(BOTT_SP_CANDIDATES)){
+    resolved[key]=spField(f,candidates);
+  }
+  BOTT_SP=resolved;
+  console.log('BOTT_SP resolved:', JSON.stringify(BOTT_SP));
+}
 // ── Microsoft 365 Configuration ──
 const SP_SITE_URL  = 'https://cognizantonline.sharepoint.com/sites/NWMCADemandTracker';
 const SP_LIST_ID   = '13d692ad-1d24-4091-8c46-00811d17c6e2';
@@ -1054,13 +1082,21 @@ function mapItem(item){
   // Log SP field names on first read (helps debug column name issues)
   if(!window._spLogged){
     window._spLogged=true;
-    console.log('SP fields returned:', Object.keys(f));
-    // BOTT column name diagnostic — logs which BOTT columns SP actually returned
+    const allKeys=Object.keys(f);
+    console.log('SP fields returned ('+allKeys.length+'):\n'+allKeys.join('\n'));
     const bottCols=Object.values(BOTT_SP);
     const missing=bottCols.filter(c=>!(c in f));
-    if(missing.length) console.warn('BOTT SP columns NOT found (check StaticName in List Settings):', missing);
-    else console.log('BOTT SP columns all present:', bottCols);
+    const found=bottCols.filter(c=>(c in f));
+    if(missing.length){
+      console.warn('BOTT SP columns NOT found — SP rejected names:\n  '+missing.join('\n  '));
+      const hints=['profile','Profile','name','Name','submit','Submit','sla','SLA','breach','Breach'];
+      const relevant=allKeys.filter(k=>hints.some(h=>k.includes(h)));
+      console.log('SP fields with profile/SLA keywords (use these in BOTT_SP config):\n  '+relevant.join('\n  '));
+    } else {
+      console.log('BOTT SP columns all present:', found);
+    }
   }
+  resolveBOTT_SP(f);
   return {
     id:                 String(item.id),            // SP internal item ID — stored as string for type-safe comparison
     demand_id:          f.Title || '',              // Title column = Demand ID
@@ -2872,6 +2908,22 @@ function onSLAInput(){
   // Recalculate Target Date whenever SLA days changes (BOTT only)
   autoCalcTarget();
 }
+function onProfileNameChange(n){
+  // Auto-set submitted date to today when profile name is entered (BOTT only)
+  const nameEl=document.getElementById('m-pn'+n);
+  const dateEl=document.getElementById('m-p'+n+'sd');
+  if(!nameEl||!dateEl) return;
+  if(nameEl.value.trim() && !dateEl.value){
+    // Only auto-set if date is currently blank — never overwrite a manually entered date
+    dateEl.value=new Date().toISOString().split('T')[0];
+  }
+  if(!nameEl.value.trim()){
+    // If name is cleared, also clear the auto-set date (but only if it wasn't manually edited)
+    // We clear only if the date equals today (i.e., we auto-set it)
+    const today=new Date().toISOString().split('T')[0];
+    if(dateEl.value===today) dateEl.value='';
+  }
+}
 function onProfileNameInput(inp){
   const psEl=document.getElementById('m-ps');
   if(!psEl) return;
@@ -3017,9 +3069,9 @@ function makeBOTTForm(d,isNew,addedVal,tgtVal){
     <div class="ff2"><label>Closure Date</label><input type="date" id="m-closed" value="${d.demand_closure_date||''}"></div>
 
     <div class="fg-sect" style="color:#1d9e75;border-color:#1d9e75">Profile Information</div>
-    <div class="ff2"><label>Profile Name 1</label><input id="m-pn1" type="text" value="${(d.profile_name_1||'').replace(/"/g,'&quot;')}" placeholder="Candidate 1"></div>
+    <div class="ff2"><label>Profile Name 1</label><input id="m-pn1" type="text" value="${(d.profile_name_1||'').replace(/"/g,'&quot;')}" placeholder="Candidate 1" oninput="onProfileNameChange(1)"></div>
     <div class="ff2"><label>Profile 1 Submitted</label><input id="m-p1sd" type="date" value="${d.profile_1_submitted_date||''}" style="width:100%"></div>
-    <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2"></div>
+    <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2" oninput="onProfileNameChange(2)"></div>
     <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
     <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
     <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
