@@ -865,7 +865,27 @@ let SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting'
 const LOC_LIST=['Offshore','Onsite','Canada','Mexico'];
 const ST_LIST=['Open','Closed','Cancel','On Hold'];
 const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Coming up in 1 week','H) Coming up in 2 weeks','I) Not due yet'];
-const BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
+// BOTT Profile Status — populated from SP column choices at runtime
+// Fallback values used until SP fetch completes (on first BOTT form open)
+let BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
+let _bottPsLoaded=false;
+async function loadBOTTPSList(){
+  if(_bottPsLoaded) return;
+  try{
+    const cols=await gFetch(BOTT_DEMANDS_BASE()+'/columns?$filter=displayName eq \'Profile_Status\'&$select=name,displayName,choice');
+    const col=(cols?.value||[]).find(c=>c.name==='Profile_Status'||c.displayName==='Profile_Status');
+    const choices=(col?.choice?.choices||[]).filter(c=>c&&c.trim());
+    if(choices.length){
+      BOTT_PS_LIST=choices;
+      _bottPsLoaded=true;
+      console.log('BOTT Profile_Status choices loaded from SP ('+choices.length+'):\n  '+choices.join('\n  '));
+    } else {
+      console.warn('BOTT Profile_Status: no choices returned from SP, using fallback list');
+    }
+  }catch(e){
+    console.warn('Could not fetch BOTT Profile_Status choices:', e.message);
+  }
+}
 const BOTT_BAND_LIST=['','D','E','F','G','H'];
 // ── BOTT SharePoint internal column names ──────────────────────────────────
 // SP Graph API uses the column's StaticName (internal name), not its display name.
@@ -1794,7 +1814,7 @@ function renderTbl(){
       return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
         +cbCell
         +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
-        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
         +'<td>'+stB(d.demand_status)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
         +'<td style="font-size:11px;color:var(--t2);font-weight:600">'+(d.band||'&#8212;')+'</td>'
@@ -1813,7 +1833,7 @@ function renderTbl(){
     return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
       +cbCell
       +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
-      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
       +'<td>'+stB(d.demand_status)+'</td>'
       +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
       +'<td>'+tyB(d.demand_type)+'</td>'
@@ -3243,6 +3263,8 @@ function makeForm(d,isNew){
 }
 function makeBOTTForm(d,isNew,addedVal,tgtVal){
   // ── BOTT-specific Add/Edit form ──────────────────────────────────────────
+  // Ensure PS list is loaded from SP (async — updates BOTT_PS_LIST in background)
+  loadBOTTPSList().catch(()=>{});
   const psBOTT = sel('ps', BOTT_PS_LIST, d.profile_status);
   const bandSel= sel('band', BOTT_BAND_LIST, d.band||'');
   return`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:8px 12px;border-radius:var(--r);margin-bottom:16px;font-weight:500">
@@ -4219,6 +4241,14 @@ async function runDiagnostics(){
       }
       log('BOTT_Demands: all SP columns',null,
         bottColNames.filter(n=>!n.startsWith('_')&&n!=='id'&&n!=='ContentType').join(', '),'BOTT');
+      // Also fetch and display the actual Profile_Status choices
+      try{
+        const psCols=await gFetch(BOTT_DEMANDS_BASE()+'/columns?$filter=displayName eq \'Profile_Status\'&$select=name,choice');
+        const psCol=(psCols?.value||[]).find(c=>c.name==='Profile_Status');
+        const psChoices=(psCol?.choice?.choices||[]);
+        log('BOTT Profile_Status choices ('+psChoices.length+')',psChoices.length>0,
+          psChoices.length?psChoices.join(' | '):'No choices found — check SP column','BOTT',{choices:psChoices});
+      }catch(e){ log('BOTT Profile_Status choices',null,'Could not fetch: '+e.message,'BOTT'); }
     }catch(e){
       log('BOTT_Demands columns check',false,'Cannot read columns: '+e.message,'BOTT');
     }
@@ -4808,7 +4838,7 @@ function applyTrackerTheme(mode){
       tr.innerHTML=''
         +'<th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">&#9634;</th>'
         +'<th style="width:28px;text-align:center;padding:0" onclick="sortBy(\'is_priority\')" title="Sort by Priority"><i id="si-pf" class="si" style="font-style:normal">🚩</i></th>'
-        +'<th style="width:52px" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
+        +'<th style="width:70px;white-space:nowrap" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
         +'<th style="width:80px" onclick="sortBy(\'demand_status\')">Status'+si+'</th>'
         +'<th style="width:148px" onclick="sortBy(\'profile_status\')">Profile Status'+si+'</th>'
         +'<th style="width:55px" onclick="sortBy(\'band\')">Band'+si+'</th>'
@@ -4826,7 +4856,7 @@ function applyTrackerTheme(mode){
       tr.innerHTML=''
         +'<th class="cb-cell" onclick="toggleBulkMode()" title="Enable bulk select" id="th-cb" style="cursor:pointer;color:var(--t3);font-size:11px;user-select:none">&#9634;</th>'
         +'<th style="width:28px;text-align:center;padding:0" onclick="sortBy(\'is_priority\')" title="Sort by Priority"><i id="si-pf" class="si" style="font-style:normal">🚩</i></th>'
-        +'<th style="width:52px" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
+        +'<th style="width:70px;white-space:nowrap" onclick="sortBy(\'demand_id\')">ID'+si+'</th>'
         +'<th style="width:80px" onclick="sortBy(\'demand_status\')">Status'+si+'</th>'
         +'<th style="width:148px" onclick="sortBy(\'profile_status\')">Profile Status'+si+'</th>'
         +'<th style="width:65px" onclick="sortBy(\'demand_type\')">Type'+si+'</th>'
@@ -4848,6 +4878,7 @@ function applySwitcherState(){
   applyTrackerTheme(TRACKER_MODE);
   if(TRACKER_MODE==='BOTT' && typeof quickCheckBOTTColumns==='function'){
     quickCheckBOTTColumns().catch(()=>{});
+    loadBOTTPSList().catch(()=>{});  // pre-load PS choices so form dropdown is ready
   }
 }
 function exportCSV(){
