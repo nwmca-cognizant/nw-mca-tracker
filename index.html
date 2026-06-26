@@ -1959,55 +1959,162 @@ function renderBOTTDashboard(){
   const el=document.getElementById('charts-grid'),kpiEl=document.getElementById('kpis');
   if(!el||!kpiEl) return;
   const now=new Date(),thisM=now.getMonth(),thisY=now.getFullYear();
-  const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
-  const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
-  const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
-  const sla3Floor=35;
-  const subThisM=demands.filter(d=>{const sd=d.profile_1_submitted_date||d.profile_2_submitted_date;if(!sd)return false;const dd=new Date(sd);return dd.getMonth()===thisM&&dd.getFullYear()===thisY;});
-  const shortlistedM=subThisM.filter(d=>(d.profile_status||'').toLowerCase().includes('interview')||(d.demand_status||'').toLowerCase()==='closed');
-  const sla2=subThisM.length>0?Math.round(shortlistedM.length/subThisM.length*100):null;
-  const interviewed=demands.filter(d=>(d.profile_status||'').toLowerCase().includes('interview'));
-  const sla3=interviewed.length>0?Math.round(closed.length/interviewed.length*100):null;
-  const closedWT=closed.filter(d=>d.target_date&&d.demand_closure_date);
-  const onTime=closedWT.filter(d=>new Date(d.demand_closure_date)<=new Date(d.target_date));
-  const sla4=closedWT.length>0?Math.round(onTime.length/closedWT.length*100):null;
-  const bc={D:0,E:0,F:0,G:0,H:0};open.forEach(d=>{if(bc[d.band]!==undefined)bc[d.band]++;});
-  kpiEl.innerHTML=`
-    <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic" style="color:#1d9e75">📊</div><div><div class="kpi-v" style="color:${sla2===null?'var(--t3)':sla2>=50?'#1d9e75':'var(--amber)'}">${sla2===null?'—':sla2+'%'}</div><div class="kpi-l">SLA2 Profile Quality</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic" style="color:#5c1a7a">🎯</div><div><div class="kpi-v" style="color:${sla3===null?'var(--t3)':sla3>=sla3Floor?'#1d9e75':'var(--red)'}">${sla3===null?'—':sla3+'%'}</div><div class="kpi-l">SLA3 Interview→Hire</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic" style="color:#1a4b8c">⏱</div><div><div class="kpi-v" style="color:${sla4===null?'var(--t3)':sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'}">${sla4===null?'—':sla4+'%'}</div><div class="kpi-l">SLA4 On-Time Offer</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>`;
-  const months=[];for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({lb:d.toLocaleString('default',{month:'short'}),y:d.getFullYear(),m:d.getMonth()});}
-  const bW=40,gap=18,cH=100;let bars='',xax='';
-  months.forEach((mo,i)=>{
-    const inv=demands.filter(d=>{const ps=(d.profile_status||'').toLowerCase();if(!ps.includes('interview'))return false;const dd=new Date(d.profile_1_submitted_date||d.demand_added_on||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
-    const sel=demands.filter(d=>{if((d.demand_status||'').toLowerCase()!=='closed')return false;const dd=new Date(d.demand_closure_date||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
-    const pct=inv>0?Math.round(sel/inv*100):null;
-    const x=12+i*(bW+gap),h2=pct!==null?Math.round((pct/100)*cH):2;
-    const col=pct===null?'var(--border2)':pct>=sla3Floor?'#1d9e75':'#e24b4a';
-    bars+=`<rect x="${x}" y="${cH-h2}" width="${bW}" height="${h2}" fill="${col}" rx="3"/>`;
-    if(pct!==null) bars+=`<text x="${x+bW/2}" y="${cH-h2-5}" text-anchor="middle" font-size="9" font-weight="500" fill="${col}">${pct}%</text>`;
-    xax+=`<text x="${x+bW/2}" y="${cH+14}" text-anchor="middle" font-size="10" fill="var(--t3)">${mo.lb}</text>`;
+
+  // ── Core counts ──────────────────────────────────────────────────────────
+  const open    = demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const closed  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
+  const cancelled=demands.filter(d=>(d.demand_status||'').toLowerCase()==='cancel');
+  const total   = demands.length;
+
+  // ── Ageing ───────────────────────────────────────────────────────────────
+  const overdue = open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const warning = open.filter(d=>['D)','E)'].some(p=>(d.ageing_group||'').startsWith(p)));
+  const onTrack = open.filter(d=>['F)','G)','H)','I)','J)'].some(p=>(d.ageing_group||'').startsWith(p)));
+
+  // ── Profile submission status ─────────────────────────────────────────────
+  const withP1  = open.filter(d=>(d.profile_name_1||'').trim());
+  const withP2  = open.filter(d=>(d.profile_name_2||'').trim());
+  const noProfile=open.filter(d=>!(d.profile_name_1||'').trim()&&!(d.profile_name_2||'').trim());
+  const atInterview=open.filter(d=>(d.profile_status||'').toLowerCase().includes('interview'));
+
+  // ── SLA Breach ───────────────────────────────────────────────────────────
+  const breached=demands.filter(d=>d.sla_breached==='Yes');
+  const breachedOpen=breached.filter(d=>(d.demand_status||'').toLowerCase()==='open');
+  const breachPct=open.length>0?Math.round(breachedOpen.length/open.length*100):0;
+
+  // ── Profile submission this month ─────────────────────────────────────────
+  const submittedThisM=demands.filter(d=>{
+    const sd=d.profile_1_submitted_date||d.profile_2_submitted_date;
+    if(!sd) return false;
+    const dd=new Date(sd);
+    return dd.getMonth()===thisM&&dd.getFullYear()===thisY;
   });
-  const svgW=12+months.length*(bW+gap)+12;
-  bars+=`<line x1="0" y1="${cH-sla3Floor}" x2="${svgW}" y2="${cH-sla3Floor}" stroke="#e24b4a" stroke-width="1" stroke-dasharray="4 3" opacity=".6"/>`;
-  bars+=`<text x="${svgW-2}" y="${cH-sla3Floor-4}" text-anchor="end" font-size="9" fill="#e24b4a">${sla3Floor}% floor</text>`;
-  const bsaC={};open.forEach(d=>{bsaC[d.bsa]=(bsaC[d.bsa]||0)+1;});
-  const bsaE=Object.entries(bsaC).sort((a,b)=>b[1]-a[1]);const mx=bsaE[0]?.[1]||1;
-  el.innerHTML=`
-    <div class="cc w3"><div class="cc-hd"><div class="cc-title">SLA3 — Interview to hire (monthly)</div><div class="cc-sub">Green = above ${sla3Floor}% floor · Red = breach</div></div>
-      <svg width="100%" viewBox="0 0 ${svgW} ${cH+24}" style="overflow:visible;max-height:130px;display:block;padding:8px 0">${bars}${xax}</svg></div>
-    <div class="cc"><div class="cc-hd"><div class="cc-title">SLA4 — Time to offer</div><div class="cc-sub">${onTime.length} of ${closedWT.length} met target</div></div>
-      <div style="padding:10px 0"><div style="font-size:28px;font-weight:500;color:${sla4===null?'var(--t3)':sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'}">${sla4===null?'No data':sla4+'%'}</div>
-      <div style="margin-top:8px;background:var(--border2);border-radius:4px;height:6px;overflow:hidden"><div style="height:100%;background:${sla4>=80?'#1d9e75':sla4>=60?'var(--amber)':'var(--red)'};width:${sla4||0}%"></div></div></div></div>
-    <div class="cc"><div class="cc-hd"><div class="cc-title">SLA2 — Profile quality</div><div class="cc-sub">${shortlistedM.length} shortlisted / ${subThisM.length} submitted this month</div></div>
-      <div style="padding:10px 0"><div style="font-size:28px;font-weight:500;color:${sla2===null?'var(--t3)':sla2>=50?'#1d9e75':'var(--amber)'}">${sla2===null?'No data':sla2+'%'}</div></div></div>
-    <div class="cc w2"><div class="cc-hd"><div class="cc-title">Open demands by BSA</div></div>
-      <div>${bsaE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/mx*100)+'%;background:#1d9e75"></div></div><div class="bsa-num">'+c+'</div></div>').join('')}</div></div>
-    <div class="cc"><div class="cc-hd"><div class="cc-title">Band distribution</div><div class="cc-sub">Open demands by band</div></div>
-      <div style="margin-top:8px">${Object.entries(bc).map(([b,c])=>'<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--border2);font-size:12px"><span style="font-weight:500">Band '+b+'</span><span style="color:#1d9e75;font-weight:500">'+c+'</span></div>').join('')}</div></div>`;
+
+  // ── Band distribution (open) ─────────────────────────────────────────────
+  const bc={D:0,E:0,F:0,G:0,H:0};
+  open.forEach(d=>{if(bc[d.band]!==undefined)bc[d.band]++;});
+
+  // ── BSA distribution (open) ─────────────────────────────────────────────
+  const bsaC={};
+  open.forEach(d=>{if(d.bsa)bsaC[d.bsa]=(bsaC[d.bsa]||0)+1;});
+  const bsaE=Object.entries(bsaC).sort((a,b)=>b[1]-a[1]);
+  const bsaMx=bsaE[0]?.[1]||1;
+
+  // ── Service line distribution (open) ────────────────────────────────────
+  const slC={};
+  open.forEach(d=>{if(d.service_line)slC[d.service_line]=(slC[d.service_line]||0)+1;});
+  const slE=Object.entries(slC).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  // ── Profile status pipeline ──────────────────────────────────────────────
+  const psC={};
+  open.forEach(d=>{const ps=(d.profile_status||'Open').replace(/^\d+\.\s*/,'');psC[ps]=(psC[ps]||0)+1;});
+  const psE=Object.entries(psC).sort((a,b)=>b[1]-a[1]);
+  const psMx=psE[0]?.[1]||1;
+
+  // ── Monthly demand trend (added) ─────────────────────────────────────────
+  const months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    months.push({lb:d.toLocaleString('default',{month:'short'}),y:d.getFullYear(),m:d.getMonth()});
+  }
+
+  // ── KPI Cards ────────────────────────────────────────────────────────────
+  kpiEl.innerHTML=''
+    +'<div class="kpi-card"><div class="kpi-ic blue">&#9711;</div><div>'
+    +'<div class="kpi-v" style="color:var(--blue)">'+open.length+'</div>'
+    +'<div class="kpi-l">Open Demands</div></div></div>'
+
+    +'<div class="kpi-card"><div class="kpi-ic red">&#9888;</div><div>'
+    +'<div class="kpi-v" style="color:var(--red)">'+overdue.length+'</div>'
+    +'<div class="kpi-l">Critical Overdue (A&#x2013;C)</div></div></div>'
+
+    +'<div class="kpi-card"><div class="kpi-ic" style="color:var(--amber)">&#9711;</div><div>'
+    +'<div class="kpi-v" style="color:var(--amber)">'+warning.length+'</div>'
+    +'<div class="kpi-l">At Risk (D&#x2013;E)</div></div></div>'
+
+    +'<div class="kpi-card"><div class="kpi-ic" style="color:#e24b4a">&#x1F6A9;</div><div>'
+    +'<div class="kpi-v" style="color:'+(breachedOpen.length>0?'var(--red)':'#1d9e75')+'">'+breachedOpen.length+'</div>'
+    +'<div class="kpi-l">SLA Breached (Open)</div><div style="font-size:10px;color:var(--t3);margin-top:2px">'+breachPct+'% of open demands</div></div></div>'
+
+    +'<div class="kpi-card"><div class="kpi-ic" style="color:#1d9e75">&#10003;</div><div>'
+    +'<div class="kpi-v" style="color:var(--green)">'+closed.length+'</div>'
+    +'<div class="kpi-l">Closed / Fulfilled</div></div></div>'
+
+    +'<div class="kpi-card"><div class="kpi-ic" style="color:var(--t3)">&#8943;</div><div>'
+    +'<div class="kpi-v" style="color:var(--t2)">'+total+'</div>'
+    +'<div class="kpi-l">Total Records</div></div></div>';
+
+  // ── Charts grid ──────────────────────────────────────────────────────────
+  const bW=40,gap=16,cH=100;
+
+  // Monthly trend bars
+  let trendBars='',trendXax='';
+  const monthMaxT=Math.max(...months.map(mo=>demands.filter(d=>{const dd=new Date(d.demand_added_on||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length),1);
+  months.forEach((mo,i)=>{
+    const cnt=demands.filter(d=>{const dd=new Date(d.demand_added_on||'');return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
+    const x=12+i*(bW+gap),h=Math.max(2,Math.round(cnt/monthMaxT*cH));
+    trendBars+='<rect x="'+x+'" y="'+(cH-h)+'" width="'+bW+'" height="'+h+'" fill="#1d9e75" rx="3"/>';
+    if(cnt>0) trendBars+='<text x="'+(x+bW/2)+'" y="'+(cH-h-4)+'" text-anchor="middle" font-size="9" font-weight="500" fill="#1d9e75">'+cnt+'</text>';
+    trendXax+='<text x="'+(x+bW/2)+'" y="'+(cH+14)+'" text-anchor="middle" font-size="10" fill="var(--t3)">'+mo.lb+'</text>';
+  });
+  const trendW=12+months.length*(bW+gap)+12;
+
+  // Profile submission bars (monthly)
+  let subBars='',subXax='';
+  const subMonthMax=Math.max(...months.map(mo=>demands.filter(d=>{const sd=d.profile_1_submitted_date||d.profile_2_submitted_date;if(!sd)return false;const dd=new Date(sd);return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length),1);
+  months.forEach((mo,i)=>{
+    const cnt=demands.filter(d=>{const sd=d.profile_1_submitted_date||d.profile_2_submitted_date;if(!sd)return false;const dd=new Date(sd);return dd.getMonth()===mo.m&&dd.getFullYear()===mo.y;}).length;
+    const x=12+i*(bW+gap),h=Math.max(2,Math.round(cnt/subMonthMax*cH));
+    const isTM=mo.m===thisM&&mo.y===thisY;
+    subBars+='<rect x="'+x+'" y="'+(cH-h)+'" width="'+bW+'" height="'+h+'" fill="'+(isTM?'#1a4b8c':'#7baee8')+'" rx="3"/>';
+    if(cnt>0) subBars+='<text x="'+(x+bW/2)+'" y="'+(cH-h-4)+'" text-anchor="middle" font-size="9" font-weight="500" fill="'+(isTM?'#1a4b8c':'#7baee8')+'">'+cnt+'</text>';
+    subXax+='<text x="'+(x+bW/2)+'" y="'+(cH+14)+'" text-anchor="middle" font-size="10" fill="var(--t3)">'+mo.lb+'</text>';
+  });
+
+  // SLA breach by BSA
+  const bsaBreach={};
+  demands.forEach(d=>{if(d.sla_breached==='Yes'&&d.bsa)bsaBreach[d.bsa]=(bsaBreach[d.bsa]||0)+1;});
+  const bsaBreachE=Object.entries(bsaBreach).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const bsaBreachMx=bsaBreachE[0]?.[1]||1;
+
+  el.innerHTML=''
+    // Row 1: Demand trend + Profile pipeline
+    +'<div class="cc w3"><div class="cc-hd"><div class="cc-title">Demand Added — Monthly Trend</div><div class="cc-sub">New demands added per month (last 6 months)</div></div>'
+    +'<svg width="100%" viewBox="0 0 '+trendW+' '+(cH+24)+'" style="overflow:visible;max-height:130px;display:block;padding:8px 0">'+trendBars+trendXax+'</svg></div>'
+
+    +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">Profile Submission Pipeline</div><div class="cc-sub">Open demands · current status</div></div>'
+    +'<div style="margin-top:8px">'
+    +psE.map(([ps,c])=>'<div class="bsa-row" title="'+ps+'"><div class="bsa-name" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ps+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/psMx*100)+'%;background:#1d9e75"></div></div><div class="bsa-num">'+c+'</div></div>').join('')
+    +'</div></div>'
+
+    // Row 2: SLA Breach detail + Profiles submitted + Band
+    +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">&#x1F6A9; SLA Breach by BSA</div><div class="cc-sub">Demands where submission exceeded target date</div></div>'
+    +(bsaBreachE.length
+      ?'<div style="margin-top:8px">'+bsaBreachE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/bsaBreachMx*100)+'%;background:var(--red)"></div></div><div class="bsa-num" style="color:var(--red)">'+c+'</div></div>').join('')+'</div>'
+      :'<div style="padding:24px 0;text-align:center;color:var(--t3);font-size:12px">&#10003; No SLA breaches recorded</div>')
+    +'</div>'
+
+    +'<div class="cc"><div class="cc-hd"><div class="cc-title">Profiles Submitted This Month</div><div class="cc-sub">'+submittedThisM.length+' submissions · '+now.toLocaleString('default',{month:'long'})+' '+thisY+'</div></div>'
+    +'<svg width="100%" viewBox="0 0 '+trendW+' '+(cH+24)+'" style="overflow:visible;max-height:130px;display:block;padding:8px 0">'+subBars+subXax+'</svg></div>'
+
+    +'<div class="cc"><div class="cc-hd"><div class="cc-title">Band Distribution</div><div class="cc-sub">Open demands by candidate band</div></div>'
+    +'<div style="margin-top:8px">'+Object.entries(bc).map(([b,c])=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border2);font-size:12px"><span style="font-weight:600">Band '+b+'</span>'+(c>0?'<span style="background:#1d9e75;color:white;border-radius:10px;padding:1px 10px;font-size:11px;font-weight:600">'+c+'</span>':'<span style="color:var(--t3)">0</span>')+'</div>').join('')+'</div></div>'
+
+    // Row 3: Open by BSA + Open by Service Line + Profile coverage
+    +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">Open Demands by BSA</div></div>'
+    +'<div style="margin-top:8px">'+bsaE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/bsaMx*100)+'%;background:#1a4b8c"></div></div><div class="bsa-num">'+c+'</div></div>').join('')+'</div></div>'
+
+    +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">Open Demands by Service Line</div></div>'
+    +'<div style="margin-top:8px">'+slE.map(([sl,c])=>'<div class="bsa-row"><div class="bsa-name" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+sl+'">'+sl+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/(slE[0]?.[1]||1)*100)+'%;background:#7baee8"></div></div><div class="bsa-num">'+c+'</div></div>').join('')+'</div></div>'
+
+    +'<div class="cc"><div class="cc-hd"><div class="cc-title">Profile Coverage</div><div class="cc-sub">Open demands</div></div>'
+    +'<div style="margin-top:10px">'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--t3)">Profile 1 assigned</span><span style="font-weight:600;color:#1d9e75">'+withP1.length+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--t3)">Profile 2 assigned</span><span style="font-weight:600;color:#1a4b8c">'+withP2.length+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--t3)">At Interview stage</span><span style="font-weight:600;color:var(--amber)">'+atInterview.length+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;border-top:1px solid var(--border2);padding-top:8px"><span style="color:var(--red)">No profile yet</span><span style="font-weight:600;color:var(--red)">'+noProfile.length+'</span></div>'
+    +'</div></div></div>';
 }
 function renderDash(){
   destroyAll();
@@ -4705,13 +4812,49 @@ function applySwitcherState(){
   }
 }
 function exportCSV(){
-  const hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
-  const rows=demands.map(d=>hdrs.map(h=>`"${(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ')}"`).join(','));
+  let hdrs, filename;
+  if(isBOTT()){
+    // BOTT export — BOTT-specific fields only
+    hdrs=['demand_id','demand_status','profile_status','demand_type','bsa',
+          'service_line','location','band','sepm_sel','skills',
+          'demand_added_on','start_date','target_date','demand_closure_date',
+          'ageing_days','ageing_group','so_id',
+          'profile_name_1','profile_1_submitted_date',
+          'profile_name_2','profile_2_submitted_date',
+          'backfill_resource','fg_form_number',
+          'skills_category_sla','sla_breached',
+          'status_updates'];
+    filename='BOTT_Demands_'+new Date().toISOString().split('T')[0]+'.csv';
+  } else {
+    // MCA export — original columns unchanged
+    hdrs=['demand_id','so_id','demand_status','profile_status','type','demand_added_on','demand_closure_date','ageing_days','ageing_group','target_date','demand_type','bsa','team_name','sepm_sel','skills','location','service_line','backfill_resource','profile_name','status_updates','tier1_program','fg_form_number','fieldglass_status'];
+    filename='NW_MCA_Demands_'+new Date().toISOString().split('T')[0]+'.csv';
+  }
+  const filtered=getFiltered(); // respect active filters
+  const rows=filtered.map(d=>hdrs.map(h=>{
+    const v=(d[h]||'').toString().replace(/"/g,'""').replace(/\n/g,' ');
+    return '"'+v+'"';
+  }).join(','));
+  // Human-readable headers for the CSV
+  const headerLabels=isBOTT()?{
+    demand_id:'Demand ID',demand_status:'Status',profile_status:'Profile Status',
+    demand_type:'Type',bsa:'BSA',service_line:'Service Line',location:'Location',
+    band:'Band',sepm_sel:'SEPM/SEL',skills:'Skills',
+    demand_added_on:'Added On',start_date:'Start Date (FG)',
+    target_date:'Target Date',demand_closure_date:'Closure Date',
+    ageing_days:'Ageing Days',ageing_group:'Ageing Group',so_id:'SO ID',
+    profile_name_1:'Profile Name 1',profile_1_submitted_date:'Profile 1 Submitted',
+    profile_name_2:'Profile Name 2',profile_2_submitted_date:'Profile 2 Submitted',
+    backfill_resource:'Current Resource (Backfill)',fg_form_number:'FG/JP ID',
+    skills_category_sla:'Skill Category SLA (days)',sla_breached:'SLA Breached',
+    status_updates:'Status Updates / Notes',
+  }:{};
+  const headerRow=hdrs.map(h=>'"'+(headerLabels[h]||h)+'"').join(',');
   const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent([hdrs.join(','),...rows].join('\n'));
-  a.download='NW_MCA_Demands_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent([headerRow,...rows].join('\n'));
+  a.download=filename;
   a.click();
-  toast(`${demands.length} records exported ✓`,'green');
+  toast(filtered.length+' records exported \u2713','green');
 }
 
 // ═══════════════════════════════════════
