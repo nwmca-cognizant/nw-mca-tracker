@@ -3671,32 +3671,47 @@ function parseImpCSV(file){
     // Parse header — normalise to lowercase internal keys
     const rawHdrs=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
     const colMap={
-      'demand_id':'demand_id','Demand_ID':'demand_id','Title':'demand_id','title':'demand_id',
-      'so_id':'so_id','SO_ID':'so_id',
-      'demand_status':'demand_status','Demand_Status':'demand_status',
-      'profile_status':'profile_status','Profile_Status':'profile_status',
-      'demand_type':'demand_type','Demand_Type':'demand_type',
+      // ── Core fields (MCA + BOTT shared) ──
+      'demand_id':'demand_id','Demand ID':'demand_id','Demand_ID':'demand_id','Title':'demand_id','title':'demand_id',
+      'so_id':'so_id','SO ID':'so_id','SO_ID':'so_id',
+      'demand_status':'demand_status','Status':'demand_status','Demand_Status':'demand_status',
+      'profile_status':'profile_status','Profile Status':'profile_status','Profile_Status':'profile_status',
+      'demand_type':'demand_type','Type':'demand_type','Demand_Type':'demand_type',
       'bsa':'bsa','BSA':'bsa',
       'team_name':'team_name','Team_Name':'team_name',
-      'sepm_sel':'sepm_sel','SEPM_SEL':'sepm_sel','semp_sel':'sepm_sel','SEMP_SEL':'sepm_sel',
+      'sepm_sel':'sepm_sel','SEPM/SEL':'sepm_sel','SEPM_SEL':'sepm_sel','semp_sel':'sepm_sel','SEMP_SEL':'sepm_sel',
       'skills':'skills','Skills':'skills',
       'location':'location','Location':'location','on/of':'location','ON/OF':'location',
-      'service_line':'service_line','Service_Line':'service_line',
-      'demand_added_on':'demand_added_on','Demand_Added_On':'demand_added_on','demand added on date':'demand_added_on',
-      'target_date':'target_date','Target_Date':'target_date','Targeting for?':'target_date',
-      'demand_closure_date':'demand_closure_date','Demand_Closure_Date':'demand_closure_date',
-      'ageing_days':'ageing_days','Ageing_Days':'ageing_days',
-      'ageing_group':'ageing_group','Ageing_Group':'ageing_group',
+      'service_line':'service_line','Service Line':'service_line','Service_Line':'service_line',
+      'demand_added_on':'demand_added_on','Added On':'demand_added_on','Demand_Added_On':'demand_added_on','demand added on date':'demand_added_on',
+      'target_date':'target_date','Target Date':'target_date','Target_Date':'target_date','Targeting for?':'target_date',
+      'demand_closure_date':'demand_closure_date','Closure Date':'demand_closure_date','Demand_Closure_Date':'demand_closure_date',
+      'ageing_days':'ageing_days','Ageing Days':'ageing_days','Ageing_Days':'ageing_days',
+      'ageing_group':'ageing_group','Ageing Group':'ageing_group','Ageing_Group':'ageing_group',
       'profile_name':'profile_name','Profile_Name':'profile_name',
-      'backfill_resource':'backfill_resource','Backfill_Resource':'backfill_resource',
-      'status_updates':'status_updates','Status_Updates':'status_updates',
+      'backfill_resource':'backfill_resource','Current Resource (Backfill)':'backfill_resource','Backfill_Resource':'backfill_resource',
+      'status_updates':'status_updates','Status Updates / Notes':'status_updates','Status_Updates':'status_updates',
       'tier1_program':'tier1_program','Tier1_Program':'tier1_program',
-      'fg_form_number':'fg_form_number','FG_Form_Number':'fg_form_number',
+      'fg_form_number':'fg_form_number','FG/JP ID':'fg_form_number','FG_Form_Number':'fg_form_number',
       'fieldglass_status':'fieldglass_status','Fieldglass_Status':'fieldglass_status',
       'updated_by':'updated_by','Updated_By':'updated_by',
+      // ── BOTT-specific fields ──────────────────────────────────────────────
+      'band':'band','Band':'band',
+      'start_date':'start_date','Start Date (FG)':'start_date','Start_Date':'start_date',
+      'profile_name_1':'profile_name_1','Profile Name 1':'profile_name_1','Profile_Name_1':'profile_name_1',
+      'profile_name_2':'profile_name_2','Profile Name 2':'profile_name_2','Profile_Name_2':'profile_name_2',
+      'profile_1_submitted_date':'profile_1_submitted_date','Profile 1 Submitted':'profile_1_submitted_date','Profile_1_Submitted_Date':'profile_1_submitted_date',
+      'profile_2_submitted_date':'profile_2_submitted_date','Profile 2 Submitted':'profile_2_submitted_date','Profile_2_Submitted_Date':'profile_2_submitted_date',
+      'skills_category_sla':'skills_category_sla','Skill Category SLA (days)':'skills_category_sla','Skill_Category_SLA':'skills_category_sla',
+      'sla_breached':'sla_breached','SLA Breached':'sla_breached','SLA_Breached':'sla_breached',
+      // ── Ignored columns ───────────────────────────────────────────────────
       'Item Type':null,'Path':null,
     };
     const mappedHdrs=rawHdrs.map(h=>colMap.hasOwnProperty(h)?colMap[h]:h.toLowerCase().replace(/[^a-z0-9_]/g,'_'));
+    // Detect mode from headers: if any BOTT-specific column present → BOTT import
+    const bottFields=['band','profile_name_1','profile_name_2','profile_1_submitted_date','profile_2_submitted_date','skills_category_sla','sla_breached','start_date'];
+    const isBottImport=mappedHdrs.some(h=>bottFields.includes(h));
+    console.log('Import mode detected:', isBottImport?'BOTT':'MCA', '| headers:', mappedHdrs.filter(Boolean));
 
     const parsed=[],errors=[],warns=[];
     for(let i=1;i<lines.length;i++){
@@ -3715,11 +3730,12 @@ function parseImpCSV(file){
         if(mh) row[mh]=(cols[j]||'').replace(/^"|"$/g,'').trim()||null;
       });
 
-      // Normalise dates: MM/DD/YYYY → YYYY-MM-DD
-      ['demand_added_on','target_date','demand_closure_date'].forEach(dc=>{
+      // Normalise dates: MM/DD/YYYY → YYYY-MM-DD for all date fields
+      const allDateFields=['demand_added_on','target_date','demand_closure_date','start_date','profile_1_submitted_date','profile_2_submitted_date'];
+      allDateFields.forEach(dc=>{
         if(row[dc]){
           const m=row[dc].match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-          if(m) row[dc]=`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+          if(m) row[dc]=m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');
           if(isNaN(new Date(row[dc]).getTime())) row[dc]=null;
         }
       });
@@ -3731,32 +3747,45 @@ function parseImpCSV(file){
       if(!row.bsa)             missing.push('bsa');
       if(!row.service_line)    missing.push('service_line');
       if(!row.location)        missing.push('location');
-      if(missing.length){errors.push(`Row ${i}: missing ${missing.join(', ')}`);continue;}
+      if(missing.length){errors.push('Row '+i+': missing '+missing.join(', '));continue;}
 
       // Auto target date
       if(!row.target_date&&row.demand_added_on){
-        try{const dt=new Date(row.demand_added_on);dt.setDate(dt.getDate()+21);row.target_date=dt.toISOString().split('T')[0];warns.push(`Row ${i}: target_date auto-set (+21 days)`);}catch(e){}
+        try{
+          const dt=new Date(row.demand_added_on);
+          const slaDays=isBottImport&&row.skills_category_sla?parseInt(row.skills_category_sla,10):21;
+          dt.setDate(dt.getDate()+(isNaN(slaDays)?21:slaDays));
+          row.target_date=dt.toISOString().split('T')[0];
+          warns.push('Row '+i+': target_date auto-set (+'+( isNaN(slaDays)?21:slaDays)+' days)');
+        }catch(e){}
       }
 
       if(!row.demand_status) row.demand_status='Open';
       if(!row.demand_type)   row.demand_type='New';
-      row.type='MCA'; row.updated_by=USER_NAME;
+      // Tag the row with the correct mode so runImport routes to the right list
+      row._importMode = isBottImport ? 'BOTT' : 'MCA';
+      row.updated_by=USER_NAME;
       if(row.demand_id) row.demand_id=parseInt(row.demand_id)||null;
       parsed.push(row);
     }
 
     importRows=parsed;
 
-    // Show preview
-    const previewCols=['demand_status','bsa','demand_type','skills','location','service_line','demand_added_on','target_date'];
-    const previewHdrs=['Status','BSA','Type','Skills','Location','Service Line','Added On','Target'];
-    document.getElementById('imp-thead').innerHTML=`<tr>${previewHdrs.map(h=>`<th>${h}</th>`).join('')}</tr>`;
-    document.getElementById('imp-tbody').innerHTML=parsed.slice(0,10).map(r=>`<tr>${previewCols.map(c=>`<td title="${r[c]||''}">${(r[c]||'—').toString().substring(0,25)}</td>`).join('')}</tr>`).join('');
+    // Show preview — use mode-appropriate columns
+    const previewCols=isBottImport
+      ?['demand_status','bsa','band','skills','location','service_line','profile_name_1','profile_name_2']
+      :['demand_status','bsa','demand_type','skills','location','service_line','demand_added_on','target_date'];
+    const previewHdrs=isBottImport
+      ?['Status','BSA','Band','Skills','Location','Service Line','Profile 1','Profile 2']
+      :['Status','BSA','Type','Skills','Location','Service Line','Added On','Target'];
+    document.getElementById('imp-thead').innerHTML='<tr>'+previewHdrs.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
+    document.getElementById('imp-tbody').innerHTML=parsed.slice(0,10).map(r=>'<tr>'+previewCols.map(c=>'<td title="'+(r[c]||'')+'">'+((r[c]||'—').toString().substring(0,25))+'</td>').join('')+'</tr>').join('');
 
     let alertHtml='';
-    if(errors.length) alertHtml+=`<div style="background:var(--red-bg);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">⚠ ${errors.length} rows skipped (missing required fields)</div>`;
-    if(warns.length)  alertHtml+=`<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">ℹ ${warns.length} rows: target date auto-calculated</div>`;
-    if(parsed.length) alertHtml+=`<div style="background:var(--green-bg);color:var(--green);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">✓ ${parsed.length} demands ready to import${parsed.length>10?' (showing first 10 in preview)':''}</div>`;
+    if(isBottImport) alertHtml+='<div style="background:rgba(29,158,117,0.1);color:#1d9e75;font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px;font-weight:500">&#9654; BOTT import detected — profile fields, band and SLA data will be imported</div>';
+    if(errors.length) alertHtml+='<div style="background:var(--red-bg);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">&#9888; '+errors.length+' rows skipped (missing required fields)</div>';
+    if(warns.length)  alertHtml+='<div style="background:var(--amber-bg);color:var(--amber);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">&#8505; '+warns.length+' rows: target date auto-calculated</div>';
+    if(parsed.length) alertHtml+='<div style="background:var(--green-bg);color:var(--green);font-size:12px;padding:10px 12px;border-radius:var(--r);margin-bottom:8px">&#10003; '+parsed.length+' demands ready to import'+(parsed.length>10?' (showing first 10 in preview)':'')+'</div>';
     document.getElementById('imp-alerts').innerHTML=alertHtml;
 
     document.getElementById('imp-summary').textContent=`${parsed.length} demand${parsed.length!==1?'s':''} validated`;
@@ -3778,27 +3807,37 @@ async function runImport(){
   let success=0,failed=0;
   for(let i=0;i<importRows.length;i++){
     const row=importRows[i];
+    const isBottRow=row._importMode==='BOTT';
+    // Remove private import tag before sending to SP
+    const {_importMode,...spRow}=row;
     try{
-      if(row.demand_id){
-        const ex=demands.find(d=>d.demand_id===row.demand_id);
+      if(spRow.demand_id){
+        const ex=demands.find(d=>d.demand_id===spRow.demand_id);
         if(ex){
-          await sbUpd('demands','id=eq.'+ex.id,row);
+          await sbUpd('demands','id=eq.'+ex.id,spRow);
           const idx=demands.findIndex(d=>d.id===ex.id);
-          demands[idx]={...demands[idx],...row};
+          demands[idx]={...demands[idx],...spRow};
         }else{
-          const res=await sbIns('demands',row);
+          const res=await sbIns('demands',spRow);
           const nd=Array.isArray(res)?res[0]:res;
           if(nd) demands.push(nd);
         }
       }else{
-        const maxId=demands.reduce((a,b)=>b.demand_id>a?b.demand_id:a,3000);
-        row.demand_id=maxId+success+1; row.ageing_days=0;
-        const res=await sbIns('demands',row);
+        if(isBottRow){
+          // BOTT: use SP-fetched max ID for accuracy
+          const maxId=demands.reduce((a,b)=>Number(b.demand_id)>a?Number(b.demand_id):a,0);
+          spRow.demand_id=maxId+success+1;
+        } else {
+          const maxId=demands.reduce((a,b)=>b.demand_id>a?b.demand_id:a,3000);
+          spRow.demand_id=maxId+success+1;
+        }
+        spRow.ageing_days=0;
+        const res=await sbIns('demands',spRow);
         const nd=Array.isArray(res)?res[0]:res;
         if(nd) demands.push(nd);
       }
       success++;
-    }catch(e){failed++;console.warn('Import row failed',row.demand_id,e.message);}
+    }catch(e){failed++;console.warn('Import row failed',spRow.demand_id,e.message);}
 
     // Update progress
     const pct=Math.round((i+1)/total*100);
