@@ -1814,7 +1814,7 @@ function renderTbl(){
       return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
         +cbCell
         +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
-        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<div style="font-family:sans-serif;font-size:8px;font-weight:700;color:var(--red);letter-spacing:0.02em;margin-top:1px;line-height:1">&#9650; Priority</div>':'')+'</td>'
         +'<td>'+stB(d.demand_status)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
         +'<td style="font-size:11px;color:var(--t2);font-weight:600">'+(d.band||'&#8212;')+'</td>'
@@ -1833,7 +1833,7 @@ function renderTbl(){
     return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
       +cbCell
       +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
-      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<span class="pf-badge">Priority</span>':'')+'</td>'
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<div style="font-family:sans-serif;font-size:8px;font-weight:700;color:var(--red);letter-spacing:0.02em;margin-top:1px;line-height:1">&#9650; Priority</div>':'')+'</td>'
       +'<td>'+stB(d.demand_status)+'</td>'
       +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
       +'<td>'+tyB(d.demand_type)+'</td>'
@@ -4588,12 +4588,19 @@ async function sendWeeklyReport(manual=false){
   </td></tr>
 </table></body></html>`;
 
-  // Save settings first from UI
-  const savedRaw = localStorage.getItem('nwmca_notif_settings');
-  const savedSettings = savedRaw ? JSON.parse(savedRaw) : {};
-  const recipients = LEADERSHIP_RECIPIENTS.length > 0
-    ? LEADERSHIP_RECIPIENTS
-    : (savedSettings.recipients || [USER_NAME]);
+  // Read recipients fresh from the UI at send time — captures emails entered
+  // but not yet explicitly saved, so Send Now always uses what the user sees
+  const liveTagEmails = [...document.querySelectorAll('#leader-tag-box .rtag')]
+    .map(el=>el.textContent.replace('×','').trim())
+    .filter(e=>e&&e.includes('@'));
+  // Also sync LEADERSHIP_RECIPIENTS so auto-schedule is consistent
+  if(liveTagEmails.length) LEADERSHIP_RECIPIENTS=liveTagEmails;
+  const recipients = liveTagEmails.length > 0
+    ? liveTagEmails
+    : LEADERSHIP_RECIPIENTS.length > 0
+      ? LEADERSHIP_RECIPIENTS
+      : [USER_NAME];
+  console.log('sendWeeklyReport: sending to', recipients);
 
   // Write to SP Notifications list — Power Automate picks this up
   try{
