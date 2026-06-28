@@ -1299,22 +1299,52 @@ async function sbIns(table, data){
   const base = table==='demands' ? LIST_BASE() : NOTIF_LIST_BASE();
 
   if(table!=='demands'){
-    // Write to Notifications list with confirmed SP column names
+    // Write to Notifications list
+    // Step 1: POST with only Title + Recipients (columns that always exist)
+    // This avoids 400s from missing optional columns blocking the whole write
+    const coreFields={
+      Title: String(data.title||data.type||'notification'),
+    };
+    // Add optional fields that exist — field names confirmed working in this SP list
+    const optionalFields={
+      NotifType:   String(data.type||''),
+      DemandId:    String(data.demand_id||''),
+      Title2:      String(data.title||''),
+      Subtitle:    String(data.subtitle||''),
+      TriggeredBy: String(data.triggered_by||USER_NAME||''),
+      Recipients:  String(data.recipients||''),
+      EmailBody:   String(data.email_body||''),
+    };
+    let createdItem=null;
+    // Try bulk POST with all fields first
     try{
-      const r = await gFetch(base+'/items','POST',{fields:{
-        Title:       String(data.title||data.type||'notification'),
-        NotifType:   String(data.type||''),
-        DemandId:    String(data.demand_id||''),
-        Title2:      String(data.title||''),
-        Subtitle:    String(data.subtitle||''),
-        TriggeredBy: String(data.triggered_by||USER_NAME||''),
-        Recipients:  String(data.recipients||''),
-        EmailBody:   String(data.email_body||'')
-      }});
-      console.log('✓ Notification written to SP:', data.type, data.demand_id);
-      return r ? [r] : [];
-    }catch(e){
-      console.warn('Notification write failed:', e.message);
+      const r=await gFetch(base+'/items','POST',{fields:{...coreFields,...optionalFields}});
+      console.log('✓ Notification written to SP (bulk):', data.type, data.demand_id);
+      return r?[r]:[];
+    }catch(bulkErr){
+      console.warn('Notification bulk POST failed ('+bulkErr.message+'), trying core fields only...');
+      // Bulk failed — create with just Title first
+      try{
+        const r2=await gFetch(base+'/items','POST',{fields:coreFields});
+        createdItem=r2;
+        console.log('✓ Notification core item created:', createdItem?.id);
+      }catch(coreErr){
+        console.warn('Notification write failed even with core fields:', coreErr.message);
+        return [];
+      }
+      // PATCH each optional field individually, skipping rejected ones
+      if(createdItem?.id){
+        for(const [k,v] of Object.entries(optionalFields)){
+          if(!v&&v!==0) continue;
+          try{
+            await gFetch(base+'/items/'+createdItem.id+'/fields','PATCH',{[k]:v});
+          }catch(pErr){
+            console.warn('Notif field skipped (not in SP list):',k,'→',pErr.message.substring(0,60));
+          }
+        }
+        console.log('✓ Notification written to SP (field-by-field):', data.type, data.demand_id);
+        return [createdItem];
+      }
     }
     return [];
   }
@@ -1814,7 +1844,7 @@ function renderTbl(){
       return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
         +cbCell
         +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
-        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<div style="font-family:sans-serif;font-size:8px;font-weight:700;color:var(--red);letter-spacing:0.02em;margin-top:1px;line-height:1">&#9650; Priority</div>':'')+'</td>'
+        +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+'</td>'
         +'<td>'+stB(d.demand_status)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
         +'<td style="font-size:11px;color:var(--t2);font-weight:600">'+(d.band||'&#8212;')+'</td>'
@@ -1833,7 +1863,7 @@ function renderTbl(){
     return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
       +cbCell
       +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
-      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+(d.is_priority?'<div style="font-family:sans-serif;font-size:8px;font-weight:700;color:var(--red);letter-spacing:0.02em;margin-top:1px;line-height:1">&#9650; Priority</div>':'')+'</td>'
+      +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+'</td>'
       +'<td>'+stB(d.demand_status)+'</td>'
       +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
       +'<td>'+tyB(d.demand_type)+'</td>'
@@ -4614,15 +4644,17 @@ async function sendWeeklyReport(manual=false){
     // Step 0: Delete previous weekly notification items so PA always reads the latest
     try{
       const notifBase = NOTIF_LIST_BASE();
-      const oldItems = await gFetch(notifBase+"/items?$expand=fields&$filter=fields/NotifType eq 'weekly'&$top=10");
-      const toDelete = (oldItems?.value||[]);
+      // NotifType column is not indexed — fetch recent items and filter in JS
+      const allRecent=await gFetch(notifBase+'/items?$expand=fields&$orderby=Created%20desc&$top=25');
+      const toDelete=(allRecent?.value||[]).filter(it=>(it.fields?.NotifType||'')==='weekly');
       for(const item of toDelete){
         try{
           await gFetch(notifBase+'/items/'+item.id,'DELETE');
           console.log('Deleted old weekly item:', item.id);
-        }catch(e){ console.warn('Could not delete old weekly item:', e.message); }
+        }catch(e){console.warn('Could not delete old weekly item:',e.message);}
       }
-    }catch(e){ console.warn('Cleanup of old weekly items failed:', e.message); }
+      console.log('Weekly cleanup: removed',toDelete.length,'old item(s)');
+    }catch(e){console.warn('Cleanup of old weekly items failed:',e.message);}
 
     // Step 1: Create the notification item with empty EmailBody
     const weeklyId = 'WEEKLY_'+Date.now();
