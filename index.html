@@ -1300,53 +1300,53 @@ async function sbIns(table, data){
 
   if(table!=='demands'){
     // Write to Notifications list
-    // Step 1: POST with only Title + Recipients (columns that always exist)
-    // This avoids 400s from missing optional columns blocking the whole write
+    const recipientsStr=String(data.recipients||'');
+    // Core fields — always written in the initial POST (these definitely exist in SP)
     const coreFields={
-      Title: String(data.title||data.type||'notification'),
-    };
-    // Add optional fields that exist — field names confirmed working in this SP list
-    const optionalFields={
+      Title:       String(data.title||data.type||'notification'),
       NotifType:   String(data.type||''),
       DemandId:    String(data.demand_id||''),
       Title2:      String(data.title||''),
       Subtitle:    String(data.subtitle||''),
       TriggeredBy: String(data.triggered_by||USER_NAME||''),
-      Recipients:  String(data.recipients||''),
-      EmailBody:   String(data.email_body||''),
+      Recipients:  recipientsStr,   // confirmed exists in SP Notifications list
     };
+    // EmailBody is written separately — it's large HTML that can cause bulk POST to fail
+    const emailBodyVal=String(data.email_body||'');
     let createdItem=null;
-    // Try bulk POST with all fields first
+    // Try bulk POST (without EmailBody to keep payload small)
     try{
-      const r=await gFetch(base+'/items','POST',{fields:{...coreFields,...optionalFields}});
-      console.log('✓ Notification written to SP (bulk):', data.type, data.demand_id);
-      return r?[r]:[];
-    }catch(bulkErr){
-      console.warn('Notification bulk POST failed ('+bulkErr.message+'), trying core fields only...');
-      // Bulk failed — create with just Title first
+      const r=await gFetch(base+'/items','POST',{fields:coreFields});
+      createdItem=r;
+      console.log('✓ Notification item created (id='+r?.id+'):', data.type, '| Recipients:', recipientsStr.substring(0,60));
+    }catch(postErr){
+      console.warn('Notification POST failed:', postErr.message);
+      // Try with only Title + Recipients as absolute minimum
       try{
-        const r2=await gFetch(base+'/items','POST',{fields:coreFields});
+        const r2=await gFetch(base+'/items','POST',{fields:{Title:coreFields.Title,Recipients:recipientsStr}});
         createdItem=r2;
-        console.log('✓ Notification core item created:', createdItem?.id);
-      }catch(coreErr){
-        console.warn('Notification write failed even with core fields:', coreErr.message);
+        console.log('✓ Notification minimal item created:', r2?.id);
+        // PATCH remaining fields individually
+        for(const [k,v] of Object.entries(coreFields)){
+          if(k==='Title'||k==='Recipients'||!v) continue;
+          try{ await gFetch(base+'/items/'+r2.id+'/fields','PATCH',{[k]:v}); }
+          catch(pErr){ console.warn('Notif field skipped:',k,pErr.message.substring(0,50)); }
+        }
+      }catch(e2){
+        console.warn('Notification write failed completely:', e2.message);
         return [];
       }
-      // PATCH each optional field individually, skipping rejected ones
-      if(createdItem?.id){
-        for(const [k,v] of Object.entries(optionalFields)){
-          if(!v&&v!==0) continue;
-          try{
-            await gFetch(base+'/items/'+createdItem.id+'/fields','PATCH',{[k]:v});
-          }catch(pErr){
-            console.warn('Notif field skipped (not in SP list):',k,'→',pErr.message.substring(0,60));
-          }
-        }
-        console.log('✓ Notification written to SP (field-by-field):', data.type, data.demand_id);
-        return [createdItem];
+    }
+    // Write EmailBody separately (large HTML — separate PATCH avoids size issues)
+    if(createdItem?.id && emailBodyVal){
+      try{
+        await gFetch(base+'/items/'+createdItem.id+'/fields','PATCH',{EmailBody:emailBodyVal});
+        console.log('✓ EmailBody written to notification item:', createdItem.id);
+      }catch(ebErr){
+        console.warn('EmailBody write failed:', ebErr.message.substring(0,80));
       }
     }
-    return [];
+    return createdItem?[createdItem]:[];
   }
 
   // Step 1: POST with unique temp title to avoid duplicate Title constraint
@@ -4645,7 +4645,7 @@ async function sendWeeklyReport(manual=false){
     try{
       const notifBase = NOTIF_LIST_BASE();
       // NotifType column is not indexed — fetch recent items and filter in JS
-      const allRecent=await gFetch(notifBase+'/items?$expand=fields&$orderby=Created%20desc&$top=25');
+      const allRecent=await gFetch(notifBase+'/items?$expand=fields&$top=25');
       const toDelete=(allRecent?.value||[]).filter(it=>(it.fields?.NotifType||'')==='weekly');
       for(const item of toDelete){
         try{
@@ -4705,9 +4705,12 @@ async function sendWeeklyReport(manual=false){
     }
     setSyncStatus('ok','● Live');
     toast(manual
-      ? `Weekly report written to SP ✓ — Power Automate weekly flow will send in 1–2 mins`
-      : `Weekly report auto-sent to ${recipients.length} leadership recipient(s) ✓`,'green');
+      ? 'Weekly report written to SP ✓ — Power Automate weekly flow will send in 1–2 mins'
+      : 'Weekly report auto-sent to '+recipients.length+' leadership recipient(s) ✓','green');
     console.log('Weekly report complete.');
+    console.log('POWER AUTOMATE — read recipients from Title field: starts with "weekly:" prefix');
+    console.log('Title format: "weekly:email1@co.com;email2@co.com;..."');
+    console.log('OR read from Subtitle: starts with "RECIPIENTS:" prefix');
     console.log('IMPORTANT: Make sure the General Notifications flow has a condition to SKIP NotifType=weekly');
     console.log('Otherwise the general flow will also fire and send an empty email.');
     console.log('Weekly report written to SP Notifications. Recipients:', recipients.join(', '));
