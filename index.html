@@ -2410,6 +2410,23 @@ async function loadAppConfig(){
     });
     try{populateFilters();}catch(e){}
     console.log('AppConfig loaded: BSA',BSA_LIST.length,'SL',SL_LIST.length);
+    // If an Add/Edit form is currently open, refresh its BSA and SL dropdowns
+    // so values like CTWS, TIP that weren't in the hardcoded fallback now appear
+    const bsaSel=document.getElementById('m-bsa');
+    const slSel=document.getElementById('m-sl');
+    if(bsaSel){
+      const curBsa=bsaSel.value;
+      // Rebuild BSA dropdown with full loaded list
+      const newOpts=[''].concat(BSA_LIST);
+      if(curBsa&&!newOpts.includes(curBsa)) newOpts.push(curBsa);
+      bsaSel.innerHTML=newOpts.map(o=>`<option${o===curBsa?' selected':''}>${o}</option>`).join('');
+    }
+    if(slSel){
+      const curSl=slSel.value;
+      const newOpts=[''].concat(SL_LIST);
+      if(curSl&&!newOpts.includes(curSl)) newOpts.push(curSl);
+      slSel.innerHTML=newOpts.map(o=>`<option${o===curSl?' selected':''}>${o}</option>`).join('');
+    }
   }catch(e){console.warn('loadAppConfig failed:',e.message);}
 }
 async function saveAppConfig(key,list){
@@ -3138,7 +3155,12 @@ function slaB(slaBreached){
   if(slaBreached==='Yes') return '<span class="badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red);font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;white-space:nowrap">SLA Breached</span>';
   return '';
 }
-function sel(id,opts,val,onch=''){return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${opts.map(o=>`<option${o===(val||'')?` selected`:``}>${o}</option>`).join('')}</select>`}
+function sel(id,opts,val,onch=''){
+  const v=val||'';
+  // If the current value is not in the options list, inject it so it's never silently lost
+  const allOpts=(v&&!opts.includes(v))?[...opts,v]:opts;
+  return`<select id="m-${id}"${onch?` onchange="${onch}"`:''} style="width:100%">${allOpts.map(o=>`<option${o===v?` selected`:``}>${o}</option>`).join('')}</select>`;
+}
 function rlbl(t){return`${t} <span class="req-star">*</span>`}
 function autoCalcTarget(){
   const a=document.getElementById('m-added'),t=document.getElementById('m-tgt');
@@ -3363,7 +3385,12 @@ function openEdit(id){
   setTimeout(()=>{ try{onTypeChange();}catch(e){} }, 80);
 }
 async function saveDemand(){
-  const sk=gv('m-sk'),bsa=gv('m-bsa'),sl=gv('m-sl'),loc=gv('m-loc'),added=gv('m-added'),tgt=gv('m-tgt');
+  const sk=gv('m-sk'),sl=gv('m-sl'),loc=gv('m-loc'),added=gv('m-added'),tgt=gv('m-tgt');
+  // Guard: if BSA dropdown reads blank but original demand had a value,
+  // keep original — prevents silent overwrite when BSA not in hardcoded list yet
+  const rawBsa=gv('m-bsa');
+  const prevBsa=editId?demands.find(x=>String(x.id)===String(editId))?.bsa||'':'';
+  const bsa=rawBsa||(editId&&prevBsa?prevBsa:'');
   const ty=gv('m-ty'), bf=gv('m-bf'), st=(gv('m-st')||'open').toLowerCase();
   const bott=isBOTT();
   const today=new Date().toISOString().split('T')[0];
