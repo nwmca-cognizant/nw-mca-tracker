@@ -247,7 +247,7 @@ tbody tr.ok td:first-child{border-left:3px solid var(--green)}
 /* Chart grid */
 .cg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:16px;box-shadow:var(--sh)}
-.cc.w2{grid-column:span 2}.cc.w3{grid-column:span 3}
+.cc.w2{grid-column:span 2}.cc.w3{grid-column:span 3}.cc.w5{grid-column:1/-1}
 .cc-hd{margin-bottom:12px}
 .cc-title{font-size:13px;font-weight:600;color:var(--text)}
 .cc-sub{font-size:11px;color:var(--t3);margin-top:2px}
@@ -2141,6 +2141,44 @@ function renderBOTTDashboard(){
   const bsaBreachE=Object.entries(bsaBreach).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const bsaBreachMx=bsaBreachE[0]?.[1]||1;
 
+  // ── Service Line vs SLA Breach ───────────────────────────────────────────
+  // For each service line: count breached vs not-breached open demands
+  const slBreachMap={};
+  open.forEach(d=>{
+    if(!d.service_line) return;
+    if(!slBreachMap[d.service_line]) slBreachMap[d.service_line]={ok:0,breached:0};
+    if(d.sla_breached==='Yes') slBreachMap[d.service_line].breached++;
+    else slBreachMap[d.service_line].ok++;
+  });
+  const slBreachE=Object.entries(slBreachMap)
+    .sort((a,b)=>(b[1].breached+b[1].ok)-(a[1].breached+a[1].ok))
+    .slice(0,10);
+  const slBreachMx=Math.max(...slBreachE.map(([,v])=>v.ok+v.breached),1);
+
+  // ── Service Line vs Profile Status ───────────────────────────────────────
+  // For each service line: distribute open demands by profile status stage
+  const psStages=['No Profile','Identified','Screening','Interview','Submitted','Closed'];
+  const psStageMap=(ps)=>{
+    if(!ps||ps==='1. Open') return 'No Profile';
+    if(ps.includes('Identif')||ps.includes('2.')) return 'Identified';
+    if(ps.includes('Screen')||ps.includes('3.')) return 'Screening';
+    if(ps.toLowerCase().includes('interview')||ps.includes('4.1')||ps.includes('4.2')) return 'Interview';
+    if(ps.includes('Submit')||ps.includes('4.3')) return 'Submitted';
+    if(ps.includes('Onboard')||ps.includes('6.')||ps.includes('7.')) return 'Closed';
+    return 'Screening';
+  };
+  const slPsMap={};
+  open.forEach(d=>{
+    if(!d.service_line) return;
+    if(!slPsMap[d.service_line]) slPsMap[d.service_line]={};
+    const stage=psStageMap(d.profile_status);
+    slPsMap[d.service_line][stage]=(slPsMap[d.service_line][stage]||0)+1;
+  });
+  const slPsE=Object.entries(slPsMap)
+    .sort((a,b)=>Object.values(b[1]).reduce((s,v)=>s+v,0)-Object.values(a[1]).reduce((s,v)=>s+v,0))
+    .slice(0,10);
+  const psColors={'No Profile':'#bbb','Identified':'#7baee8','Screening':'#1a4b8c','Interview':'#d29922','Submitted':'#1d9e75','Closed':'#085041'};
+
   el.innerHTML=''
     // Row 1: Demand trend + Profile pipeline
     +'<div class="cc w3"><div class="cc-hd"><div class="cc-title">Demand Added — Monthly Trend</div><div class="cc-sub">New demands added per month (last 6 months)</div></div>'
@@ -2151,7 +2189,7 @@ function renderBOTTDashboard(){
     +psE.map(([ps,c])=>'<div class="bsa-row" title="'+ps+'"><div class="bsa-name" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ps+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/psMx*100)+'%;background:#1d9e75"></div></div><div class="bsa-num">'+c+'</div></div>').join('')
     +'</div></div>'
 
-    // Row 2: SLA Breach detail + Profiles submitted + Band
+    // Row 2: SLA Breach by BSA + Profiles submitted + Band
     +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">&#x1F6A9; SLA Breach by BSA</div><div class="cc-sub">Demands where submission exceeded target date</div></div>'
     +(bsaBreachE.length
       ?'<div style="margin-top:8px">'+bsaBreachE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/bsaBreachMx*100)+'%;background:var(--red)"></div></div><div class="bsa-num" style="color:var(--red)">'+c+'</div></div>').join('')+'</div>'
@@ -2164,7 +2202,61 @@ function renderBOTTDashboard(){
     +'<div class="cc"><div class="cc-hd"><div class="cc-title">Band Distribution</div><div class="cc-sub">Open demands by candidate band</div></div>'
     +'<div style="margin-top:8px">'+Object.entries(bc).map(([b,c])=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border2);font-size:12px"><span style="font-weight:600">Band '+b+'</span>'+(c>0?'<span style="background:#1d9e75;color:white;border-radius:10px;padding:1px 10px;font-size:11px;font-weight:600">'+c+'</span>':'<span style="color:var(--t3)">0</span>')+'</div>').join('')+'</div></div>'
 
-    // Row 3: Open by BSA + Open by Service Line + Profile coverage
+    // Row 3: NEW — Service Line vs SLA Breach (full width)
+    +'<div class="cc w5"><div class="cc-hd"><div class="cc-title">&#x1F6A9; Service Line vs SLA Breach</div><div class="cc-sub">Open demands per service line — breached (red) vs on-track (green)</div>'
+    +'<div style="display:flex;gap:14px;margin-top:6px">'
+    +'<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)"><span style="width:10px;height:10px;background:var(--red);border-radius:2px;display:inline-block"></span>SLA Breached</span>'
+    +'<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)"><span style="width:10px;height:10px;background:#1d9e75;border-radius:2px;display:inline-block"></span>On Track</span>'
+    +'</div></div>'
+    +(slBreachE.length
+      ?'<div style="margin-top:10px">'
+        +slBreachE.map(([sl,v])=>{
+          const tot=v.ok+v.breached;
+          const bPct=Math.round(v.breached/slBreachMx*100);
+          const oPct=Math.round(v.ok/slBreachMx*100);
+          return '<div style="display:grid;grid-template-columns:140px 1fr 36px;align-items:center;gap:8px;margin-bottom:7px">'
+            +'<div style="font-size:11px;color:var(--t2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+sl+'">'+sl+'</div>'
+            +'<div style="display:flex;height:16px;border-radius:3px;overflow:hidden;background:var(--bg2)">'
+              +(v.ok>0?'<div style="width:'+oPct+'%;background:#1d9e75;display:flex;align-items:center;justify-content:center"><span style="font-size:9px;font-weight:700;color:white;white-space:nowrap;padding:0 3px">'+(v.ok>0?v.ok:'')+'</span></div>':'')
+              +(v.breached>0?'<div style="width:'+bPct+'%;background:var(--red);display:flex;align-items:center;justify-content:center"><span style="font-size:9px;font-weight:700;color:white;white-space:nowrap;padding:0 3px">'+v.breached+'</span></div>':'')
+            +'</div>'
+            +'<div style="font-size:11px;font-weight:600;color:var(--t2);text-align:right">'+tot+'</div>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+      :'<div style="padding:24px 0;text-align:center;color:var(--t3);font-size:12px">No open demands with service line data</div>')
+    +'</div>'
+
+    // Row 4: NEW — Service Line vs Profile Status (full width)
+    +'<div class="cc w5"><div class="cc-hd"><div class="cc-title">Service Line vs Profile Status</div><div class="cc-sub">Open demand distribution by service line and recruitment stage</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">'
+    +psStages.map(s=>'<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t3)"><span style="width:10px;height:10px;background:'+psColors[s]+';border-radius:2px;display:inline-block"></span>'+s+'</span>').join('')
+    +'</div></div>'
+    +(slPsE.length
+      ?'<div style="margin-top:10px">'
+        +slPsE.map(([sl,stages])=>{
+          const tot=Object.values(stages).reduce((s,v)=>s+v,0);
+          const slPsMx=Math.max(...slPsE.map(([,st])=>Object.values(st).reduce((s,v)=>s+v,0)),1);
+          return '<div style="display:grid;grid-template-columns:140px 1fr 36px;align-items:center;gap:8px;margin-bottom:7px">'
+            +'<div style="font-size:11px;color:var(--t2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+sl+'">'+sl+'</div>'
+            +'<div style="display:flex;height:16px;border-radius:3px;overflow:hidden;background:var(--bg2)">'
+              +psStages.map(s=>{
+                const c=stages[s]||0;
+                if(!c) return '';
+                const w=Math.round(c/slPsMx*100);
+                return '<div style="width:'+w+'%;background:'+psColors[s]+';display:flex;align-items:center;justify-content:center" title="'+s+': '+c+'">'
+                  +(c>0?'<span style="font-size:9px;font-weight:700;color:'+(s==='No Profile'?'#555':'white')+';white-space:nowrap;padding:0 3px">'+c+'</span>':'')
+                +'</div>';
+              }).join('')
+            +'</div>'
+            +'<div style="font-size:11px;font-weight:600;color:var(--t2);text-align:right">'+tot+'</div>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+      :'<div style="padding:24px 0;text-align:center;color:var(--t3);font-size:12px">No open demands with service line data</div>')
+    +'</div>'
+
+    // Row 5: Open by BSA + Open by Service Line + Profile coverage
     +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">Open Demands by BSA</div></div>'
     +'<div style="margin-top:8px">'+bsaE.map(([b,c])=>'<div class="bsa-row"><div class="bsa-name">'+b+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/bsaMx*100)+'%;background:#1a4b8c"></div></div><div class="bsa-num">'+c+'</div></div>').join('')+'</div></div>'
 
@@ -2342,6 +2434,9 @@ function renderDash(){
     <div class="cc"><div class="cc-hd"><div class="cc-title">Location Split</div><div class="cc-sub">Open demands by work location</div></div><div class="ch-wrap h200"><canvas id="ch-loc"></canvas></div><div class="leg" id="leg-loc"></div></div>
     <div class="cc w3"><div class="cc-hd"><div class="cc-title">Recruitment Pipeline — Profile Status Funnel</div><div class="cc-sub">Where open demands sit in the hiring funnel</div></div><div class="ch-wrap h160"><canvas id="ch-pipe"></canvas></div></div>
     <div class="cc w2"><div class="cc-hd"><div class="cc-title">Service Line Demand Count</div><div class="cc-sub">Open demand volume by practice area</div></div><div class="ch-wrap h200"><canvas id="ch-sl"></canvas></div></div>
+    <div class="cc w5"><div class="cc-hd"><div class="cc-title">Service Line vs Profile Status</div><div class="cc-sub">Open demands — recruitment stage distribution across practice areas</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="slps-legend"></div>
+    </div><div id="slps-chart" style="margin-top:10px"></div></div>
     <div class="cc"><div class="cc-hd"><div class="cc-title">Top Overdue Demands</div><div class="cc-sub">Highest ageing — immediate action needed</div></div>
       ${ovdList.length?`<table class="ovd-tbl"><thead><tr><th>ID</th><th>BSA</th><th>Skills</th><th>Days</th></tr></thead><tbody>${ovdList.map(d=>`<tr style="cursor:pointer" onclick="closeAllModals();openDetail(${d.id})"><td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t3)">#${d.demand_id}</td><td style="font-weight:500">${d.bsa}</td><td style="font-size:11px">${(d.skills||'').substring(0,22)}</td><td>${ageB(d.ageing_days,d.ageing_group)}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:12px;color:var(--t3);padding:8px 0">No overdue demands 🎉</p>'}
     </div>
@@ -2375,6 +2470,51 @@ function renderDash(){
     const psKeys=Object.keys(psC);
     charts.pipe=new Chart(document.getElementById('ch-pipe'),{type:'bar',data:{labels:psKeys.map(k=>psS[k]||k),datasets:[{data:psKeys.map(k=>psC[k]),backgroundColor:'#185FA5',borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{font:{size:10}},grid:{display:false}}}}});
     charts.sl=new Chart(document.getElementById('ch-sl'),{type:'bar',data:{labels:slE.map(x=>x[0]),datasets:[{data:slE.map(x=>x[1]),backgroundColor:'#0d5c52',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{ticks:{font:{size:10},autoSkip:false,maxRotation:35},grid:{display:false}}}}});
+
+    // ── Service Line vs Profile Status — stacked bar ─────────────────────────
+    const slpsStages=['No Profile','Internal Screening','Interview','Submitted to NW','Onboarding'];
+    const slpsColors={'No Profile':'#ccc','Internal Screening':'#1a4b8c','Interview':'#d29922','Submitted to NW':'#1d9e75','Onboarding':'#5c1a7a'};
+    const slpsMap=(ps)=>{
+      if(!ps||ps==='1. Open') return 'No Profile';
+      if(ps.includes('Screen')||ps.includes('3.')) return 'Internal Screening';
+      if(ps.toLowerCase().includes('interview')||ps.includes('4.1')||ps.includes('4.2')) return 'Interview';
+      if(ps.includes('Submit')||ps.includes('4.3')) return 'Submitted to NW';
+      if(ps.includes('Onboard')||ps.includes('6.')) return 'Onboarding';
+      return 'Internal Screening';
+    };
+    const slpsData={};
+    open.forEach(d=>{
+      if(!d.service_line) return;
+      if(!slpsData[d.service_line]) slpsData[d.service_line]={};
+      const stage=slpsMap(d.profile_status);
+      slpsData[d.service_line][stage]=(slpsData[d.service_line][stage]||0)+1;
+    });
+    const slpsE=Object.entries(slpsData)
+      .sort((a,b)=>Object.values(b[1]).reduce((s,v)=>s+v,0)-Object.values(a[1]).reduce((s,v)=>s+v,0))
+      .slice(0,12);
+    const slpsMx=Math.max(...slpsE.map(([,st])=>Object.values(st).reduce((s,v)=>s+v,0)),1);
+    const slpsEl=document.getElementById('slps-chart');
+    const slpsLeg=document.getElementById('slps-legend');
+    if(slpsEl){
+      slpsEl.innerHTML=slpsE.map(([sl,stages])=>{
+        const tot=Object.values(stages).reduce((s,v)=>s+v,0);
+        return '<div style="display:grid;grid-template-columns:160px 1fr 36px;align-items:center;gap:8px;margin-bottom:8px">'
+          +'<div style="font-size:11px;color:var(--t2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+sl+'">'+sl+'</div>'
+          +'<div style="display:flex;height:18px;border-radius:3px;overflow:hidden;background:var(--bg2)">'
+            +slpsStages.map(s=>{
+              const c=stages[s]||0;if(!c)return'';
+              const w=Math.round(c/slpsMx*100);
+              return'<div style="width:'+w+'%;background:'+slpsColors[s]+';display:flex;align-items:center;justify-content:center" title="'+s+': '+c+'">'
+                +'<span style="font-size:9px;font-weight:700;color:'+(s==='No Profile'?'#555':'white')+';padding:0 3px">'+c+'</span></div>';
+            }).join('')
+          +'</div>'
+          +'<div style="font-size:11px;font-weight:600;color:var(--t2);text-align:right">'+tot+'</div>'
+        +'</div>';
+      }).join('')||'<div style="color:var(--t3);font-size:12px;padding:12px 0">No data</div>';
+    }
+    if(slpsLeg){
+      slpsLeg.innerHTML=slpsStages.map(s=>'<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t3)"><span style="width:10px;height:10px;background:'+slpsColors[s]+';border-radius:2px;display:inline-block"></span>'+s+'</span>').join('');
+    }
   },80);
 }
 
