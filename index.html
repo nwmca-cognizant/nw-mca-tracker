@@ -1158,7 +1158,20 @@ function mapItem(item){
     profile_name_2:             f[BOTT_SP.profileName2]||'',
     profile_2_submitted_date:   f[BOTT_SP.profile2SubDate] ? f[BOTT_SP.profile2SubDate].split('T')[0] : '',
     skills_category_sla:        f[BOTT_SP.skillsSLA]!==undefined && f[BOTT_SP.skillsSLA]!==null && f[BOTT_SP.skillsSLA]!=='' ? Number(f[BOTT_SP.skillsSLA])||'' : '',
-    sla_breached:               f[BOTT_SP.slaBreached]||'',
+    sla_breached:               (()=>{
+      // Use SP value if available; otherwise compute locally from dates
+      const spVal=f[BOTT_SP.slaBreached]||'';
+      if(spVal==='Yes'||spVal==='No') return spVal;
+      // Compute: if either submitted date is after target date → breached
+      const tgt=f.Target_Date?new Date(f.Target_Date):null;
+      const p1=f[BOTT_SP.profile1SubDate]?new Date(f[BOTT_SP.profile1SubDate]):null;
+      const p2=f[BOTT_SP.profile2SubDate]?new Date(f[BOTT_SP.profile2SubDate]):null;
+      if(tgt&&(p1||p2)){
+        const breached=(p1&&p1>tgt)||(p2&&p2>tgt);
+        return breached?'Yes':'No';
+      }
+      return '';
+    })(),
   };
 }
 
@@ -1699,12 +1712,13 @@ function fmt(v){if(!v)return'—';return String(v).substring(0,10)}
 // ═══════════════════════════════════════
 // PRIORITY FLAGGING
 // ═══════════════════════════════════════
+function _priorityKey(){ return isBOTT()?'nwmca_bott_priority':'nwmca_priority'; }
 function _loadPrioritySet(){
-  try{ return new Set(JSON.parse(localStorage.getItem('nwmca_priority')||'[]')); }
+  try{ return new Set(JSON.parse(localStorage.getItem(_priorityKey())||'[]')); }
   catch(e){ return new Set(); }
 }
 function _savePrioritySet(set){
-  try{ localStorage.setItem('nwmca_priority',JSON.stringify([...set])); }catch(e){}
+  try{ localStorage.setItem(_priorityKey(),JSON.stringify([...set])); }catch(e){}
 }
 function loadPriority(){
   const set=_loadPrioritySet();
@@ -3134,6 +3148,8 @@ function openDetail(id){
       <div><span style='color:var(--t3)'>Profile 1 Submitted</span><div style='font-weight:500'>${d.profile_1_submitted_date?new Date(d.profile_1_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
       <div><span style='color:var(--t3)'>Profile Name 2</span><div style='font-weight:500'>${d.profile_name_2||'\u2014'}</div></div>
       <div><span style='color:var(--t3)'>Profile 2 Submitted</span><div style='font-weight:500'>${d.profile_2_submitted_date?new Date(d.profile_2_submitted_date).toLocaleDateString('en-GB'):'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>Skill Category SLA</span><div style='font-weight:500'>${d.skills_category_sla?d.skills_category_sla+' days':'\u2014'}</div></div>
+      <div><span style='color:var(--t3)'>SLA Breached</span><div style='font-weight:500'>${d.sla_breached==='Yes'?'<span style="color:var(--red);font-weight:700">\u26a0 Yes — submitted after target date</span>':d.sla_breached==='No'?'<span style="color:#1d9e75">\u2713 No</span>':'\u2014'}</div></div>
     </div>
   </div>`:''}`:''}`;
   document.getElementById('panel-foot').innerHTML=`
