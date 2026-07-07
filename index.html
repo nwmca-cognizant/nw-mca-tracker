@@ -1722,28 +1722,35 @@ function _savePrioritySet(set){
 }
 function loadPriority(){
   const set=_loadPrioritySet();
-  demands.forEach(d=>{ d.is_priority=set.has(String(d.demand_id)); });
+  demands.forEach(d=>{
+    // Use SP item ID as key for BOTT (always unique, never blank)
+    // Use demand_id for MCA (backward-compatible with existing stored flags)
+    const key=isBOTT()?String(d.id):String(d.demand_id);
+    d.is_priority=set.has(key);
+  });
 }
 function togglePriority(demandId, event){
   if(event) event.stopPropagation();
+  // demandId passed from onclick may be demand_id or id depending on context
   const d=demands.find(x=>String(x.demand_id)===String(demandId)||String(x.id)===String(demandId));
   if(!d) return;
   d.is_priority=!d.is_priority;
   const set=_loadPrioritySet();
-  if(d.is_priority) set.add(String(d.demand_id));
-  else set.delete(String(d.demand_id));
+  // Use SP item ID as storage key for BOTT, demand_id for MCA
+  const key=isBOTT()?String(d.id):String(d.demand_id);
+  if(d.is_priority) set.add(key);
+  else set.delete(key);
   _savePrioritySet(set);
   // Update all flag buttons for this demand without full re-render
-  document.querySelectorAll('.pf-btn[data-did="'+d.demand_id+'"]').forEach(btn=>{
+  // Match on both demand_id and id to handle both BOTT and MCA
+  document.querySelectorAll('.pf-btn[data-did="'+d.demand_id+'"],.pf-btn[data-spid="'+d.id+'"]').forEach(btn=>{
     btn.classList.toggle('pf-on', d.is_priority);
     btn.title=d.is_priority?'Priority — click to remove':'Mark as Priority';
   });
-  // Update sidebar badge count
   const cnt=demands.filter(x=>x.is_priority).length;
   const sbEl=document.getElementById('sb-pf');
   if(sbEl) sbEl.textContent=cnt||'—';
-  // If priority filter is active and we just un-flagged, re-render to remove row
-  if(isPriorityFilter && !d.is_priority) { renderTbl(); renderCardList(); }
+  if(isPriorityFilter && !d.is_priority){ renderTbl(); renderCardList(); }
 }
 function togglePriorityFilter(){
   isPriorityFilter=!isPriorityFilter;
@@ -1768,7 +1775,15 @@ function getFiltered(){
     if(fl&&(d.location||'').trim().toLowerCase()!==fl.toLowerCase())return false;
     if(activeAg&&d.ageing_group!==activeAg)return false;
     if(q){const h=[d.demand_id,d.skills,d.bsa,d.team_name,d.profile_name,d.service_line,d.sepm_sel,d.fg_form_number].join(' ').toLowerCase();if(!h.includes(q))return false}
-    if(activeSpecial==='noprofile'&&(d.profile_name||'').trim())return false;
+    if(activeSpecial==='noprofile'){
+      if(isBOTT()){
+        const hasName=(d.profile_name_1||'').trim()||(d.profile_name_2||'').trim();
+        const pastInitial=d.profile_status&&d.profile_status!=='1. Open'&&d.profile_status!=='1.Open';
+        if(hasName||pastInitial) return false;
+      } else {
+        if((d.profile_name||'').trim()) return false;
+      }
+    }
     if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
     if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
     if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)))return false;
@@ -1801,7 +1816,17 @@ function sortBy(f){
 function renderMetrics(){
   const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
   const ov=open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p)));
-  const noP=open.filter(d=>!d.profile_name);
+  // No Profile Yet: for BOTT check profile_name_1/2 AND profile_status not past initial stage
+  // for MCA check profile_name
+  const noP=open.filter(d=>{
+    if(isBOTT()){
+      // BOTT: has a profile if either name is set OR profile_status is past initial screening
+      const hasName=(d.profile_name_1||'').trim()||(d.profile_name_2||'').trim();
+      const pastInitial=d.profile_status&&d.profile_status!=='1. Open'&&d.profile_status!=='1.Open';
+      return !hasName&&!pastInitial;
+    }
+    return !d.profile_name;
+  });
   const closed=demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
   const bsas=new Set(open.map(d=>d.bsa)).size;
   document.getElementById('metrics').innerHTML=`
@@ -1813,7 +1838,6 @@ function renderMetrics(){
   document.getElementById('sb-open').textContent=open.length;
   document.getElementById('sb-ov').textContent=ov.length;
   document.getElementById('sb-np').textContent=noP.length;
-  // Update mobile bottom nav badge
   const sbn=document.getElementById('sb-notif');if(sbn&&notifLog.length)sbn.style.display='';
 }
 function renderAgeTabs(){
@@ -1857,7 +1881,7 @@ function renderTbl(){
       var p2sub=d.profile_2_submitted_date?'<div style="font-size:10px;color:var(--t3)">'+fmt(d.profile_2_submitted_date)+'</div>':'';
       return'<tr class="'+rowClass+'" onclick="openDetail('+d.id+')">'
         +cbCell
-        +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
+        +'<td style="text-align:center;padding:0 2px" onclick="event.stopPropagation()"><button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" data-spid="'+d.id+'" onclick="togglePriority(\''+d.id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'">&#x2691;&#xFE0E;</button></td>'
         +'<td style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;min-width:52px">'+d.demand_id+'</td>'
         +'<td>'+stB(d.demand_status)+'</td>'
         +'<td style="font-size:11px;color:var(--t2)" title="'+(d.profile_status||'')+'">'+( d.profile_status||'&#8212;')+'</td>'
@@ -1955,7 +1979,7 @@ function renderCardList(){
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:6px">'
           +'<div class="dc-badges">'+badges+'</div>'
-          +'<button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" onclick="togglePriority(\''+d.demand_id+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'" style="font-size:16px">&#x2691;&#xFE0E;</button>'
+          +'<button class="pf-btn'+(d.is_priority?' pf-on':'')+'" data-did="'+d.demand_id+'" data-spid="'+d.id+'" onclick="togglePriority(\''+(isBOTT()?d.id:d.demand_id)+'\',event)" title="'+(d.is_priority?'Priority — click to remove':'Mark as Priority')+'" style="font-size:16px">&#x2691;&#xFE0E;</button>'
         +'</div>'
       +'</div>'
       +'<div class="dc-title">'+(d.skills||'No skills specified')+'</div>'
@@ -2832,24 +2856,24 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
- 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+  'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
   'CIS':             ['srividhya.balachandran@cognizant.com'],
-  'IPA Consulting':  [],
+  'IPA Consulting':  ['Siddhartha.Singh@cognizant.com'],
   'ISG (GW)':        ['neelakantasastry.peri@cognizant.com'],
 };
 
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -2862,7 +2886,10 @@ let LEADERSHIP_RECIPIENTS = [
   // 'leader2@cognizant.com',
 ];
 async function logNotif(type,d){
-  // Check if this notification type is enabled in settings
+  // Guarantee demand_id is always displayable — never show #undefined in emails
+  if(!d.demand_id&&d.demand_id!==0){
+    d={...d, demand_id: d.id||'N/A'};
+  }
   const toggleMap={add:'t-new',cancel:'t-cancel',close:'t-close'};
   const toggleId = toggleMap[type];
   // Toggle controls general recipients (cfg.to) — SL POCs always notified
@@ -3689,8 +3716,13 @@ async function saveDemand(){
       const ns=(payload.demand_status||'').toLowerCase(),os=(prev||'').toLowerCase();
       console.log('Status change check: prev=',os,'new=',ns);
       if(ns!==os){
-        if(ns==='cancel'||ns==='cancelled') logNotif('cancel',demands[idx]);
-        else if(ns==='closed'||ns==='close') logNotif('close',demands[idx]);
+        // Build a safe notif demand object — guarantee demand_id is always present
+        const notifD={...demands[idx],
+          demand_id: demands[idx].demand_id||d?.demand_id||demands[idx].id||editId,
+          id:        demands[idx].id||editId
+        };
+        if(ns==='cancel'||ns==='cancelled') logNotif('cancel',notifD);
+        else if(ns==='closed'||ns==='close') logNotif('close',notifD);
       }
       toast('Demand #'+demands[idx].demand_id+' updated \u2713','green');
     }else{
@@ -3768,7 +3800,12 @@ async function doCancel(id){
     await sbUpd('demands','id=eq.'+id,payload);
     const idx=demands.findIndex(x=>String(x.id)===String(id));
     demands[idx]={...demands[idx],...payload};
-    if(document.getElementById('t-cancel')?.checked)logNotif('cancel',demands[idx]);
+    // Build safe notif object — guarantee demand_id is always present (never undefined)
+    const notifD={...demands[idx],
+      demand_id: demands[idx].demand_id||d?.demand_id||String(id),
+      id:        String(id)
+    };
+    if(document.getElementById('t-cancel')?.checked)logNotif('cancel',notifD);
     setSyncStatus('ok','● Live');
     toast(`Demand #${d.demand_id} cancelled`,'amber');
     renderAll();
