@@ -1778,8 +1778,10 @@ function getFiltered(){
     if(activeSpecial==='noprofile'){
       if(isBOTT()){
         const hasName=(d.profile_name_1||'').trim()||(d.profile_name_2||'').trim();
-        const pastInitial=d.profile_status&&d.profile_status!=='1. Open'&&d.profile_status!=='1.Open';
-        if(hasName||pastInitial) return false;
+        // No profile = no name AND status is still Open or Internal Screening
+        const noProfileStatus=['','1. Open','1.Open','3. Internal Screening','3.Internal Screening']
+          .includes((d.profile_status||'').trim());
+        if(hasName||!noProfileStatus) return false;
       } else {
         if((d.profile_name||'').trim()) return false;
       }
@@ -1820,10 +1822,12 @@ function renderMetrics(){
   // for MCA check profile_name
   const noP=open.filter(d=>{
     if(isBOTT()){
-      // BOTT: has a profile if either name is set OR profile_status is past initial screening
+      // BOTT: "No Profile Yet" = no profile name set AND status is still at Open or Internal Screening
+      // Internal Screening means the team is looking but no candidate has been identified/submitted
       const hasName=(d.profile_name_1||'').trim()||(d.profile_name_2||'').trim();
-      const pastInitial=d.profile_status&&d.profile_status!=='1. Open'&&d.profile_status!=='1.Open';
-      return !hasName&&!pastInitial;
+      const noProfileStatus=['','1. Open','1.Open','3. Internal Screening','3.Internal Screening']
+        .includes((d.profile_status||'').trim());
+      return !hasName&&noProfileStatus;
     }
     return !d.profile_name;
   });
@@ -2868,12 +2872,12 @@ let SL_POC_MAP={
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com','Venugopal.Muddana@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
