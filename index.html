@@ -615,7 +615,8 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <select id="f-ty" onchange="filterChanged()" class="sel-hide-mob"><option value="">All types</option><option>New</option><option>Backfill</option><option>Sell Bill</option></select>
       <div class="multi-dd" id="bsa-dd"><button class="multi-dd-btn" onclick="toggleDD('bsa-dd',event)" id="f-bsa-btn">All BSAs ▾</button><div class="multi-dd-list" id="f-bsa-list" onclick="event.stopPropagation()"></div></div>
       <div class="multi-dd sel-hide-mob" id="sl-dd"><button class="multi-dd-btn" onclick="toggleDD('sl-dd',event)" id="f-sl-btn">All SLs ▾</button><div class="multi-dd-list" id="f-sl-list" onclick="event.stopPropagation()"></div></div>
-      <select id="f-loc" onchange="filterChanged()" class="sel-hide-mob"><option value="">All locations</option><option>Offshore</option><option>Onsite</option><option>Canada</option><option>Mexico</option></select>
+      <div class="multi-dd sel-hide-mob" id="loc-dd"><button class="multi-dd-btn" onclick="toggleDD('loc-dd',event)" id="f-loc-btn">All Locations ▾</button><div class="multi-dd-list" id="f-loc-list" onclick="event.stopPropagation()"></div></div>
+      <div class="multi-dd sel-hide-mob" id="ps-dd"><button class="multi-dd-btn" onclick="toggleDD('ps-dd',event)" id="f-ps-btn">All Profiles ▾</button><div class="multi-dd-list" id="f-ps-list" onclick="event.stopPropagation()"></div></div>
       <button id="pf-filter-btn" class="pf-filter-btn" onclick="togglePriorityFilter()" title="Show only Priority demands">🚩 Priority Only</button>
       <span class="rcount-pill" id="rcount">—</span>
     </div>
@@ -1656,14 +1657,20 @@ function showAll(el){
   document.getElementById('f-st').value='';
   activeAg=''; activeSpecial=''; isPriorityFilter=false;
   const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');
+  try{clearDD('f-bsa-list','f-bsa-btn','BSAs');}catch(e){}
+  try{clearDD('f-sl-list','f-sl-btn','SLs');}catch(e){}
+  try{clearDD('f-loc-list','f-loc-btn','Locations');}catch(e){}
+  try{clearDD('f-ps-list','f-ps-btn','Profiles');}catch(e){}
   goPage('tracker',el||document.getElementById('nav-tracker'));
   renderAll();
 }
 function quickFilter(type){
   goPage('tracker',document.getElementById('nav-tracker'));
-  ['f-st','f-ty','f-loc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-st','f-ty'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   try{clearDD('f-bsa-list','f-bsa-btn','BSAs');}catch(e){}
   try{clearDD('f-sl-list','f-sl-btn','SLs');}catch(e){}
+  try{clearDD('f-loc-list','f-loc-btn','Locations');}catch(e){}
+  try{clearDD('f-ps-list','f-ps-btn','Profiles');}catch(e){}
   document.getElementById('q').value='';
   activeAg=''; activeSpecial='';
   if(type==='overdue'){document.getElementById('f-st').value='Open';activeSpecial='overdue';}
@@ -1766,15 +1773,17 @@ function getFiltered(){
   const ft=document.getElementById('f-ty').value;
   const fbArr=[...document.querySelectorAll('#f-bsa-list input[type=checkbox]:not(#f-bsa-list-all):checked')].map(x=>x.value).filter(Boolean);
   const fslArr=[...document.querySelectorAll('#f-sl-list input[type=checkbox]:not(#f-sl-list-all):checked')].map(x=>x.value).filter(Boolean);
-  const fl=document.getElementById('f-loc').value;
+  const flocArr=[...document.querySelectorAll('#f-loc-list input[type=checkbox]:not(#f-loc-list-all):checked')].map(x=>x.value).filter(Boolean);
+  const fpsArr=[...document.querySelectorAll('#f-ps-list input[type=checkbox]:not(#f-ps-list-all):checked')].map(x=>x.value).filter(Boolean);
   return demands.filter(d=>{
     if(fs&&(d.demand_status||'').toLowerCase()!==fs.toLowerCase())return false;
     if(ft&&d.demand_type!==ft)return false;
     if(fbArr.length&&!fbArr.includes(d.bsa))return false;
     if(fslArr.length&&!fslArr.includes(d.service_line))return false;
-    if(fl&&(d.location||'').trim().toLowerCase()!==fl.toLowerCase())return false;
+    if(flocArr.length&&!flocArr.map(v=>v.toLowerCase()).includes((d.location||'').trim().toLowerCase()))return false;
+    if(fpsArr.length&&!fpsArr.includes(d.profile_status||''))return false;
     if(activeAg&&d.ageing_group!==activeAg)return false;
-    if(q){const h=[d.demand_id,d.skills,d.bsa,d.team_name,d.profile_name,d.service_line,d.sepm_sel,d.fg_form_number].join(' ').toLowerCase();if(!h.includes(q))return false}
+    if(q){const h=[d.demand_id,d.skills,d.bsa,d.team_name,d.profile_name,d.profile_name_1,d.profile_name_2,d.service_line,d.sepm_sel,d.fg_form_number].join(' ').toLowerCase();if(!h.includes(q))return false}
     if(activeSpecial==='noprofile'){
       if(isBOTT()){
         const hasName=(d.profile_name_1||'').trim()||(d.profile_name_2||'').trim();
@@ -2026,6 +2035,13 @@ function renderFilterBadge(){
   // Update filter button state
   const pfBtn=document.getElementById('pf-filter-btn');
   if(pfBtn) pfBtn.classList.toggle('active', isPriorityFilter);
+  // Update dropdown button labels to reflect active selections
+  const flocArr=[...document.querySelectorAll('#f-loc-list input[type=checkbox]:not(#f-loc-list-all):checked')].map(x=>x.value).filter(Boolean);
+  const fpsArr=[...document.querySelectorAll('#f-ps-list input[type=checkbox]:not(#f-ps-list-all):checked')].map(x=>x.value).filter(Boolean);
+  const locBtn=document.getElementById('f-loc-btn');
+  if(locBtn) locBtn.textContent=flocArr.length?flocArr.length+' Location'+(flocArr.length>1?'s':'')+'  ▾':'All Locations ▾';
+  const psBtn=document.getElementById('f-ps-btn');
+  if(psBtn) psBtn.textContent=fpsArr.length?fpsArr.length+' Profile Status'+(fpsArr.length>1?'es':'')+'  ▾':'All Profiles ▾';
   const L={
     overdue:  '⚠ Showing overdue demands only (A\u2013C)',
     noprofile:'👤 Showing demands with no profile assigned',
@@ -2860,7 +2876,7 @@ let SL_POC_MAP={
   // Loaded dynamically from SP SL_POC_Config list on page load
   // Edit emails via Notifications page or directly in SharePoint SL_POC_Config list
   // Fallback entries used only if SP list is unreachable
-  'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
+ 'ADM':             ['prabhu.yogarajan@cognizant.com', 'vasudev.majji@cognizant.com','Jasna.M@cognizant.com'],
   'QEA':             ['arnab.sen4@cognizant.com', 'asoketaru.sain@cognizant.com'],
   'IDE':             ['palanivel.marimuthu@cognizant.com', 'Subramani.Gurunathan@cognizant.com'],
   'AIA':             ['suraj.rajan2@cognizant.com', 'himanshu.srivastava2@cognizant.com','mahesh.hariharanpotty@cognizant.com'],
@@ -2872,12 +2888,12 @@ let SL_POC_MAP={
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -4996,11 +5012,18 @@ function updateDDLabel(lid,bid,lbl){
   btn.textContent=ch.length===0?'All '+lbl+' ▾':ch.length===1?ch[0]+' ▾':ch.length+' selected ▾';
 }
 function populateFilters(){
-  // Always use full demands array — all BSAs must be available regardless of current filter
+  // Always use full demands array — all values must be available regardless of current filter
   const bv=[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort();
   const sv=[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort();
+  // Locations: from data + standard options to ensure all known locations appear
+  const locStd=['Offshore','Onsite','Canada','Mexico'];
+  const lv=[...new Set([...locStd,...demands.map(d=>d.location).filter(Boolean)])].sort();
+  // Profile Status: from actual data, sorted — shown for all demands (MCA and BOTT)
+  const psv=[...new Set(demands.map(d=>d.profile_status).filter(Boolean))].sort();
   buildMultiDD('f-bsa-list','f-bsa-btn',bv,'BSAs');
   buildMultiDD('f-sl-list','f-sl-btn',sv,'SLs');
+  buildMultiDD('f-loc-list','f-loc-btn',lv,'Locations');
+  buildMultiDD('f-ps-list','f-ps-btn',psv,'Profiles');
 }
 function clearDashFilters(){
   ['df-from','df-to','df-status','df-bsa','df-sl','df-loc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
