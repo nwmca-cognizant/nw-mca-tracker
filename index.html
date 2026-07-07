@@ -2872,12 +2872,12 @@ let SL_POC_MAP={
 // ══ EMAIL NOTIFICATION RECIPIENTS ══
 // Add/remove emails for each event type
 const NOTIF_CFG={
-  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
+  add:    {label:'New Demand Added',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   update: {label:'Demand Updated',          to:['Srikanth.Bura@cognizant.com']},
-  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
-  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
+  cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com,'Venugopal.Muddana@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -3059,18 +3059,24 @@ function loadNotifSettings(){
       localStorage.setItem('nwmca_notif_settings',JSON.stringify(s));
     }
     
-    // Restore recipient tags
+    // Restore recipient tags — validate emails before rendering
     if(s.recipients && s.recipients.length){
+      const validEmails=s.recipients.filter(e=>typeof e==='string'&&e.includes('@')&&e.length<200);
       const box = document.getElementById('tag-box');
       const inp = document.getElementById('tag-inp');
-      if(box && inp){
+      if(box && inp && validEmails.length){
         // Remove existing placeholder tags
         box.querySelectorAll('.rtag').forEach(t=>t.remove());
         // Add saved recipients
-        s.recipients.forEach(email=>{
+        validEmails.forEach(email=>{
           const span = document.createElement('span');
           span.className = 'rtag';
-          span.innerHTML = `${email}<span class="rx" onclick="removeTag(this)">×</span>`;
+          span.textContent = email;
+          const rx = document.createElement('span');
+          rx.className = 'rx';
+          rx.textContent = '×';
+          rx.onclick = function(){ removeTag(this); };
+          span.appendChild(rx);
           box.insertBefore(span, inp);
         });
       }
@@ -3141,7 +3147,11 @@ function loadLeadershipRecipients(){
   try{
     const raw=localStorage.getItem('nwmca_leadership_recipients');
     if(!raw) return;
-    const tags=JSON.parse(raw);
+    const parsed=JSON.parse(raw);
+    // Validate: must be an array of strings that look like email addresses
+    if(!Array.isArray(parsed)) return;
+    const tags=parsed.filter(e=>typeof e==='string'&&e.includes('@')&&e.length<200);
+    if(!tags.length) return;
     LEADERSHIP_RECIPIENTS=tags;
     const box=document.getElementById('leader-tag-box');
     const inp=document.getElementById('leader-tag-inp');
