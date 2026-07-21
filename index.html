@@ -865,7 +865,7 @@ let BSA_LIST=['Annuities','IDS','S&I','ESS','CSS','Pet Tech','PLS','ADS','EI&M',
 let SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting','ISG (GW)','Moment (Content)','Moment (Salesforce)','Moment(Contact Center)','ISG-SAP','IoT CS','ISG (OIPA)','EPS (Oracle)','EPS (IPM)','EPS','Moment (DXP)','SNBG','Consulting','ISG (EIS)','ISG GW','EPS-CRM','ISG (BFS)','Moment (Digital Learning)','ISG','ISG-GW','ISG (Group Benefits)'];
 const LOC_LIST=['Offshore','Onsite','Canada','Mexico'];
 const ST_LIST=['Open','Closed','Cancel','On Hold'];
-const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Coming up in 1 week','H) Coming up in 2 weeks','I) Not due yet'];
+const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Due Today','H) Coming up in 1 week','I) Coming up in 2 weeks','J) Not due yet'];
 // BOTT Profile Status — populated from SP column choices at runtime
 // Fallback values used until SP fetch completes (on first BOTT form open)
 let BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
@@ -1126,7 +1126,7 @@ function mapItem(item){
     }
   }
   resolveBOTT_SP(f);
-  return {
+  const mappedDemand = {
     id:                 String(item.id),            // SP internal item ID — stored as string for type-safe comparison
     demand_id:          f.Title || '',              // Title column = Demand ID
     so_id:              f.SO_ID || '',
@@ -1174,11 +1174,13 @@ function mapItem(item){
       return '';
     })(),
   };
+  return normaliseDemandAgeing(mappedDemand);
 }
 
 
 // ── Map demand object to SharePoint fields ──
 function mapFields(d){
+  d = normaliseDemandAgeing({...d});
   // Maps tracker data object to exact SharePoint field names
   // Confirmed from SP List Settings screenshot (May 2026)
   // SP Columns: Title(text), SO_ID, Demand_Status(choice), Profile_Status(choice),
@@ -1854,9 +1856,12 @@ function renderMetrics(){
   const sbn=document.getElementById('sb-notif');if(sbn&&notifLog.length)sbn.style.display='';
 }
 function renderAgeTabs(){
-  const base=getFiltered();
-  const cnt={};base.forEach(d=>{const ag=d.ageing_group||'';cnt[ag]=(cnt[ag]||0)+1});
-  const color=ag=>{if(ag.startsWith('A)')||ag.startsWith('B)')||ag.startsWith('C)'))return'red';if(ag.startsWith('D)')||ag.startsWith('E)'))return'amb';return'grn'};
+  const prevAg = activeAg;
+  activeAg = '';
+  const base = getFiltered();
+  activeAg = prevAg;
+  const cnt={};base.forEach(d=>{const ag=calcAgeingGroup(d.ageing_days)||(d.ageing_group||'');cnt[ag]=(cnt[ag]||0)+1});
+  const color=ag=>{if(ag.startsWith('A)')||ag.startsWith('B)')||ag.startsWith('C)'))return'red';if(ag.startsWith('D)')||ag.startsWith('E)'))return'amb';if(ag.startsWith('F)')||ag.startsWith('G)'))return'amb';return'grn'};
   let h=`<span class="atab ${!activeAg?'on':''}" data-ag="">All (${base.length})</span>`;
   AGS.forEach(ag=>{if(cnt[ag])h+=`<span class="atab ${color(ag)} ${activeAg===ag?'on':''}" data-ag="${ag}"><b>${ag[0]}</b>) ${ag.substring(3)} (${cnt[ag]})</span>`;});
   document.getElementById('atabs').innerHTML=h;
@@ -2010,6 +2015,7 @@ function renderCardList(){
 function filterChanged(){activeSpecial='';isPriorityFilter=false;const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');renderAll();}
 function calcAgeingGroup(days){
   if(days===null||days===undefined||isNaN(days)) return '';
+  days = Number(days);
   if(days>70)  return 'A) > 10 weeks Overdue';
   if(days>35)  return 'B) > 5 - 10 weeks Overdue';
   if(days>21)  return 'C) 3 to 5 weeks Overdue';
@@ -2021,7 +2027,47 @@ function calcAgeingGroup(days){
   if(days>=-14)return 'I) Coming up in 2 weeks';
   return 'J) Not due yet';
 }
+function calcAgeingDaysFromTarget(targetDate){
+  if(!targetDate) return null;
+  const target = new Date(String(targetDate).split('T')[0] + 'T00:00:00');
+  if(isNaN(target.getTime())) return null;
+  const today = new Date();
+  const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.floor((todayLocal - target) / (1000*60*60*24));
+}
+function normaliseDemandAgeing(d){
+  if(!d) return d;
+  const calculatedDays = calcAgeingDaysFromTarget(d.target_date);
+  if(calculatedDays !== null){
+    d.ageing_days = calculatedDays;
+    d.ageing_group = calcAgeingGroup(calculatedDays);
+  }else{
+    const days = Number(d.ageing_days);
+    if(!isNaN(days)){
+      d.ageing_days = days;
+      d.ageing_group = calcAgeingGroup(days);
+    }
+  }
+  return d;
+}
+function syncAllAgeing(){
+  if(Array.isArray(demands)) demands.forEach(normaliseDemandAgeing);
+}
+function ageingColor(ag){
+  if(ag.startsWith('A)')) return '#D32F2F';
+  if(ag.startsWith('B)')) return '#F44336';
+  if(ag.startsWith('C)')) return '#FF7043';
+  if(ag.startsWith('D)')) return '#FB8C00';
+  if(ag.startsWith('E)')) return '#FBC02D';
+  if(ag.startsWith('F)')) return '#C0CA33';
+  if(ag.startsWith('G)')) return '#FFD54F';
+  if(ag.startsWith('H)')) return '#42A5F5';
+  if(ag.startsWith('I)')) return '#5C6BC0';
+  if(ag.startsWith('J)')) return '#43A047';
+  return '#9E9E9E';
+}
 function renderAll(){
+  syncAllAgeing();
   // Ensure filters are populated before rendering
   if(demands.length && !document.getElementById('f-bsa-list')?.querySelector('input'))
     try{ populateFilters(); }catch(e){}renderMetrics();refreshDropdowns();renderAgeTabs();renderTbl();renderCardList();renderFilterBadge();updateBulkBar();}
@@ -2457,8 +2503,9 @@ function renderDash(){
   const maxBsa=bsaE[0]?.[1]||1;
   const slC={};open.forEach(d=>{if(d.service_line)slC[d.service_line]=(slC[d.service_line]||0)+1;});
   const slE=Object.entries(slC).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const agC={};open.forEach(d=>{const ag=d.ageing_group||'Unknown';agC[ag]=(agC[ag]||0)+1;});
-  const agColors=Object.keys(agC).map(ag=>{if(ag.startsWith('A)')||ag.startsWith('B)'))return'#b01c1c';if(ag.startsWith('C)'))return'#c44a00';if(ag.startsWith('D)')||ag.startsWith('E)'))return'#b86e00';if(ag.startsWith('F)')||ag.startsWith('G)'))return'#8c7800';return'#1a6640';});
+  const agC={};open.forEach(d=>{const ag=calcAgeingGroup(d.ageing_days)||(d.ageing_group||'Unknown');agC[ag]=(agC[ag]||0)+1;});
+  const agKeys=AGS.filter(ag=>agC[ag]);
+  const agColors=agKeys.map(ageingColor);
   const locC={Offshore:0,Onsite:0,Canada:0,Mexico:0};open.forEach(d=>{const l=(d.location||'').trim();if(locC[l]!==undefined)locC[l]++;});
   const locColors=['#185FA5','#5c1a7a','#7a2e1a','#6b5a1a'];
   const tyC={New:0,Backfill:0,'Sell Bill':0};open.forEach(d=>{if(tyC[d.demand_type]!==undefined)tyC[d.demand_type]++;});
@@ -2504,7 +2551,6 @@ function renderDash(){
     const tot=open.length+closed.length+cancelled.length||1;
     charts.status=new Chart(document.getElementById('ch-status'),{type:'doughnut',data:{labels:['Open','Closed','Cancelled'],datasets:[{data:[open.length,closed.length,cancelled.length],backgroundColor:['#185FA5','#1a6640','#8c1f1f'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:d=>`${d.label}: ${d.raw} (${Math.round(d.raw/tot*100)}%)`}}},cutout:'62%'}});
     document.getElementById('leg-status').innerHTML=[['#185FA5','Open',open.length],['#1a6640','Closed',closed.length],['#8c1f1f','Cancelled',cancelled.length]].map(([c,l,n])=>`<div class="leg-i"><div class="leg-dot" style="background:${c}"></div>${l}: <strong>${n}</strong></div>`).join('');
-    const agKeys=Object.keys(agC);
     charts.age=new Chart(document.getElementById('ch-age'),{type:'doughnut',data:{labels:agKeys.map(k=>k.substring(0,12)),datasets:[{data:Object.values(agC),backgroundColor:agColors,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
     document.getElementById('leg-age').innerHTML=agKeys.map((k,i)=>`<div class="leg-i"><div class="leg-dot" style="background:${agColors[i]}"></div>${k.substring(0,18)}: <strong>${agC[k]}</strong></div>`).join('');
     charts.type=new Chart(document.getElementById('ch-type'),{type:'doughnut',data:{labels:DT_LIST,datasets:[{data:DT_LIST.map(t=>tyC[t]),backgroundColor:['#4a2d8c','#7a4a00','#0d5c52'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
@@ -3650,7 +3696,7 @@ async function saveDemand(){
     demand_added_on:     added,
     target_date:         tgt,
     demand_closure_date: finalClosure,
-    ageing_group:        gv('m-ag')||calcAgeingGroup(ageingDays),
+    ageing_group:        calcAgeingGroup(ageingDays),
     backfill_resource:   bf,
     fg_form_number:      gv('m-fg'),
     // status_updates and updated_by are set conditionally below
@@ -4133,7 +4179,7 @@ async function runImport(){
           const maxId=demands.reduce((a,b)=>b.demand_id>a?b.demand_id:a,3000);
           spRow.demand_id=maxId+success+1;
         }
-        spRow.ageing_days=0;
+        normaliseDemandAgeing(spRow);
         const res=await sbIns('demands',spRow);
         const nd=Array.isArray(res)?res[0]:res;
         if(nd) demands.push(nd);
@@ -4748,7 +4794,7 @@ async function sendWeeklyReport(manual=false){
     'Critical (A-C)': open.filter(d=>['A)','B)','C)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
     'Warning (D-E)':  open.filter(d=>['D)','E)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
     'Soon (F-G)':     open.filter(d=>['F)','G)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
-    'On Track (H-I)': open.filter(d=>['H)','I)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
+    'On Track (H-J)': open.filter(d=>['H)','I)','J)'].some(p=>(d.ageing_group||'').startsWith(p))).length,
   };
 
   // SL breakdown
@@ -5062,8 +5108,8 @@ async function duplicateDemand(id){
     profile_status:    '',                              // Clear profile status
     backfill_resource: src.backfill_resource,
     overall_positions: src.overall_positions||1,
-    ageing_days:       0,
-    ageing_group:      '',
+    ageing_days:       calcAgeingDaysFromTarget(src.target_date) ?? 0,
+    ageing_group:      calcAgeingGroup(calcAgeingDaysFromTarget(src.target_date) ?? 0),
     demand_closure_date:'',
     status_updates:    `Duplicated from demand #${src.demand_id} on ${today} by ${USER_NAME}`,
   };
