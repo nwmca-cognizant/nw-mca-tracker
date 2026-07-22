@@ -571,7 +571,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>
     <div class="ni" onclick="runEmailTests()" style="color:var(--teal,#1d9e75);font-size:12px"><span class="ni-ic">📧</span><span class="ni-lbl">Email Tests</span></div>    
     <div class="nsect">Filters</div>
-    <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
+    <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–E)</span><span class="ni-badge red" id="sb-ov">—</span></div>
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
     <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
     <div class="ni" onclick="quickFilter('thisweek')"><span class="ni-ic">📅</span><span class="ni-lbl">Due This Week</span></div>
@@ -1847,7 +1847,7 @@ function renderMetrics(){
   const bsas=new Set(open.map(d=>d.bsa)).size;
   document.getElementById('metrics').innerHTML=`
     <div class="mc blue" onclick="quickFilter('open')" style="cursor:pointer"><div class="ml">Open Demands</div><div class="mv">${open.length}</div><div class="ms">${bsas} BSAs active</div><div class="mc-trend">◉</div></div>
-    <div class="mc red" onclick="quickFilter('overdue')" style="cursor:pointer"><div class="ml">Overdue A–C</div><div class="mv">${ov.length}</div><div class="ms">Needs immediate action</div><div class="mc-trend">⚠</div></div>
+    <div class="mc red" onclick="quickFilter('overdue')" style="cursor:pointer"><div class="ml">Overdue A–E</div><div class="mv">${ov.length}</div><div class="ms">Needs immediate action</div><div class="mc-trend">⚠</div></div>
     <div class="mc amber" onclick="quickFilter('noprofile')" style="cursor:pointer"><div class="ml">No Profile Yet</div><div class="mv">${noP.length}</div><div class="ms">Candidate needed</div><div class="mc-trend">👤</div></div>
     <div class="mc green"><div class="ml">Closed / Fulfilled</div><div class="mv">${closed.length}</div><div class="ms">Successfully placed</div><div class="mc-trend">✓</div></div>
     <div class="mc teal"><div class="ml">Total Records</div><div class="mv">${demands.length}</div><div class="ms">All statuses</div><div class="mc-trend">≡</div></div>`;
@@ -2140,7 +2140,7 @@ function renderBOTTDashboard(){
   const total   = demands.length;
 
   // ── Ageing ───────────────────────────────────────────────────────────────
-  const overdue = open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+  const overdue = open.filter(d=>['A)','B)','C)','D)','E)].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const warning = open.filter(d=>['D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const onTrack = open.filter(d=>['F)','G)','H)','I)','J)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
 
@@ -2511,7 +2511,7 @@ function renderDash(){
 
   document.getElementById('kpis').innerHTML=`
     <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open Demands</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue A–C</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue A–E</div></div></div>
     <div class="kpi-card"><div class="kpi-ic amber">👤</div><div><div class="kpi-v" style="color:var(--amber)">${noP}</div><div class="kpi-l">No Profile Yet</div></div></div>
     <div class="kpi-card"><div class="kpi-ic purple">💬</div><div><div class="kpi-v" style="color:var(--purple)">${atInt.length}</div><div class="kpi-l">At Interview</div></div></div>
     <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>
@@ -2558,7 +2558,7 @@ function renderDash(){
       <table class="summ-tbl">
         <tr><td>Total demands in database</td><td>${demands.length}</td><td>All statuses</td></tr>
         <tr><td>Currently open</td><td style="color:var(--blue)">${open.length}</td><td>Active pipeline</td></tr>
-        <tr><td>Overdue (A–C)</td><td style="color:var(--red)">${ov.length}</td><td style="color:var(--red)">⚠ Immediate action needed</td></tr>
+        <tr><td>Overdue (A–E)</td><td style="color:var(--red)">${ov.length}</td><td style="color:var(--red)">⚠ Immediate action needed</td></tr>
         <tr><td>Profiles submitted to NW</td><td style="color:var(--purple)">${profSub.length}</td><td>Awaiting customer decision</td></tr>
         <tr><td>At interview stage</td><td style="color:var(--amber)">${atInt.length}</td><td>Interview scheduled/completed</td></tr>
         <tr><td>Closed / Fulfilled</td><td style="color:var(--green)">${closed.length}</td><td>Successfully placed</td></tr>
@@ -3329,12 +3329,12 @@ function buildNotifEmailHTML(type, d){
     inner=hdr(`${ov.length} Overdue Demands Require Action`,'Daily overdue alert · '+new Date().toLocaleDateString(),'#7a4a00')+
     body_wrap(
       alert(`<strong>${ov.length} demands</strong> have passed their target start dates and need immediate attention.`,'#7a4a00','#fef3e2')+
-      section('⚠ CRITICAL OVERDUE DEMANDS (A–C)')+
+      section('⚠ CRITICAL OVERDUE DEMANDS (A–E)')+
       ov.slice(0,10).map(x=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid #f0f0f0;font-size:12px"><div><strong>#${x.demand_id}</strong> · ${x.bsa} · ${(x.skills||'').substring(0,30)}<div style="font-size:10px;color:#888;margin-top:1px">${x.ageing_group} · ${x.service_line}</div></div><span style="color:#8c1f1f;font-size:11px;font-weight:600">${x.ageing_group}</span></div>`).join('')+
       (ov.length>10?`<div style="font-size:11px;color:#888;padding:5px 0">+ ${ov.length-10} more</div>`:'')+
       section('PIPELINE SNAPSHOT')+
       row('Total Open',open.length)+
-      row('Overdue A–C',ov.length)+
+      row('Overdue A–E',ov.length)+
       row('Closed Today',closed.filter(x=>new Date(x.demand_closure_date||x.demand_added_on).toDateString()===new Date().toDateString()).length)+
       section('OPEN BY BSA')+
       Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([b,c])=>row(b,c)).join('')
@@ -4803,7 +4803,7 @@ async function sendWeeklyReport(manual=false){
   const open    = demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
   const closed  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
   const cancel  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='cancel');
-  const overdue = open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+  const overdue = open.filter(d=>['A)','B)','C),'D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const noProfile = open.filter(d=>!(d.profile_name||'').trim());
 
   // BSA breakdown
@@ -4886,7 +4886,7 @@ async function sendWeeklyReport(manual=false){
         </div></td>
         <td width="25%" style="padding:4px"><div style="background:#fdf0f0;border-radius:6px;padding:12px;text-align:center;border:1px solid #f5cccc">
           <div style="font-size:28px;font-weight:700;color:#8c1f1f">${overdue.length}</div>
-          <div style="font-size:11px;color:#666;margin-top:3px">Overdue (A–C)</div>
+          <div style="font-size:11px;color:#666;margin-top:3px">Overdue (A–E)</div>
         </div></td>
         <td width="25%" style="padding:4px"><div style="background:#fef8ec;border-radius:6px;padding:12px;text-align:center;border:1px solid #f5dfa0">
           <div style="font-size:28px;font-weight:700;color:#7a4a00">${noProfile.length}</div>
