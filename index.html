@@ -571,7 +571,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="ni" onclick="runDiagnostics()" style="color:var(--blue);font-size:12px"><span class="ni-ic">🔍</span><span class="ni-lbl">Run Diagnostics</span></div>
     <div class="ni" onclick="runEmailTests()" style="color:var(--teal,#1d9e75);font-size:12px"><span class="ni-ic">📧</span><span class="ni-lbl">Email Tests</span></div>    
     <div class="nsect">Filters</div>
-    <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–C)</span><span class="ni-badge red" id="sb-ov">—</span></div>
+    <div class="ni" onclick="quickFilter('overdue')"><span class="ni-ic">⚠</span><span class="ni-lbl">Overdue (A–E)</span><span class="ni-badge red" id="sb-ov">—</span></div>
     <div class="ni" onclick="quickFilter('noprofile')"><span class="ni-ic">👤</span><span class="ni-lbl">No Profile Yet</span><span class="ni-badge amber" id="sb-np">—</span></div>
     <div class="ni" onclick="quickFilter('interview')"><span class="ni-ic">💬</span><span class="ni-lbl">At Interview</span></div>
     <div class="ni" onclick="quickFilter('thisweek')"><span class="ni-ic">📅</span><span class="ni-lbl">Due This Week</span></div>
@@ -596,10 +596,10 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     </div>
     <div class="topbar-right">
       <div class="legend" id="tb-legend">
-        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>A–C Overdue</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#d4860a"></div>D–E Warning</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#c9a800"></div>F–G Soon</div>
-        <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>On track</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>A–E Overdue</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#d4860a"></div>F–G Due Soon</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#c9a800"></div>H–J On Track</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Future / Healthy</div>
       </div>
       <span class="sync-pill ok" id="sync-pill">● Live</span>
       <button class="btn ghost sm" onclick="event.stopPropagation();openImport()" id="nav-import" title="Import CSV" style="font-size:12px;padding:5px 12px;margin-right:6px">⬆ Import CSV</button>    </div>
@@ -724,7 +724,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
           <div class="tog-row"><div class="tog-info"><div class="tt">New demand added</div><div class="ts">SL POC + recipients notified on demand creation</div></div><label class="tog"><input type="checkbox" id="t-new" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Demand cancelled</div><div class="ts">SL POC + recipients notified on cancellation</div></div><label class="tog"><input type="checkbox" id="t-cancel" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Demand closed / fulfilled</div><div class="ts">SL POC + recipients notified on fulfilment</div></div><label class="tog"><input type="checkbox" id="t-close" checked><span class="tog-sl"></span></label></div>
-          <div class="tog-row"><div class="tog-info"><div class="tt">Overdue daily digest</div><div class="ts">A/B ageing demands each morning</div></div><label class="tog"><input type="checkbox" id="t-ovd" checked><span class="tog-sl"></span></label></div>
+          <div class="tog-row"><div class="tog-info"><div class="tt">Overdue daily digest</div><div class="ts">A-E ageing demands each morning</div></div><label class="tog"><input type="checkbox" id="t-ovd" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Pipeline summary</div><div class="ts">Morning snapshot email</div></div><label class="tog"><input type="checkbox" id="t-digest" checked><span class="tog-sl"></span></label></div>
           <div class="tog-row"><div class="tog-info"><div class="tt">Weekly leadership report</div><div class="ts">BSA-level summary every Monday at digest time</div></div><label class="tog"><input type="checkbox" id="t-weekly" checked><span class="tog-sl"></span></label></div>
           <div style="margin-top:12px;display:flex;gap:8px">
@@ -1598,7 +1598,7 @@ async function silentRefresh(){
     const sentToday=lastDig&&new Date(lastDig).toDateString()===now.toDateString();
     if(isWeekday&&isDigestHour&&!sentToday&&saved.triggers?.overdue!==false){
       localStorage.setItem('nwmca_daily_digest',now.toISOString());
-      const ov=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open'&&['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+      const ov=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open'&&['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
       if(ov.length>0) await logNotif('overdue',{demand_id:'DIGEST',bsa:'Multiple',service_line:'',skills:`${ov.length} critical overdue demands`,demand_status:'Open'});
     }
   }catch(e){}
@@ -1800,7 +1800,7 @@ function getFiltered(){
     }
     if(activeSpecial==='interview'&&!['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status))return false;
     if(activeSpecial==='thisweek'){if(!d.target_date)return false;const tgt=new Date(d.target_date),now=new Date(),week=new Date();week.setDate(now.getDate()+7);if(tgt<now||tgt>week)return false;}
-    if(activeSpecial==='overdue'&&!['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)))return false;
+    if(activeSpecial==='overdue'&&!['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)))return false;
     if(activeSpecial==='priority'&&!d.is_priority)return false;
     if(isPriorityFilter&&!d.is_priority)return false;
     return true;
@@ -1829,7 +1829,7 @@ function sortBy(f){
 }
 function renderMetrics(){
   const open=demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
-  const ov=open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+  const ov=open.filter(d=>['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   // No Profile Yet: for BOTT check profile_name_1/2 AND profile_status not past initial stage
   // for MCA check profile_name
   const noP=open.filter(d=>{
@@ -1847,7 +1847,7 @@ function renderMetrics(){
   const bsas=new Set(open.map(d=>d.bsa)).size;
   document.getElementById('metrics').innerHTML=`
     <div class="mc blue" onclick="quickFilter('open')" style="cursor:pointer"><div class="ml">Open Demands</div><div class="mv">${open.length}</div><div class="ms">${bsas} BSAs active</div><div class="mc-trend">◉</div></div>
-    <div class="mc red" onclick="quickFilter('overdue')" style="cursor:pointer"><div class="ml">Overdue A–C</div><div class="mv">${ov.length}</div><div class="ms">Needs immediate action</div><div class="mc-trend">⚠</div></div>
+    <div class="mc red" onclick="quickFilter('overdue')" style="cursor:pointer"><div class="ml">Overdue A–E</div><div class="mv">${ov.length}</div><div class="ms">Needs immediate action</div><div class="mc-trend">⚠</div></div>
     <div class="mc amber" onclick="quickFilter('noprofile')" style="cursor:pointer"><div class="ml">No Profile Yet</div><div class="mv">${noP.length}</div><div class="ms">Candidate needed</div><div class="mc-trend">👤</div></div>
     <div class="mc green"><div class="ml">Closed / Fulfilled</div><div class="mv">${closed.length}</div><div class="ms">Successfully placed</div><div class="mc-trend">✓</div></div>
     <div class="mc teal"><div class="ml">Total Records</div><div class="mv">${demands.length}</div><div class="ms">All statuses</div><div class="mc-trend">≡</div></div>`;
@@ -2140,7 +2140,7 @@ function renderBOTTDashboard(){
   const total   = demands.length;
 
   // ── Ageing ───────────────────────────────────────────────────────────────
-  const overdue = open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+  const overdue = open.filter(d=>['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const warning = open.filter(d=>['D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const onTrack = open.filter(d=>['F)','G)','H)','I)','J)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
 
@@ -2199,7 +2199,7 @@ function renderBOTTDashboard(){
 
     +'<div class="kpi-card"><div class="kpi-ic red">&#9888;</div><div>'
     +'<div class="kpi-v" style="color:var(--red)">'+overdue.length+'</div>'
-    +'<div class="kpi-l">Critical Overdue (A&#x2013;C)</div></div></div>'
+    +'<div class="kpi-l">Overdue (A&#x2013;E)</div></div></div>'
 
     +'<div class="kpi-card"><div class="kpi-ic" style="color:var(--amber)">&#9711;</div><div>'
     +'<div class="kpi-v" style="color:var(--amber)">'+warning.length+'</div>'
@@ -2503,7 +2503,7 @@ function renderDash(){
   const open      = flt.filter(d=>(d.demand_status||'').toLowerCase()==='open');
   const closed    = flt.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
   const cancelled = flt.filter(d=>['cancel','cancelled'].includes((d.demand_status||'').toLowerCase()));
-  const ov        = open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+  const ov        = open.filter(d=>['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const noP       = open.filter(d=>!d.profile_name).length;
   const atInt     = open.filter(d=>['4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending'].includes(d.profile_status));
   const profSub   = open.filter(d=>d.profile_status==='4.3 Profiles Submitted in Review with NW');
@@ -2511,7 +2511,7 @@ function renderDash(){
 
   document.getElementById('kpis').innerHTML=`
     <div class="kpi-card"><div class="kpi-ic blue">◉</div><div><div class="kpi-v" style="color:var(--blue)">${open.length}</div><div class="kpi-l">Open Demands</div></div></div>
-    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue A–C</div></div></div>
+    <div class="kpi-card"><div class="kpi-ic red">⚠</div><div><div class="kpi-v" style="color:var(--red)">${ov.length}</div><div class="kpi-l">Overdue A–E</div></div></div>
     <div class="kpi-card"><div class="kpi-ic amber">👤</div><div><div class="kpi-v" style="color:var(--amber)">${noP}</div><div class="kpi-l">No Profile Yet</div></div></div>
     <div class="kpi-card"><div class="kpi-ic purple">💬</div><div><div class="kpi-v" style="color:var(--purple)">${atInt.length}</div><div class="kpi-l">At Interview</div></div></div>
     <div class="kpi-card"><div class="kpi-ic green">✓</div><div><div class="kpi-v" style="color:var(--green)">${closed.length}</div><div class="kpi-l">Closed</div></div></div>
@@ -2558,7 +2558,7 @@ function renderDash(){
       <table class="summ-tbl">
         <tr><td>Total demands in database</td><td>${demands.length}</td><td>All statuses</td></tr>
         <tr><td>Currently open</td><td style="color:var(--blue)">${open.length}</td><td>Active pipeline</td></tr>
-        <tr><td>Overdue (A–C)</td><td style="color:var(--red)">${ov.length}</td><td style="color:var(--red)">⚠ Immediate action needed</td></tr>
+        <tr><td>Overdue (A–E)</td><td style="color:var(--red)">${ov.length}</td><td style="color:var(--red)">⚠ Immediate action needed</td></tr>
         <tr><td>Profiles submitted to NW</td><td style="color:var(--purple)">${profSub.length}</td><td>Awaiting customer decision</td></tr>
         <tr><td>At interview stage</td><td style="color:var(--amber)">${atInt.length}</td><td>Interview scheduled/completed</td></tr>
         <tr><td>Closed / Fulfilled</td><td style="color:var(--green)">${closed.length}</td><td>Successfully placed</td></tr>
@@ -3261,7 +3261,7 @@ function buildNotifEmailHTML(type, d){
   const body_wrap=(c)=>`<div style="padding:20px 24px">${c}</div>`;
   const alert=(msg,col,bg)=>`<div style="background:${bg};border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:${col}">${msg}</div>`;
   const open=demands.filter(x=>(x.demand_status||'').toLowerCase()==='open');
-  const ov=open.filter(x=>['A)','B)','C)'].some(p=>(x.ageing_group||'').startsWith(p)));
+  const ov=open.filter(x=>['A)','B)','C)','D)','E)'].some(p=>(x.ageing_group||'').startsWith(p)));
   const closed=demands.filter(x=>(x.demand_status||'').toLowerCase()==='closed');
   let inner='';
   if(type==='new'||type==='add'){
@@ -3329,12 +3329,12 @@ function buildNotifEmailHTML(type, d){
     inner=hdr(`${ov.length} Overdue Demands Require Action`,'Daily overdue alert · '+new Date().toLocaleDateString(),'#7a4a00')+
     body_wrap(
       alert(`<strong>${ov.length} demands</strong> have passed their target start dates and need immediate attention.`,'#7a4a00','#fef3e2')+
-      section('⚠ CRITICAL OVERDUE DEMANDS (A–C)')+
+      section('⚠ OVERDUE DEMANDS (A–E)')+
       ov.slice(0,10).map(x=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid #f0f0f0;font-size:12px"><div><strong>#${x.demand_id}</strong> · ${x.bsa} · ${(x.skills||'').substring(0,30)}<div style="font-size:10px;color:#888;margin-top:1px">${x.ageing_group} · ${x.service_line}</div></div><span style="color:#8c1f1f;font-size:11px;font-weight:600">${x.ageing_group}</span></div>`).join('')+
       (ov.length>10?`<div style="font-size:11px;color:#888;padding:5px 0">+ ${ov.length-10} more</div>`:'')+
       section('PIPELINE SNAPSHOT')+
       row('Total Open',open.length)+
-      row('Overdue A–C',ov.length)+
+      row('Overdue A–E',ov.length)+
       row('Closed Today',closed.filter(x=>new Date(x.demand_closure_date||x.demand_added_on).toDateString()===new Date().toDateString()).length)+
       section('OPEN BY BSA')+
       Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([b,c])=>row(b,c)).join('')
@@ -4803,7 +4803,7 @@ async function sendWeeklyReport(manual=false){
   const open    = demands.filter(d=>(d.demand_status||'').toLowerCase()==='open');
   const closed  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='closed');
   const cancel  = demands.filter(d=>(d.demand_status||'').toLowerCase()==='cancel');
-  const overdue = open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
+  const overdue = open.filter(d=>['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p)));
   const noProfile = open.filter(d=>!(d.profile_name||'').trim());
 
   // BSA breakdown
@@ -4812,10 +4812,10 @@ async function sendWeeklyReport(manual=false){
 
   // Ageing breakdown
   const ageMap = {
-    'Critical (A-C)': open.filter(d=>['A)','B)','C)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
-    'Warning (D-E)':  open.filter(d=>['D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
-    'Soon (F-G)':     open.filter(d=>['F)','G)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
-    'On Track (H-J)': open.filter(d=>['H)','I)','J)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
+    'Overdue (A-E)': open.filter(d=>['A)','B)','C)','D)','E)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
+    'Due Soon (F-G)':  open.filter(d=>['F)','G)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
+    'On Track (H-J)':     open.filter(d=>['H)','I)','J)'].some(p=>calcAgeingGroup(d.ageing_days).startsWith(p))).length,
+    
   };
 
   // SL breakdown
@@ -4850,7 +4850,7 @@ async function sendWeeklyReport(manual=false){
       <td style="padding:3px 0 3px 8px;font-size:11px;font-weight:700;color:${col}">${c}</td></tr>`;
   }).join('');
 
-  const ageCols = {'Critical (A-C)':'#8c1f1f','Warning (D-E)':'#d29922','Soon (F-G)':'#639922','On Track (H-I)':'#1d9e75'};
+  const ageCols = {'Overdue (A-E)':'#8c1f1f','Due Soon (F-G)':'#d29922','On Track (H-J)':'#1d9e75'};
   const ageBars = Object.entries(ageMap).map(([label,c])=>{
     const pct = Math.round((c/maxAge)*100);
     const col = ageCols[label]||'#888';
@@ -4886,7 +4886,7 @@ async function sendWeeklyReport(manual=false){
         </div></td>
         <td width="25%" style="padding:4px"><div style="background:#fdf0f0;border-radius:6px;padding:12px;text-align:center;border:1px solid #f5cccc">
           <div style="font-size:28px;font-weight:700;color:#8c1f1f">${overdue.length}</div>
-          <div style="font-size:11px;color:#666;margin-top:3px">Overdue (A–C)</div>
+          <div style="font-size:11px;color:#666;margin-top:3px">Overdue (A–E)</div>
         </div></td>
         <td width="25%" style="padding:4px"><div style="background:#fef8ec;border-radius:6px;padding:12px;text-align:center;border:1px solid #f5dfa0">
           <div style="font-size:28px;font-weight:700;color:#7a4a00">${noProfile.length}</div>
