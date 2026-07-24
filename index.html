@@ -1098,6 +1098,8 @@ const BOTT_DEMANDS_BASE=()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAM
 const BOTT_NOTIF_BASE  =()=>`https://graph.microsoft.com/v1.0/sites/${SP_HOSTNAME}:${SP_SITE_PATH}:/lists/${BOTT_NOTIF_ID}`;
 let TRACKER_MODE=localStorage.getItem('nwmca_tracker_mode')||'MCA';
 const isBOTT=()=>TRACKER_MODE==='BOTT';
+const notificationBrandTitle=()=>isBOTT()?'Cognizant · Nationwide GCC BOTT':'Cognizant · Nationwide MCA';
+const trackerReportTitle=()=>isBOTT()?'NW GCC BOTT':'NW MCA';
 
 // ── Map SharePoint item to demand object ──
 function mapItem(item){
@@ -3025,7 +3027,7 @@ async function logNotif(type,d){
     cancel: `Demand #${d.demand_id} cancelled — ${d.bsa}`,
     close:  `Demand #${d.demand_id} closed/fulfilled — ${d.bsa}`,
     digest: `${d.count||''} overdue demands require action`,
-    weekly: `NW BOTT Weekly Pipeline Report`
+    weekly: `${trackerReportTitle()} Weekly Pipeline Report`
   };
   const subs={
     add:    `${d.skills||'—'} · ${d.demand_type||'—'} · ${d.service_line||'—'}`,
@@ -3254,7 +3256,7 @@ function removeTag(el){el.parentElement.remove()}
 function buildNotifEmailHTML(type, d){
   // Shared email HTML builder — used by both preview and actual notifications
   const fmt=v=>{if(!v)return'—';try{return new Date(v).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(e){return v;}};
-  const hdr=(t,sub,col='#1a4b8c')=>`<div style="background:${col};padding:20px 24px;color:white"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-bottom:6px">Cognizant · Nationwide MCA</div><div style="font-size:20px;font-weight:700;margin-bottom:4px">${t}</div><div style="font-size:12px;opacity:.85">${sub}</div></div>`;
+  const hdr=(t,sub,col='#1a4b8c')=>`<div style="background:${col};padding:20px 24px;color:white"><div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-bottom:6px">${notificationBrandTitle()}</div><div style="font-size:20px;font-weight:700;margin-bottom:4px">${t}</div><div style="font-size:12px;opacity:.85">${sub}</div></div>`;
   const row=(l,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #f0f0f0;font-size:13px"><span style="color:#666">${l}</span><strong style="text-align:right;max-width:60%">${v||'—'}</strong></div>`;
   const section=(t)=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;padding:14px 0 6px">${t}</div>`;
   const wrap=(body)=>`<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">${body}<div style="background:#f5f5f5;padding:12px 24px;font-size:10px;color:#888;text-align:center">Automated · NW MCA Demand Tracker · Do not reply to this email · Nationwidedemands@cognizant.com</div></div>`;
@@ -4871,9 +4873,9 @@ async function sendWeeklyReport(manual=false){
   const emailBody = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;font-size:13px">
 <table width="600" cellpadding="0" cellspacing="0" style="margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0">
   <tr><td style="background:#1a4b8c;padding:20px 24px;color:white">
-    <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin-bottom:6px">Cognizant · Nationwide MCA · Weekly Report</div>
-    <div style="font-size:20px;font-weight:700;margin-bottom:4px">NW MCA Demand Pipeline</div>
-    <div style="font-size:12px;opacity:.8">Week ending ${weekEnd} · Prepared for NW MCA Leadership</div>
+    <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin-bottom:6px">${notificationBrandTitle()} · Weekly Report</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">${trackerReportTitle()} Demand Pipeline</div>
+    <div style="font-size:12px;opacity:.8">Week ending ${weekEnd} · Prepared for ${trackerReportTitle()} Leadership</div>
   </td></tr>
 
   <tr><td style="padding:16px 24px;background:#fff">
@@ -4980,7 +4982,7 @@ async function sendWeeklyReport(manual=false){
     const created = await sbIns('notifications',{
       type:        'weekly',
       demand_id:   weeklyId,
-      title:       `NW MCA Weekly Leadership Report — Week ending ${weekEnd}`,
+      title:       `${trackerReportTitle()} Weekly Leadership Report — Week ending ${weekEnd}`,
       subtitle:    `Open:${open.length}|Overdue:${overdue.length}|NoProfile:${noProfile.length}|Closed:${closed.length}`,
       triggered_by: USER_NAME,
       recipients:  recipients.join(';'),
