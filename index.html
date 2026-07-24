@@ -2131,6 +2131,9 @@ function destroyAll(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e)
 function renderBOTTDashboard(){
   syncAllAgeing();
   destroyAll();
+  // BOTT dashboard must not show MCA-only Month-on-Month Activity.
+  const momEl=document.getElementById('dash-mom');
+  if(momEl){ momEl.innerHTML=''; momEl.style.display='none'; }
   const el=document.getElementById('charts-grid'),kpiEl=document.getElementById('kpis');
   if(!el||!kpiEl) return;
   const now=new Date(),thisM=now.getMonth(),thisY=now.getFullYear();
@@ -2291,10 +2294,7 @@ function renderBOTTDashboard(){
   const psColors={'No Profile':'#bbb','Identified':'#7baee8','Screening':'#1a4b8c','Interview':'#d29922','Submitted':'#1d9e75','Closed':'#085041'};
 
   el.innerHTML=''
-    // Row 1: Demand trend + Profile pipeline
-    +'<div class="cc w3"><div class="cc-hd"><div class="cc-title">Demand Added — Monthly Trend</div><div class="cc-sub">New demands added per month (last 6 months)</div></div>'
-    +'<svg width="100%" viewBox="0 0 '+trendW+' '+(cH+24)+'" style="overflow:visible;max-height:130px;display:block;padding:8px 0">'+trendBars+trendXax+'</svg></div>'
-
+    // Row 1: BOTT-specific profile pipeline. MCA demand trend is intentionally hidden for BOTT.
     +'<div class="cc w2"><div class="cc-hd"><div class="cc-title">Profile Submission Pipeline</div><div class="cc-sub">Open demands · current status</div></div>'
     +'<div style="margin-top:8px">'
     +psE.map(([ps,c])=>'<div class="bsa-row" title="'+ps+'"><div class="bsa-name" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ps+'</div><div class="bsa-bar-bg"><div class="bsa-bar-fill" style="width:'+Math.round(c/psMx*100)+'%;background:#1d9e75"></div></div><div class="bsa-num">'+c+'</div></div>').join('')
@@ -2386,6 +2386,9 @@ function renderBOTTDashboard(){
 function renderDash(){
   syncAllAgeing();
   destroyAll();
+  // MCA dashboard owns the Month-on-Month Activity chart; re-show it if user switched from BOTT.
+  const mcaMomEl=document.getElementById('dash-mom');
+  if(mcaMomEl) mcaMomEl.style.display='';
 
   // ── Populate filter dropdowns (once) ──
   const dfBE=document.getElementById('df-bsa'),dfSE=document.getElementById('df-sl');
