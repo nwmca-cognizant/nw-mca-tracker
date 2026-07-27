@@ -183,6 +183,9 @@ select:focus{outline:none;border-color:var(--blue)}
 .atab.red.on{background:var(--red);border-color:var(--red);box-shadow:0 2px 6px rgba(140,31,31,.25)}
 .atab.amb.on{background:#b86e00;border-color:#b86e00}
 .atab.grn.on{background:var(--green);border-color:var(--green)}
+.atab.dyn.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.atab-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);padding:5px 6px 0 0}
+#filter-cat-wrap select{min-width:116px}
 
 /* Table */
 .tbl-outer{margin:10px 24px 24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:auto;flex:1;min-height:0;box-shadow:var(--sh)}
@@ -548,7 +551,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <button id="sw-mca" onclick="switchTracker('MCA')" style="flex:1;padding:5px 0;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:var(--blue);color:white">MCA</button>
       <button id="sw-bott" onclick="switchTracker('BOTT')" style="flex:1;padding:5px 0;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;background:none;color:var(--t2)">BOTT</button>
     </div>
-    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';renderAll();">
+    <div class="ni on" id="nav-tracker" onclick="goPage('tracker',this);document.getElementById('f-st').value='Open';activeAg='';activeSpecial='';activeDynField='';activeDynValue='';renderAll();">
       <span class="ni-ic">◉</span><span class="ni-lbl">Open Demands</span>
       <span class="ni-badge blue" id="sb-open">—</span>
     </div>
@@ -615,8 +618,9 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
       <select id="f-ty" onchange="filterChanged()" class="sel-hide-mob"><option value="">All types</option><option>New</option><option>Backfill</option><option>Sell Bill</option></select>
       <div class="multi-dd" id="bsa-dd"><button class="multi-dd-btn" onclick="toggleDD('bsa-dd',event)" id="f-bsa-btn">All BSAs ▾</button><div class="multi-dd-list" id="f-bsa-list" onclick="event.stopPropagation()"></div></div>
       <div class="multi-dd sel-hide-mob" id="sl-dd"><button class="multi-dd-btn" onclick="toggleDD('sl-dd',event)" id="f-sl-btn">All SLs ▾</button><div class="multi-dd-list" id="f-sl-list" onclick="event.stopPropagation()"></div></div>
-      <div class="multi-dd sel-hide-mob" id="loc-dd"><button class="multi-dd-btn" onclick="toggleDD('loc-dd',event)" id="f-loc-btn">All Locations ▾</button><div class="multi-dd-list" id="f-loc-list" onclick="event.stopPropagation()"></div></div>
-      <div class="multi-dd sel-hide-mob" id="ps-dd"><button class="multi-dd-btn" onclick="toggleDD('ps-dd',event)" id="f-ps-btn">All Profiles ▾</button><div class="multi-dd-list" id="f-ps-list" onclick="event.stopPropagation()"></div></div>
+      <div class="sel-wrap sel-hide-mob" id="filter-cat-wrap"><select id="f-filter-cat" onchange="filterCategoryChanged()" title="All Filters"><option value="ageing_group">All Filters</option><option value="service_line">SLs</option><option value="bsa">BSAs</option><option value="profile_status">Profile Status</option><option value="location">Locations</option><option value="ageing_group">Ageing Group</option></select></div>
+      <div class="multi-dd sel-hide-mob" id="loc-dd" style="display:none"><button class="multi-dd-btn" onclick="toggleDD('loc-dd',event)" id="f-loc-btn">All Locations ▾</button><div class="multi-dd-list" id="f-loc-list" onclick="event.stopPropagation()"></div></div>
+      <div class="multi-dd sel-hide-mob" id="ps-dd" style="display:none"><button class="multi-dd-btn" onclick="toggleDD('ps-dd',event)" id="f-ps-btn">All Profiles ▾</button><div class="multi-dd-list" id="f-ps-list" onclick="event.stopPropagation()"></div></div>
       <button id="pf-filter-btn" class="pf-filter-btn" onclick="togglePriorityFilter()" title="Show only Priority demands">🚩 Priority Only</button>
       <span class="rcount-pill" id="rcount">—</span>
     </div>
@@ -950,7 +954,7 @@ let tokenExpiry = 0;
 // ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
-let demands=[], sortField='ageing_days', sortDir='desc', activeAg='', activeSpecial='', editId=null, isPriorityFilter=false;
+let demands=[], sortField='ageing_days', sortDir='desc', activeAg='', activeSpecial='', editId=null, isPriorityFilter=false, activeDynField='', activeDynValue='';
 let selectedIds=new Set(), bulkMode=false;
 let charts={}, notifLog=[], currentPage='tracker';
 
@@ -1660,7 +1664,7 @@ function goPage(id,el){
 }
 function showAll(el){
   document.getElementById('f-st').value='';
-  activeAg=''; activeSpecial=''; isPriorityFilter=false;
+  activeAg=''; activeSpecial=''; activeDynField=''; activeDynValue=''; isPriorityFilter=false;
   const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');
   try{clearDD('f-bsa-list','f-bsa-btn','BSAs');}catch(e){}
   try{clearDD('f-sl-list','f-sl-btn','SLs');}catch(e){}
@@ -1768,7 +1772,7 @@ function togglePriorityFilter(){
   isPriorityFilter=!isPriorityFilter;
   const btn=document.getElementById('pf-filter-btn');
   if(btn) btn.classList.toggle('active', isPriorityFilter);
-  activeSpecial=''; activeAg='';
+  activeSpecial=''; activeAg=''; activeDynField=''; activeDynValue='';
   renderAll();
 }
 
@@ -1787,6 +1791,10 @@ function getFiltered(){
     if(fslArr.length&&!fslArr.includes(d.service_line))return false;
     if(flocArr.length&&!flocArr.map(v=>v.toLowerCase()).includes((d.location||'').trim().toLowerCase()))return false;
     if(fpsArr.length&&!fpsArr.includes(d.profile_status||''))return false;
+    if(activeDynField&&activeDynValue){
+      const dynVal=((d[activeDynField]||'').trim())||'Blank';
+      if(dynVal!==activeDynValue)return false;
+    }
     if(activeAg&&calcAgeingGroup(d.ageing_days)!==activeAg)return false;
     if(q){const h=[d.demand_id,d.skills,d.bsa,d.team_name,d.profile_name,d.profile_name_1,d.profile_name_2,d.service_line,d.sepm_sel,d.fg_form_number].join(' ').toLowerCase();if(!h.includes(q))return false}
     if(activeSpecial==='noprofile'){
@@ -1858,21 +1866,42 @@ function renderMetrics(){
   document.getElementById('sb-np').textContent=noP.length;
   const sbn=document.getElementById('sb-notif');if(sbn&&notifLog.length)sbn.style.display='';
 }
-function renderAgeTabs(){
-  const prevAg = activeAg;
-  activeAg = '';
-  const base = getFiltered();
-  activeAg = prevAg;
-  const cnt={};base.forEach(d=>{const ag=calcAgeingGroup(d.ageing_days)||(calcAgeingGroup(d.ageing_days)||'');cnt[ag]=(cnt[ag]||0)+1});
-  const color=ag=>{if(ag.startsWith('A)')||ag.startsWith('B)')||ag.startsWith('C)'))return'red';if(ag.startsWith('D)')||ag.startsWith('E)'))return'amb';if(ag.startsWith('F)')||ag.startsWith('G)'))return'amb';return'grn'};
-  let h=`<span class="atab ${!activeAg?'on':''}" data-ag="">All (${base.length})</span>`;
-  AGS.forEach(ag=>{if(cnt[ag])h+=`<span class="atab ${color(ag)} ${activeAg===ag?'on':''}" data-ag="${ag}"><b>${ag[0]}</b>) ${ag.substring(3)} (${cnt[ag]})</span>`;});
-  document.getElementById('atabs').innerHTML=h;
-  document.getElementById('atabs').querySelectorAll('.atab').forEach(el=>{
-    el.addEventListener('click',()=>setAg(el.dataset.ag||''));
-  });
+function _htmlEsc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function _tabCategory(){return document.getElementById('f-filter-cat')?.value || 'ageing_group';}
+function _filterLabel(cat){return ({service_line:'SLs',bsa:'BSAs',profile_status:'Profile Status',location:'Locations',ageing_group:'Ageing Group'}[cat]||'Ageing Group');}
+function _countBaseForTabs(){
+  const prevAg=activeAg, prevField=activeDynField, prevVal=activeDynValue;
+  activeAg=''; activeDynField=''; activeDynValue='';
+  const base=getFiltered();
+  activeAg=prevAg; activeDynField=prevField; activeDynValue=prevVal;
+  return base;
 }
-function setAg(ag){activeAg=ag;activeSpecial='';renderTbl();renderCardList();renderAgeTabs();}
+function renderAgeTabs(){
+  const cat=_tabCategory();
+  const base=_countBaseForTabs();
+  const el=document.getElementById('atabs'); if(!el)return;
+  if(cat==='ageing_group'){
+    const cnt={};base.forEach(d=>{const ag=calcAgeingGroup(d.ageing_days)||(calcAgeingGroup(d.ageing_days)||'');cnt[ag]=(cnt[ag]||0)+1});
+    const color=ag=>{if(ag.startsWith('A)')||ag.startsWith('B)')||ag.startsWith('C)'))return'red';if(ag.startsWith('D)')||ag.startsWith('E)'))return'amb';if(ag.startsWith('F)')||ag.startsWith('G)'))return'amb';return'grn'};
+    let h=`<span class="atab-label">Ageing Group</span><span class="atab ${!activeAg?'on':''}" data-ag="">All (${base.length})</span>`;
+    AGS.forEach(ag=>{if(cnt[ag])h+=`<span class="atab ${color(ag)} ${activeAg===ag?'on':''}" data-ag="${_htmlEsc(ag)}"><b>${ag[0]}</b>) ${_htmlEsc(ag.substring(3))} (${cnt[ag]})</span>`;});
+    el.innerHTML=h;
+    el.querySelectorAll('.atab').forEach(tab=>tab.addEventListener('click',()=>setAg(tab.dataset.ag||'')));
+    return;
+  }
+  const field=cat;
+  const label=_filterLabel(cat);
+  const cnt={};
+  base.forEach(d=>{const v=((d[field]||'').trim())||'Blank';cnt[v]=(cnt[v]||0)+1;});
+  const values=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||a.localeCompare(b));
+  let h=`<span class="atab-label">${_htmlEsc(label)}</span><span class="atab dyn ${!activeDynValue?'on':''}" data-val="">All ${_htmlEsc(label)} (${base.length})</span>`;
+  values.forEach(v=>{h+=`<span class="atab dyn ${activeDynValue===v?'on':''}" data-val="${_htmlEsc(v)}">${_htmlEsc(v)} (${cnt[v]})</span>`;});
+  el.innerHTML=h;
+  el.querySelectorAll('.atab').forEach(tab=>tab.addEventListener('click',()=>setDynamicTab(field,tab.dataset.val||'')));
+}
+function setAg(ag){activeAg=ag;activeDynField='';activeDynValue='';activeSpecial='';renderTbl();renderCardList();renderAgeTabs();}
+function setDynamicTab(field,val){activeAg='';activeDynField=val?field:'';activeDynValue=val;activeSpecial='';renderTbl();renderCardList();renderAgeTabs();}
+function filterCategoryChanged(){activeAg='';activeDynField='';activeDynValue='';activeSpecial='';renderTbl();renderCardList();renderAgeTabs();}
 function refreshDropdowns(){ try{ populateFilters(); }catch(e){} }
 function renderTbl(){
   const rows=getSorted(getFiltered());
@@ -2015,7 +2044,7 @@ function renderCardList(){
     +'</div>';
   }).join('');
 }
-function filterChanged(){activeSpecial='';isPriorityFilter=false;const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');renderAll();}
+function filterChanged(){activeSpecial='';isPriorityFilter=false;activeDynValue='';const b=document.getElementById('pf-filter-btn');if(b)b.classList.remove('active');refreshDropdowns();renderAll();}
 function calcAgeingGroup(days){
   if(days===null||days===undefined||isNaN(days)) return '';
   days = Number(days);
@@ -5084,14 +5113,13 @@ function updateDDLabel(lid,bid,lbl){
   btn.textContent=ch.length===0?'All '+lbl+' ▾':ch.length===1?ch[0]+' ▾':ch.length+' selected ▾';
 }
 function populateFilters(){
-  // Always use full demands array — all values must be available regardless of current filter
-  const bv=[...new Set(demands.map(d=>d.bsa).filter(Boolean))].sort();
+  const selectedSL=[...document.querySelectorAll('#f-sl-list input[type=checkbox]:not(#f-sl-list-all):checked')].map(x=>x.value).filter(Boolean);
+  const scoped=selectedSL.length?demands.filter(d=>selectedSL.includes(d.service_line)):demands;
+  const bv=[...new Set(scoped.map(d=>d.bsa).filter(Boolean))].sort();
   const sv=[...new Set(demands.map(d=>d.service_line).filter(Boolean))].sort();
-  // Locations: from data + standard options to ensure all known locations appear
   const locStd=['Offshore','Onsite','Canada','Mexico'];
-  const lv=[...new Set([...locStd,...demands.map(d=>d.location).filter(Boolean)])].sort();
-  // Profile Status: from actual data, sorted — shown for all demands (MCA and BOTT)
-  const psv=[...new Set(demands.map(d=>d.profile_status).filter(Boolean))].sort();
+  const lv=[...new Set([...locStd,...scoped.map(d=>d.location).filter(Boolean)])].sort();
+  const psv=[...new Set(scoped.map(d=>d.profile_status).filter(Boolean))].sort();
   buildMultiDD('f-bsa-list','f-bsa-btn',bv,'BSAs');
   buildMultiDD('f-sl-list','f-sl-btn',sv,'SLs');
   buildMultiDD('f-loc-list','f-loc-btn',lv,'Locations');
