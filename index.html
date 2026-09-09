@@ -863,7 +863,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 // ═══════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════
-const PS_LIST=['3. Internal Screening','4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending','4.3 Profiles Submitted in Review with NW','4.4 External Profiles selected - Cognizant onboarding pending','4.5 Profile Selected - NW Onboarding InProgress','6. NW Onboarding'];
+const PS_LIST=['3. Internal Screening','4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending','4.3 Profiles Submitted in Review with NW','4.4 External Profiles selected - Cognizant onboarding pending','4.5 Profile Selected - NW Onboarding InProgress','NW Onboarding completed'];
 const DT_LIST=['New','Backfill','Sell Bill'];
 let BSA_LIST=['Annuities','IDS','S&I','ESS','CSS','Pet Tech','PLS','ADS','EI&M','FIT','RST','Group Benefits','Life Tech','CLS','Customer Solutions','IIR','EDO','DAC','Agri Business','Tech ops','EIM'];
 let SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting','ISG (GW)','Moment (Content)','Moment (Salesforce)','Moment(Contact Center)','ISG-SAP','IoT CS','ISG (OIPA)','EPS (Oracle)','EPS (IPM)','EPS','Moment (DXP)','SNBG','Consulting','ISG (EIS)','ISG GW','EPS-CRM','ISG (BFS)','Moment (Digital Learning)','ISG','ISG-GW','ISG (Group Benefits)'];
@@ -872,7 +872,7 @@ const ST_LIST=['Open','Profile Selected','Closed','Cancel','On Hold'];
 const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Due Today','H) Coming up in 1 week','I) Coming up in 2 weeks','J) Not due yet'];
 // BOTT Profile Status — populated from SP column choices at runtime
 // Fallback values used until SP fetch completes (on first BOTT form open)
-let BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','4.5 Profile Selected - NW Onboarding InProgress','6. NW Onboarding','7. Closed'];
+let BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','4.5 Profile Selected - NW Onboarding InProgress','NW Onboarding completed','7. Closed'];
 let _bottPsLoaded=false;
 async function loadBOTTPSList(){
   if(_bottPsLoaded) return;
@@ -2564,7 +2564,7 @@ function renderDash(){
   const locColors=['#185FA5','#5c1a7a','#7a2e1a','#6b5a1a'];
   const tyC={New:0,Backfill:0,'Sell Bill':0};open.forEach(d=>{if(tyC[d.demand_type]!==undefined)tyC[d.demand_type]++;});
   const psC={};open.forEach(d=>{if(d.profile_status)psC[d.profile_status]=(psC[d.profile_status]||0)+1;});
-  const psS={'3. Internal Screening':'Internal Screening','4. Customer interview':'Customer Interview','4.1 Interview Scheduled':'Interview Scheduled','4.2 Interview Completed - Decision Pending':'Decision Pending','4.3 Profiles Submitted in Review with NW':'Submitted to NW','4.4 External Profiles selected - Cognizant onboarding pending':'Ext. Selected','6. NW Onboarding':'NW Onboarding'};
+  const psS={'3. Internal Screening':'Internal Screening','4. Customer interview':'Customer Interview','4.1 Interview Scheduled':'Interview Scheduled','4.2 Interview Completed - Decision Pending':'Decision Pending','4.3 Profiles Submitted in Review with NW':'Submitted to NW','4.4 External Profiles selected - Cognizant onboarding pending':'Ext. Selected','NW Onboarding completed':'NW Onboarding'};
   const ovdList=open.filter(d=>(d.ageing_days||0)>0).sort((a,b)=>(b.ageing_days||0)-(a.ageing_days||0)).slice(0,8);
   const t1C={};open.filter(d=>d.tier1_program).forEach(d=>{t1C[d.tier1_program]=(t1C[d.tier1_program]||0)+1;});
   const t1E=Object.entries(t1C).sort((a,b)=>b[1]-a[1]);
@@ -3552,9 +3552,9 @@ function onStatusChange(){
     if(clEl)clEl.style.borderColor='';
     if(hint)hint.innerHTML='<span style="color:var(--blue);font-weight:500">&#10003; Profile Status set to 4.5 Profile Selected &middot; NW Onboarding InProgress</span>';
   } else if(st==='closed'){
-    if(psEl){psEl.value='6. NW Onboarding';psEl.style.borderColor='var(--green)';}
+    if(psEl){psEl.value='NW Onboarding completed';psEl.style.borderColor='var(--green)';}
     if(clEl){clEl.value=today;clEl.style.borderColor='var(--green)';}
-    if(hint)hint.innerHTML='<span style="color:var(--green);font-weight:500">&#10003; Profile Status set to NW Onboarding &middot; Closure Date set to today</span>';
+    if(hint)hint.innerHTML='<span style="color:var(--green);font-weight:500">&#10003; Profile Status set to NW Onboarding completed &middot; Closure Date set to today</span>';
   } else if(st==='cancel'){
     if(clEl){clEl.value=today;clEl.style.borderColor='var(--amber)';}
     if(psEl)psEl.style.borderColor='';
@@ -3729,7 +3729,7 @@ async function saveDemand(){
   const psEl=document.getElementById('m-ps');
   const clEl=document.getElementById('m-closed');
   if(st==='closed'){
-    if(psEl)psEl.value=bott?'7. Closed':'6. NW Onboarding';
+    if(psEl)psEl.value=bott?'7. Closed':'NW Onboarding completed';
     if(clEl&&!clEl.value)clEl.value=today;
   }
   if(st==='cancel'){if(clEl&&!clEl.value)clEl.value=today;}
