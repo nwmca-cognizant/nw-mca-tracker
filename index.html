@@ -614,7 +614,7 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
     <div class="qf-bar">
       <div class="srch"><span class="srch-ic">🔍</span><input type="text" id="q" id="f-search" placeholder="Search ID, skills, BSA, team…" oninput="filterChanged()"></div>
       <div class="qf-divider"></div>
-      <select id="f-st" onchange="filterChanged()"><option value="">All statuses</option><option>Open</option><option>Closed</option><option>Cancel</option><option>On Hold</option></select>
+      <select id="f-st" onchange="filterChanged()"><option value="">All statuses</option><option>Open</option><option>Profile Selected</option><option>Closed</option><option>Cancel</option><option>On Hold</option></select>
       <select id="f-ty" onchange="filterChanged()" class="sel-hide-mob"><option value="">All types</option><option>New</option><option>Backfill</option><option>Sell Bill</option></select>
       <div class="multi-dd" id="bsa-dd"><button class="multi-dd-btn" onclick="toggleDD('bsa-dd',event)" id="f-bsa-btn">All BSAs ▾</button><div class="multi-dd-list" id="f-bsa-list" onclick="event.stopPropagation()"></div></div>
       <div class="multi-dd sel-hide-mob" id="sl-dd"><button class="multi-dd-btn" onclick="toggleDD('sl-dd',event)" id="f-sl-btn">All SLs ▾</button><div class="multi-dd-list" id="f-sl-list" onclick="event.stopPropagation()"></div></div>
@@ -863,16 +863,16 @@ input[type=checkbox].row-cb{width:15px;height:15px;cursor:pointer;accent-color:v
 // ═══════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════
-const PS_LIST=['3. Internal Screening','4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending','4.3 Profiles Submitted in Review with NW','4.4 External Profiles selected - Cognizant onboarding pending','6. NW Onboarding'];
+const PS_LIST=['3. Internal Screening','4. Customer interview','4.1 Interview Scheduled','4.2 Interview Completed - Decision Pending','4.3 Profiles Submitted in Review with NW','4.4 External Profiles selected - Cognizant onboarding pending','4.5 Profile Selected - NW Onboarding InProgress','6. NW Onboarding'];
 const DT_LIST=['New','Backfill','Sell Bill'];
 let BSA_LIST=['Annuities','IDS','S&I','ESS','CSS','Pet Tech','PLS','ADS','EI&M','FIT','RST','Group Benefits','Life Tech','CLS','Customer Solutions','IIR','EDO','DAC','Agri Business','Tech ops','EIM'];
 let SL_LIST=['QEA','IDE','AIA','ADM','Moment (BA and PO)','CIS','IPA Consulting','ISG (GW)','Moment (Content)','Moment (Salesforce)','Moment(Contact Center)','ISG-SAP','IoT CS','ISG (OIPA)','EPS (Oracle)','EPS (IPM)','EPS','Moment (DXP)','SNBG','Consulting','ISG (EIS)','ISG GW','EPS-CRM','ISG (BFS)','Moment (Digital Learning)','ISG','ISG-GW','ISG (Group Benefits)'];
 const LOC_LIST=['Offshore','Onsite','Canada','Mexico'];
-const ST_LIST=['Open','Closed','Cancel','On Hold'];
+const ST_LIST=['Open','Profile Selected','Closed','Cancel','On Hold'];
 const AGS=['A) > 10 weeks Overdue','B) > 5 - 10 weeks Overdue','C) 3 to 5 weeks Overdue','D) 2 - 3 weeks Overdue','E) 1 - 2 weeks Overdue','F) < 1 week Overdue','G) Due Today','H) Coming up in 1 week','I) Coming up in 2 weeks','J) Not due yet'];
 // BOTT Profile Status — populated from SP column choices at runtime
 // Fallback values used until SP fetch completes (on first BOTT form open)
-let BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','6. NW Onboarding','7. Closed'];
+let BOTT_PS_LIST=['1. Open','2. Profiles Identified','3. Internal Screening','4.1 Interview Scheduled','4.2 Interview Completed','4.3 Profiles Submitted','5. Offer Extended','4.5 Profile Selected - NW Onboarding InProgress','6. NW Onboarding','7. Closed'];
 let _bottPsLoaded=false;
 async function loadBOTTPSList(){
   if(_bottPsLoaded) return;
@@ -3547,7 +3547,11 @@ function onStatusChange(){
   if(!stEl)return;
   const st=stEl.value.toLowerCase();
   const today=new Date().toISOString().split('T')[0];
-  if(st==='closed'){
+  if(st==='profile selected'){
+    if(psEl){psEl.value='4.5 Profile Selected - NW Onboarding InProgress';psEl.style.borderColor='var(--blue)';}
+    if(clEl)clEl.style.borderColor='';
+    if(hint)hint.innerHTML='<span style="color:var(--blue);font-weight:500">&#10003; Profile Status set to 4.5 Profile Selected &middot; NW Onboarding InProgress</span>';
+  } else if(st==='closed'){
     if(psEl){psEl.value='6. NW Onboarding';psEl.style.borderColor='var(--green)';}
     if(clEl){clEl.value=today;clEl.style.borderColor='var(--green)';}
     if(hint)hint.innerHTML='<span style="color:var(--green);font-weight:500">&#10003; Profile Status set to NW Onboarding &middot; Closure Date set to today</span>';
@@ -3734,7 +3738,7 @@ async function saveDemand(){
   const tgtDate=tgt?new Date(tgt):null;
   const ageingDays=tgtDate?Math.floor((today2-tgtDate)/(1000*60*60*24)):0;
   const rawSt=gv('m-st')||'Open';
-  const statusMap={'open':'Open','closed':'Closed','cancel':'Cancel','on hold':'On Hold'};
+  const statusMap={'open':'Open','profile selected':'Profile Selected','closed':'Closed','cancel':'Cancel','on hold':'On Hold'};
   const normSt=statusMap[rawSt.toLowerCase()]||rawSt;
   const _p={
     demand_status:       normSt,
