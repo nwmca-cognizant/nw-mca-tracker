@@ -2993,7 +2993,7 @@ const NOTIF_CFG={
   cancel: {label:'Demand Cancelled',        to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   close:  {label:'Demand Closed/Fulfilled', to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
   weekly:  {label:'Weekly Leadership Report',to:['Srikanth.Bura@cognizant.com']},
-  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Sanjith.Alex@cognizant.com']},
+  overdue: {label:'Overdue Demands Digest',  to:['Srikanth.Bura@cognizant.com','sivasankar.balakumar@cognizant.com','Arnab.Sen4@cognizant.com','AsokeTaru.Sain@cognizant.com','Palanivel.Marimuthu@cognizant.com','Suraj.Rajan2@cognizant.com','Ramesh.Balasubramaniam@cognizant.com','Prabhu.Yogarajan@cognizant.com','Sanjith.Alex@cognizant.com']},
 };
 
 // ══ LEADERSHIP REPORT RECIPIENTS ══
@@ -3370,8 +3370,47 @@ function buildNotifEmailHTML(type, d){
       row('Total Open',open.length)+
       row('Overdue A–E',ov.length)+
       row('Closed Today',closed.filter(x=>new Date(x.demand_closure_date||x.demand_added_on).toDateString()===new Date().toDateString()).length)+
-      section('OPEN BY BSA')+
-      Object.entries(bsaMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([b,c])=>row(b,c)).join('')
+      (()=>{
+        // Open demands with Initial/Internal Screening profile status — grouped by Service Line
+        const IS_STATUSES=['','1. Open','3. Internal Screening','3.Internal Screening','Internal Screening'];
+        const screening=open.filter(d=>IS_STATUSES.some(s=>((d.profile_status||'')).trim()===s||(d.profile_name_1||'').trim()===''&&(d.profile_name||'').trim()===''&&(!d.profile_status||d.profile_status.toLowerCase().includes('screening')||d.profile_status==='1. Open')));
+        // Deduplicate and group by Service Line
+        const slMap={};
+        open.filter(d=>{
+          const ps=(d.profile_status||'').trim();
+          return IS_STATUSES.includes(ps)||ps.toLowerCase().includes('screening')||ps==='1. Open';
+        }).forEach(d=>{
+          const sl=d.service_line||'(No Service Line)';
+          if(!slMap[sl]) slMap[sl]=[];
+          slMap[sl].push(d);
+        });
+        const slEntries=Object.entries(slMap).sort((a,b)=>b[1].length-a[1].length);
+        if(!slEntries.length) return '<div style="font-size:12px;color:#888;padding:8px 0">No demands currently in Initial Screening.</div>';
+        return section('OPEN DEMANDS — INITIAL SCREENING BY SERVICE LINE')+
+          '<div style="font-size:11px;color:#888;margin:-6px 0 10px">Demands with profile status set to Initial Screening · requires candidate identification</div>'+
+          slEntries.map(([sl,items])=>
+            // Service Line header
+            `<div style="background:#f0f4ff;border-left:3px solid #1a4b8c;padding:5px 10px;margin-top:10px;margin-bottom:4px;font-size:11px;font-weight:700;color:#1a4b8c;letter-spacing:0.05em">`+
+            `${sl.toUpperCase()} <span style="font-weight:400;color:#666">(${items.length} demand${items.length>1?'s':''})</span></div>`+
+            items.map(x=>
+              // Demand row
+              `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 10px;border-bottom:0.5px solid #f0f0f0;font-size:12px">`+
+                `<div style="flex:1;min-width:0">`+
+                  `<div><strong>#${x.demand_id}</strong> &middot; <span style="color:#444">${x.bsa||'—'}</span>`+
+                  `${x.sepm_sel?` &middot; <span style="color:#666">${x.sepm_sel}</span>`:''}</div>`+
+                  `<div style="font-size:11px;color:#777;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px">${(x.skills||'—').substring(0,60)}${(x.skills||'').length>60?'…':''}</div>`+
+                  `<div style="font-size:10px;color:#aaa;margin-top:1px">`+
+                    `${x.location||''} · Target: ${x.target_date?(new Date(x.target_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})||'—'):'—'}`+
+                  `</div>`+
+                `</div>`+
+                `<div style="text-align:right;white-space:nowrap;margin-left:8px">`+
+                  `<span style="font-size:10px;color:${['A)','B)','C)'].some(p=>(x.ageing_group||'').startsWith(p))?'#8c1f1f':['D)','E)'].some(p=>(x.ageing_group||'').startsWith(p))?'#7a4a00':'#1d6640'};font-weight:600">`+
+                  `${x.ageing_group||'—'}</span>`+
+                `</div>`+
+              `</div>`
+            ).join('')
+          ).join('');
+      })()
     );
   }else{
     inner=hdr('NW MCA Notification','Automated alert from the Demand Tracker')+
