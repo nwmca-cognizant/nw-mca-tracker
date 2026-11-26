@@ -2010,7 +2010,7 @@ function renderCardList(){
         ?'<div><div class="dc-meta-label">Team</div><div class="dc-meta-item">'+d.team_name+'</div></div>'
         :'';
       var fgDiv=d.fg_form_number
-        ?'<div><div class="dc-meta-label">FG/JP ID</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--teal)">'+d.fg_form_number+'</div></div>'
+        ?'<div><div class="dc-meta-label">Vndly / JP ID</div><div class="dc-meta-item" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--teal)">'+d.fg_form_number+'</div></div>'
         :'';
       meta='<div><div class="dc-meta-label">BSA</div><div class="dc-meta-item">'+(d.bsa||'&#8212;')+'</div></div>'
           +'<div><div class="dc-meta-label">Service Line</div><div class="dc-meta-item">'+(d.service_line||'&#8212;')+'</div></div>'
@@ -3314,7 +3314,7 @@ function buildNotifEmailHTML(type, d){
       row('Demand Type',d.demand_type||'—')+
       row('Target Start Date',fmt(d.target_date))+
       row('SEPM/SEL',d.sepm_sel||'—')+
-      row('FG/JP ID',d.fg_form_number||'—')+
+      row('Vndly / JP ID',d.fg_form_number||'—')+
       row('Added by',USER_NAME)+
       `<div style="margin-top:20px;text-align:center"><a href="https://nwmca-cognizant.github.io/nw-mca-tracker/" style="background:#1a4b8c;color:white;padding:10px 24px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Open Tracker →</a></div>`
     );
@@ -3342,7 +3342,7 @@ function buildNotifEmailHTML(type, d){
       row('Skills',d.skills||'—')+
       row('Profile Selected',d.profile_name||'—')+
       row('Service Line',d.service_line||'—')+
-      row('FG/JP ID',d.fg_form_number||'—')+
+      row('Vndly / JP ID',d.fg_form_number||'—')+
       row('Closed by',USER_NAME)+
       row('Closure Date',new Date().toLocaleDateString())
     );
@@ -3457,7 +3457,7 @@ function openDetail(id){
         <div class="di"><div class="dl">SEPM / SEL</div><div class="dv">${d.sepm_sel||'—'}</div></div>
         <div class="di"><div class="dl">SO ID</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${d.so_id||'—'}</div></div>
         ${d.tier1_program?`<div class="di full"><div class="dl">Tier-1 Program</div><div class="dv" style="color:var(--purple);font-weight:600">${d.tier1_program}</div></div>`:''}
-        ${d.fg_form_number?`<div class="di"><div class="dl">FG Form / JP ID</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}
+        ${d.fg_form_number?`<div class="di"><div class="dl">Vndly / JP ID</div><div class="dv" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal)">${d.fg_form_number}</div></div>`:''}
         ${d.fieldglass_status?`<div class="di"><div class="dl">Fieldglass Status</div><div class="dv">${d.fieldglass_status}</div></div>`:''}
       </div>
     </div>
@@ -3666,7 +3666,7 @@ function makeForm(d,isNew){
     <div class="ff2 fg-full"><label>Profile Name(s)</label><input id="m-prof" value="${(d.profile_name||'').split('\n')[0].replace(/"/g,'&quot;')}" oninput="onProfileNameInput(this)"></div>
     <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
     <div class="ff2"><label>Tier-1 Program</label><input id="m-t1" value="${(d.tier1_program||'').replace(/"/g,'&quot;')}"></div>
-    <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2"><label>Vndly / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes <span style="font-size:10px;color:var(--t3);font-weight:400">(new entry only — existing history shown below)</span></label><textarea id="m-upd" placeholder="Type new note here…"></textarea></div>
     ${d.status_updates?('<div class="ff2 fg-full"><label style="color:var(--t3)">Existing History (read-only)</label><div style="font-size:11px;color:var(--t2);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;max-height:120px;overflow-y:auto;white-space:pre-wrap;line-height:1.5">'+d.status_updates.replace(/</g,'&lt;')+'</div></div>'):''}
   </div>`;
@@ -3708,7 +3708,7 @@ function makeBOTTForm(d,isNew,addedVal,tgtVal){
     <div class="ff2"><label>Profile Name 2</label><input id="m-pn2" type="text" value="${(d.profile_name_2||'').replace(/"/g,'&quot;')}" placeholder="Candidate 2" oninput="onProfileNameChange(2)"></div>
     <div class="ff2"><label>Profile 2 Submitted</label><input id="m-p2sd" type="date" value="${d.profile_2_submitted_date||''}" style="width:100%"></div>
     <div class="ff2 fg-full" id="m-bf-wrap"><label id="m-bf-label">Current Resource (Backfill)</label><input id="m-bf" value="${(d.backfill_resource||'').replace(/"/g,'&quot;')}" oninput="onBackfillInput(this)"></div>
-    <div class="ff2"><label>FG Form / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
+    <div class="ff2"><label>Vndly / JP ID</label><input id="m-fg" value="${(d.fg_form_number||'').replace(/"/g,'&quot;')}"></div>
     <div class="ff2 fg-full"><label>Status Updates / Notes <span style="font-size:10px;color:var(--t3);font-weight:400">(new entry only — existing history shown below)</span></label><textarea id="m-upd" placeholder="Type new note here…"></textarea></div>
     ${d.status_updates?('<div class="ff2 fg-full"><label style="color:var(--t3)">Existing History (read-only)</label><div style="font-size:11px;color:var(--t2);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;max-height:120px;overflow-y:auto;white-space:pre-wrap;line-height:1.5">'+d.status_updates.replace(/</g,'&lt;')+'</div></div>'):''}
   </div>`;
@@ -4139,7 +4139,7 @@ function parseImpCSV(file){
       'backfill_resource':'backfill_resource','Current Resource (Backfill)':'backfill_resource','Backfill_Resource':'backfill_resource',
       'status_updates':'status_updates','Status Updates / Notes':'status_updates','Status_Updates':'status_updates',
       'tier1_program':'tier1_program','Tier1_Program':'tier1_program',
-      'fg_form_number':'fg_form_number','FG/JP ID':'fg_form_number','FG_Form_Number':'fg_form_number',
+      'fg_form_number':'fg_form_number','Vndly / JP ID':'fg_form_number','FG_Form_Number':'fg_form_number',
       'fieldglass_status':'fieldglass_status','Fieldglass_Status':'fieldglass_status',
       'updated_by':'updated_by','Updated_By':'updated_by',
       // ── BOTT-specific fields ──────────────────────────────────────────────
@@ -5312,7 +5312,7 @@ function applyTrackerTheme(mode){
         +'<th style="width:82px" onclick="sortBy(\'target_date\')">Target'+si+'</th>'
         +'<th style="width:65px" onclick="sortBy(\'ageing_days\')">Ageing'+si+'</th>'
         +'<th style="width:95px">Profile</th>'
-        +'<th style="width:108px" onclick="sortBy(\'fg_form_number\')">FG / JP ID'+si+'</th>'
+        +'<th style="width:108px" onclick="sortBy(\'fg_form_number\')">Vndly / JP ID'+si+'</th>'
         +'<th style="width:108px">Actions</th>';
     }
   }
@@ -5359,7 +5359,7 @@ function exportCSV(){
     ageing_days:'Ageing Days',ageing_group:'Ageing Group',so_id:'SO ID',
     profile_name_1:'Profile Name 1',profile_1_submitted_date:'Profile 1 Submitted',
     profile_name_2:'Profile Name 2',profile_2_submitted_date:'Profile 2 Submitted',
-    backfill_resource:'Current Resource (Backfill)',fg_form_number:'FG/JP ID',
+    backfill_resource:'Current Resource (Backfill)',fg_form_number:'Vndly / JP ID',
     skills_category_sla:'Skill Category SLA (days)',sla_breached:'SLA Breached',
     status_updates:'Status Updates / Notes',
   }:{};
